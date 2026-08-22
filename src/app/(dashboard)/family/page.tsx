@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { Users, TreePine, MapPin, Plus, Edit, ChevronRight, CheckCircle2 } from 'lucide-react'
 import { calculateAge, genderLabel, maritalLabel, MARITAL_STATUS_LABELS, GENDER_LABELS } from '@/lib/utils'
+import MemberManageMenu from '@/components/family/MemberManageMenu'
 
 export default async function FamilyPage() {
   const session = await getServerSession(authOptions)
@@ -39,6 +40,10 @@ export default async function FamilyPage() {
   const family = user?.member?.families[0]?.family
   const members = family?.members ?? []
   const address = family?.addresses[0]
+  const viewerMemberId = user?.member?.id
+  const viewerIsKarta = members.some((m: any) => m.member.id === viewerMemberId && m.isKarta)
+  const roles: string[] = (session.user as any)?.roles ?? []
+  const canManageMembers = viewerIsKarta || roles.includes('ADMIN') || roles.includes('OPERATOR')
 
   if (!family) {
     return (
@@ -137,30 +142,37 @@ export default async function FamilyPage() {
             const age = calculateAge(member.dateOfBirth)
             const edu = member.education[0]
             return (
-              <Link key={member.id} href={`/members/${member.id}`} className="card-hover block">
-                <div className="flex items-start gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 ${
-                    member.gender === 'MALE' ? 'bg-blue-500' : member.gender === 'FEMALE' ? 'bg-pink-500' : 'bg-gray-400'
-                  }`}>
-                    {member.firstName[0]}{member.lastName?.[0] ?? ''}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <p className="font-semibold text-gray-900 text-sm truncate">
-                        {member.firstName} {member.lastName ?? ''}
-                      </p>
-                      {isKarta && <span className="badge-orange text-xs shrink-0">Karta</span>}
-                      {member.status === 'DECEASED' && <span className="badge-gray text-xs shrink-0">Deceased</span>}
+              <div key={member.id} className="relative card-hover">
+                <Link href={`/members/${member.id}`} className="block">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 ${
+                      member.gender === 'MALE' ? 'bg-blue-500' : member.gender === 'FEMALE' ? 'bg-pink-500' : 'bg-gray-400'
+                    }`}>
+                      {member.firstName[0]}{member.lastName?.[0] ?? ''}
                     </div>
-                    <div className="text-xs text-gray-500 space-y-0.5 mt-0.5">
-                      <div>{genderLabel(member.gender)} {age ? `· ${age} yrs` : ''}</div>
-                      <div>{maritalLabel(member.maritalStatus)}</div>
-                      {member.currentCity && <div className="truncate">{member.currentCity}</div>}
-                      {edu && <div className="truncate">{edu.qualification ?? edu.level}</div>}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-semibold text-gray-900 text-sm truncate">
+                          {member.firstName} {member.lastName ?? ''}
+                        </p>
+                        {isKarta && <span className="badge-orange text-xs shrink-0">Karta</span>}
+                        {member.status === 'DECEASED' && <span className="badge-gray text-xs shrink-0">Deceased</span>}
+                      </div>
+                      <div className="text-xs text-gray-500 space-y-0.5 mt-0.5">
+                        <div>{genderLabel(member.gender)} {age ? `· ${age} yrs` : ''}</div>
+                        <div>{maritalLabel(member.maritalStatus)}</div>
+                        {member.currentCity && <div className="truncate">{member.currentCity}</div>}
+                        {edu && <div className="truncate">{edu.qualification ?? edu.level}</div>}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+                {canManageMembers && !isKarta && (
+                  <div className="absolute top-3 right-3">
+                    <MemberManageMenu familyId={family.id} memberId={member.id} currentStatus={member.status} />
+                  </div>
+                )}
+              </div>
             )
           })}
           <Link href={`/family/${family.id}/members/new`}

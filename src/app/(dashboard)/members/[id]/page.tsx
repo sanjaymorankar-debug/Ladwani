@@ -9,6 +9,7 @@ import {
   Building2, Star, Users
 } from 'lucide-react'
 import { calculateAge, genderLabel, maritalLabel, formatDate, GENDER_LABELS, MARITAL_STATUS_LABELS, getInitials } from '@/lib/utils'
+import RequestToJoinFamilyForm from '@/components/family/RequestToJoinFamilyForm'
 
 export default async function MemberProfilePage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -43,6 +44,15 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
   const isOwnProfile = member.user?.id === viewerUserId
   const family = member.families[0]?.family
   const age = calculateAge(member.dateOfBirth)
+
+  const viewerMemberId = (session.user as any)?.memberId as string | null
+  let viewerAlreadyInThisFamily = true
+  if (family && viewerMemberId && !isOwnProfile) {
+    const membership = await prisma.familyMember.findFirst({
+      where: { familyId: family.id, memberId: viewerMemberId, leftAt: null },
+    })
+    viewerAlreadyInThisFamily = !!membership
+  }
 
   const genderGrad = member.gender === 'MALE' ? 'from-blue-400 to-blue-600'
     : member.gender === 'FEMALE' ? 'from-pink-400 to-pink-600'
@@ -154,6 +164,12 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
             </Link>
           )}
         </div>
+
+        {family && !isOwnProfile && !viewerAlreadyInThisFamily && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <RequestToJoinFamilyForm relatedToMemberId={member.id} relatedToName={member.firstName} />
+          </div>
+        )}
       </div>
 
       <div className="grid md:grid-cols-2 gap-5">

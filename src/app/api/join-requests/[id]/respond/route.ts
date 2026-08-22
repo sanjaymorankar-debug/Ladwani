@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { isFamilyKartaOrAdmin } from '@/lib/family-auth'
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -18,8 +19,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     include: { family: { select: { id: true, name: true } } },
   })
   if (!joinRequest) return NextResponse.json({ message: 'Join request not found' }, { status: 404 })
-  if (joinRequest.memberId !== myMemberId) {
-    return NextResponse.json({ message: 'Only the invited member can respond to this request' }, { status: 403 })
+
+  // Either the invited member responds to a Karta-initiated invite, or the
+  // family's Karta responds to a member-initiated self-service request.
+  const isInvitedMember = joinRequest.memberId === myMemberId
+  const isKarta = joinRequest.requestedBy !== session.user.id && (await isFamilyKartaOrAdmin(joinRequest.familyId, session))
+  if (!isInvitedMember && !isKarta) {
+    return NextResponse.json({ message: 'You are not authorized to respond to this request' }, { status: 403 })
   }
   if (joinRequest.status !== 'PENDING') {
     return NextResponse.json({ message: 'This request has already been responded to' }, { status: 409 })
