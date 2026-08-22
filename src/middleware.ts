@@ -15,6 +15,7 @@ export default withAuth(
     return NextResponse.next()
   },
   {
+    secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl
@@ -24,8 +25,7 @@ export default withAuth(
           pathname.startsWith('/register') ||
           pathname.startsWith('/forgot-password') ||
           pathname.startsWith('/privacy') ||
-          pathname.startsWith('/terms') ||
-          pathname.startsWith('/api/auth')
+          pathname.startsWith('/terms')
         ) return true
         return !!token
       },
@@ -34,5 +34,5 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|images|icons).*)'],
+  matcher: ['/((?!api/auth|_next/static|_next/image|favicon.ico|images|icons).*)'],
 }
