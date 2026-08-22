@@ -34,13 +34,12 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'credentials',
       credentials: {
-        email: { label: 'Email', type: 'email' },
-        mobile: { label: 'Mobile', type: 'text' },
+        identifier: { label: 'Email or Mobile', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
         if (!credentials?.password) throw new Error('Password required')
-        const identifier = credentials.email || credentials.mobile
+        const identifier = credentials?.identifier
         if (!identifier) throw new Error('Email or mobile required')
 
         const user = await prisma.user.findFirst({
