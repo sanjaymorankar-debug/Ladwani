@@ -43,8 +43,10 @@ export async function POST(req: Request) {
           email: data.email || null,
           mobile: data.mobile,
           passwordHash,
-          status: 'PENDING',
-          mobileVerified: false,
+          // OTP verification is disabled until a real SMS provider is wired in,
+          // so accounts are activated immediately at registration.
+          status: 'ACTIVE',
+          mobileVerified: true,
         },
       })
 
@@ -74,25 +76,11 @@ export async function POST(req: Request) {
         },
       })
 
-      // Create OTP token (in production: send via SMS)
-      const otp = Math.floor(100000 + Math.random() * 900000).toString()
-      const otpHash = await hash(otp, 10)
-      await tx.verificationToken.create({
-        data: {
-          userId: user.id,
-          type: 'MOBILE_VERIFY',
-          tokenHash: otpHash,
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 min
-        },
-      })
-
-      console.log(`[DEV] OTP for ${data.mobile}: ${otp}`) // remove in production
-
       return { userId: user.id, memberId: member.id }
     })
 
     return NextResponse.json({
-      message: 'Account created. OTP sent to your mobile.',
+      message: 'Account created. You can now sign in.',
       userId: result.userId,
     }, { status: 201 })
   } catch (e: any) {

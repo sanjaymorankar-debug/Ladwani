@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { Heart, Search, Filter, MapPin, GraduationCap, Briefcase } from 'lucide-react'
 import { calculateAge, genderLabel, maritalLabel, GENDER_LABELS } from '@/lib/utils'
+import SendInterestButton from '@/components/matrimony/SendInterestButton'
 
 export default async function MatrimonyPage() {
   const session = await getServerSession(authOptions)
@@ -30,6 +31,7 @@ export default async function MatrimonyPage() {
   ])
 
   const myProfile = currentMember?.member?.matrimonialProfile
+  const myMemberId = currentMember?.member?.id
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -167,9 +169,9 @@ export default async function MatrimonyPage() {
                     className="flex-1 btn-secondary text-sm text-center py-2">
                     View Profile
                   </Link>
-                  <button className="flex-1 btn-primary text-sm py-2 flex items-center justify-center gap-1">
-                    <Heart className="w-3.5 h-3.5" /> Send Interest
-                  </button>
+                  {member.id !== myMemberId && (
+                    <SendInterestButton toMemberId={member.id} />
+                  )}
                 </div>
               </div>
             )

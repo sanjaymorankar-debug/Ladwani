@@ -8,7 +8,7 @@ import { Eye, EyeOff, Loader2, CheckCircle2, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { registerSchema, type RegisterInput } from '@/lib/validators'
 
-const steps = ['Account', 'Verification', 'Complete']
+const steps = ['Account', 'Complete']
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -16,14 +16,11 @@ export default function RegisterPage() {
   const [showPwd, setShowPwd] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [otp, setOtp] = useState('')
 
-  const { register, handleSubmit, watch, getValues, formState: { errors } } = useForm<RegisterInput>({
+  const { register, handleSubmit, formState: { errors } } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
     defaultValues: { consentAccepted: true },
   })
-
-  const mobile = watch('mobile')
 
   const onSubmit = async (data: RegisterInput) => {
     setIsLoading(true)
@@ -42,27 +39,8 @@ export default function RegisterPage() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || 'Registration failed')
-      toast.success('Account created! Please verify your mobile.')
+      toast.success('Account created!')
       setStep(1)
-    } catch (e: any) {
-      toast.error(e.message)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const verifyOtp = async () => {
-    setIsLoading(true)
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile: getValues('mobile'), otp }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.message || 'Verification failed')
-      toast.success('Mobile verified successfully!')
-      setStep(2)
     } catch (e: any) {
       toast.error(e.message)
     } finally {
@@ -190,37 +168,6 @@ export default function RegisterPage() {
             )}
 
             {step === 1 && (
-              <div className="text-center py-4">
-                <div className="w-16 h-16 bg-saffron-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl">📱</span>
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">Verify Your Mobile</h2>
-                <p className="text-gray-500 text-sm mb-6">
-                  We sent a 6-digit OTP to <span className="font-medium text-gray-900">+91 {mobile}</span>
-                </p>
-                <div className="mb-4">
-                  <label className="form-label text-left">Enter OTP</label>
-                  <input
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    className="form-input text-center text-2xl tracking-widest font-mono"
-                    placeholder="• • • • • •"
-                    maxLength={6}
-                  />
-                </div>
-                <button onClick={verifyOtp} disabled={isLoading || otp.length < 6}
-                  className="w-full btn-primary py-3 flex items-center justify-center gap-2 disabled:opacity-70">
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  {isLoading ? 'Verifying...' : 'Verify OTP'}
-                </button>
-                <p className="text-xs text-gray-400 mt-4">
-                  Didn&apos;t receive OTP?{' '}
-                  <button className="text-saffron-600 font-medium">Resend in 60s</button>
-                </p>
-              </div>
-            )}
-
-            {step === 2 && (
               <div className="text-center py-4">
                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle2 className="w-10 h-10 text-green-500" />
