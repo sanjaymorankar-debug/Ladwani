@@ -22,11 +22,11 @@ export default function Topbar({ user }: TopbarProps) {
         </div>
       </div>
       <div className="flex items-center gap-3 ml-auto">
-        <Link href="/dashboard/notifications" className="relative p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+        <Link href="/notifications" className="relative p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-saffron-500 rounded-full" />
         </Link>
-        <Link href="/dashboard/profile" className="flex items-center gap-2">
+        <Link href="/profile" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-saffron-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
             {getInitials(name)}
           </div>

@@ -45,11 +45,11 @@ export default async function MatrimonyPage() {
         </div>
         <div className="flex gap-3">
           {!myProfile ? (
-            <Link href="/dashboard/matrimony/create-profile" className="btn-primary flex items-center gap-2 text-sm">
+            <Link href="/matrimony/create-profile" className="btn-primary flex items-center gap-2 text-sm">
               <Heart className="w-4 h-4" /> Create My Profile
             </Link>
           ) : (
-            <Link href="/dashboard/matrimony/my-profile" className="btn-secondary flex items-center gap-2 text-sm">
+            <Link href="/matrimony/my-profile" className="btn-secondary flex items-center gap-2 text-sm">
               <Heart className="w-4 h-4" /> {myProfile.isVisible ? 'My Profile (Visible)' : 'My Profile (Hidden)'}
             </Link>
           )}
@@ -163,7 +163,7 @@ export default async function MatrimonyPage() {
                 )}
 
                 <div className="flex gap-2">
-                  <Link href={`/dashboard/matrimony/${profile.id}`}
+                  <Link href={`/matrimony/${profile.id}`}
                     className="flex-1 btn-secondary text-sm text-center py-2">
                     View Profile
                   </Link>

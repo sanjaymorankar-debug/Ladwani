@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  Home, Users, TreePine, Heart, Bell, Search,
+  Home, Users, Heart, Bell, Search,
   Settings, LogOut, ChevronLeft, ChevronRight,
   Building2, Newspaper, UserCircle, ShieldCheck
 } from 'lucide-react'
@@ -12,14 +12,13 @@ import { cn } from '@/lib/utils'
 
 const nav = [
   { href: '/dashboard', icon: Home, label: 'Dashboard', exact: true },
-  { href: '/dashboard/family', icon: Building2, label: 'My Family' },
-  { href: '/dashboard/family/tree', icon: TreePine, label: 'Family Tree' },
-  { href: '/dashboard/members', icon: Users, label: 'Directory' },
-  { href: '/dashboard/matrimony', icon: Heart, label: 'Matrimony' },
-  { href: '/dashboard/community', icon: Newspaper, label: 'Community' },
-  { href: '/dashboard/search', icon: Search, label: 'Search' },
-  { href: '/dashboard/profile', icon: UserCircle, label: 'My Profile' },
-  { href: '/dashboard/notifications', icon: Bell, label: 'Notifications' },
+  { href: '/family', icon: Building2, label: 'My Family' },
+  { href: '/members', icon: Users, label: 'Directory' },
+  { href: '/matrimony', icon: Heart, label: 'Matrimony' },
+  { href: '/community', icon: Newspaper, label: 'Community' },
+  { href: '/search', icon: Search, label: 'Search' },
+  { href: '/profile', icon: UserCircle, label: 'My Profile' },
+  { href: '/notifications', icon: Bell, label: 'Notifications' },
 ]
 
 export default function Sidebar() {
@@ -72,7 +71,7 @@ export default function Sidebar() {
       </nav>
 
       <div className="border-t border-gray-100 p-2 space-y-0.5">
-        <Link href="/dashboard/settings" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+        <Link href="/settings" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
           <Settings className="w-5 h-5 flex-shrink-0" />
           {!collapsed && <span>Settings</span>}
         </Link>
