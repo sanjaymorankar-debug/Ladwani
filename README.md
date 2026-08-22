@@ -2,7 +2,7 @@
 
 Official digital platform for Ladwani Samaj: Family Registry, Member Directory & Matrimony.
 
-**Live URL:** https://agtci.com/ladwani
+**Live URL:** https://devmiladwani.agtci.com
 
 ## Tech Stack
 
@@ -56,7 +56,7 @@ cd apps/web
 npm run dev
 ```
 
-Visit: http://localhost:3000/ladwani
+Visit: http://localhost:3000
 
 ## Project Structure
 
@@ -68,7 +68,7 @@ miladwani/
 │       │   ├── app/       # App Router pages + API routes
 │       │   ├── components/# React components
 │       │   └── lib/       # Auth, Prisma, utils, validators
-│       ├── next.config.js # basePath: /ladwani
+│       ├── next.config.js
 │       └── Dockerfile
 ├── prisma/
 │   ├── schema.prisma      # Complete database schema (40+ models)
@@ -77,27 +77,15 @@ miladwani/
 └── .env.example
 ```
 
-## Deployment (agtci.com/ladwani)
+## Deployment (devmiladwani.agtci.com)
 
-### Nginx Configuration (add to your server block)
-
-```nginx
-location /ladwani {
-    proxy_pass http://localhost:3000;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection 'upgrade';
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_cache_bypass $http_upgrade;
-}
-```
+App is served at the root of the `devmiladwani.agtci.com` subdomain (no basePath / sub-path). If the host's reverse proxy needs an explicit vhost config, point it at the Node process root — no `location /ladwani` block is needed.
 
 ### Production Build
 
 ```bash
-npm run db:generate
-npm run build
+npm install
+npm run build   # runs "prisma generate" then "next build" (see package.json)
 npm run start
 ```
 
@@ -106,8 +94,8 @@ npm run start
 ```
 DATABASE_URL=postgresql://...
 NEXTAUTH_SECRET=<strong-random-secret>
-NEXTAUTH_URL=https://agtci.com/ladwani
-NEXT_PUBLIC_APP_URL=https://agtci.com/ladwani
+NEXTAUTH_URL=https://devmiladwani.agtci.com
+NEXT_PUBLIC_APP_URL=https://devmiladwani.agtci.com
 ```
 
 ## Default Roles

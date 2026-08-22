@@ -24,7 +24,7 @@ export default function PostCard({ post, viewerUserId }: PostCardProps) {
     setLiked(newLiked)
     setReactionCount((c: number) => newLiked ? c + 1 : c - 1)
     try {
-      await fetch(`/ladwani/api/posts/${post.id}/reactions`, {
+      await fetch(`/api/posts/${post.id}/reactions`, {
         method: newLiked ? 'POST' : 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reactionType: 'LIKE' }),
@@ -103,7 +103,7 @@ export default function PostCard({ post, viewerUserId }: PostCardProps) {
         </Link>
         <button
           onClick={() => {
-            navigator.clipboard.writeText(`${window.location.origin}/ladwani/community/${post.id}`)
+            navigator.clipboard.writeText(`${window.location.origin}/community/${post.id}`)
             toast.success('Link copied!')
           }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"

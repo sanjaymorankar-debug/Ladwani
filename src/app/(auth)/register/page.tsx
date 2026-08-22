@@ -28,7 +28,7 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterInput) => {
     setIsLoading(true)
     try {
-      const res = await fetch('/ladwani/api/auth/register', {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -54,7 +54,7 @@ export default function RegisterPage() {
   const verifyOtp = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch('/ladwani/api/auth/verify-otp', {
+      const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile: getValues('mobile'), otp }),

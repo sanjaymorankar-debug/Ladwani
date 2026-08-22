@@ -10,7 +10,7 @@ export default function MyMatrimonyProfilePage() {
   const [isToggling, setIsToggling] = useState(false)
 
   useEffect(() => {
-    fetch('/ladwani/api/matrimony/profiles/mine')
+    fetch('/api/matrimony/profiles/mine')
       .then((r) => r.json())
       .then((d) => setProfile(d.profile))
       .finally(() => setIsLoading(false))
@@ -20,7 +20,7 @@ export default function MyMatrimonyProfilePage() {
     if (!profile) return
     setIsToggling(true)
     try {
-      const res = await fetch(`/ladwani/api/matrimony/profiles/${profile.id}`, {
+      const res = await fetch(`/api/matrimony/profiles/${profile.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isVisible: !profile.isVisible }),

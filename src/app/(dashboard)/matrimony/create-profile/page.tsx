@@ -30,7 +30,7 @@ export default function CreateMatrimonyProfilePage() {
   })
 
   useEffect(() => {
-    fetch('/ladwani/api/matrimony/profiles/mine')
+    fetch('/api/matrimony/profiles/mine')
       .then((r) => r.json())
       .then((d) => {
         if (d.profile) {
@@ -68,7 +68,7 @@ export default function CreateMatrimonyProfilePage() {
       }
 
       if (existingId) {
-        const res = await fetch(`/ladwani/api/matrimony/profiles/${existingId}`, {
+        const res = await fetch(`/api/matrimony/profiles/${existingId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -77,7 +77,7 @@ export default function CreateMatrimonyProfilePage() {
         if (!res.ok) throw new Error(json.message)
         toast.success('Profile updated!')
       } else {
-        const res = await fetch('/ladwani/api/matrimony/profiles', {
+        const res = await fetch('/api/matrimony/profiles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),

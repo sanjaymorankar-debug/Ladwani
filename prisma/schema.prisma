@@ -244,7 +244,7 @@ model Member {
   mobilePrimary         String?
   mobileAlternate       String?
   email                 String?
-  profilePhotoId        String?
+  profilePhotoId        String?        @unique
   biography             String?        @db.Text
   currentCity           String?
   currentState          String?
@@ -500,7 +500,8 @@ model IncomeRange {
 model Address {
   id              String  @id @default(cuid())
   addressableType String  // family | member
-  addressableId   String
+  familyId        String?
+  memberId        String?
   addressType     String  // CURRENT, NATIVE, WORK, OTHER
   line1           String?
   line2           String?
@@ -513,8 +514,8 @@ model Address {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  family Family? @relation(fields: [addressableId], references: [id])
-  member Member? @relation(fields: [addressableId], references: [id])
+  family Family? @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  member Member? @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@map("addresses")
 }
@@ -703,18 +704,19 @@ model Comment {
 }
 
 model Reaction {
-  id              String   @id @default(cuid())
-  reactionableType String  // post | comment
-  reactionableId  String
-  userId          String
-  reactionType    String   @default("LIKE") // LIKE, LOVE, SUPPORT, CELEBRATE, CONDOLENCE
-  createdAt       DateTime @default(now())
+  id           String   @id @default(cuid())
+  postId       String?
+  commentId    String?
+  userId       String
+  reactionType String   @default("LIKE") // LIKE, LOVE, SUPPORT, CELEBRATE, CONDOLENCE
+  createdAt    DateTime @default(now())
 
   user    User     @relation(fields: [userId], references: [id])
-  post    Post?    @relation(fields: [reactionableId], references: [id])
-  comment Comment? @relation(fields: [reactionableId], references: [id])
+  post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
 
-  @@unique([reactionableType, reactionableId, userId])
+  @@unique([postId, userId])
+  @@unique([commentId, userId])
   @@map("reactions")
 }
 
@@ -743,7 +745,9 @@ model Report {
 model Photo {
   id               String   @id @default(cuid())
   ownerType        String   // member | family | post
-  ownerId          String
+  memberId         String?
+  familyId         String?
+  postId           String?
   uploadedBy       String
   storageKey       String   // S3 key (not public URL)
   thumbnailKey     String?
@@ -760,9 +764,9 @@ model Photo {
   updatedAt        DateTime @updatedAt
 
   uploader    User    @relation(fields: [uploadedBy], references: [id])
-  member      Member? @relation(fields: [ownerId], references: [id])
-  family      Family? @relation(fields: [ownerId], references: [id])
-  post        Post?   @relation(fields: [ownerId], references: [id])
+  member      Member? @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  family      Family? @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  post        Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
   profileOf   Member? @relation("ProfilePhoto")
 
   @@map("photos")

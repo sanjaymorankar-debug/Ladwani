@@ -2,8 +2,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   optimizeFonts: false,
-  basePath: '/ladwani',
-  assetPrefix: '/ladwani',
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'agtci.com' },

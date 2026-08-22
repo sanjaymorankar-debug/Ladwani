@@ -20,7 +20,7 @@ export default function SettingsPage() {
     if (newPwd.length < 8) return toast.error('Password must be at least 8 characters')
     setIsSaving(true)
     try {
-      const res = await fetch('/ladwani/api/auth/change-password', {
+      const res = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentPassword: current, newPassword: newPwd }),

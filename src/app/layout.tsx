@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_IN',
-    url: 'https://agtci.com/ladwani',
+    url: 'https://devmiladwani.agtci.com',
     siteName: 'Mi Ladwani',
   },
 }

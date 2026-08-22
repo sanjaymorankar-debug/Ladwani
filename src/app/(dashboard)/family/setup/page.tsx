@@ -42,7 +42,7 @@ export default function FamilySetupPage() {
     if (!searchQuery.trim()) return
     setIsSearching(true)
     try {
-      const res = await fetch(`/ladwani/api/families?q=${encodeURIComponent(searchQuery)}&limit=10`)
+      const res = await fetch(`/api/families?q=${encodeURIComponent(searchQuery)}&limit=10`)
       const data = await res.json()
       setSearchResults(data.families ?? [])
     } finally { setIsSearching(false) }
@@ -56,7 +56,7 @@ export default function FamilySetupPage() {
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
     try {
-      const res = await fetch('/ladwani/api/families', {
+      const res = await fetch('/api/families', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

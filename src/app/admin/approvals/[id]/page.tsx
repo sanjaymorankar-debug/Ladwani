@@ -14,7 +14,7 @@ export default function ApprovalDetailPage() {
   const [isLoading, setIsLoading] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`/ladwani/api/approvals/${params.id}`)
+    fetch(`/api/approvals/${params.id}`)
       .then((r) => r.json())
       .then(setApproval)
   }, [params.id])
@@ -22,7 +22,7 @@ export default function ApprovalDetailPage() {
   const act = async (action: string) => {
     setIsLoading(action)
     try {
-      const res = await fetch(`/ladwani/api/approvals/${params.id}`, {
+      const res = await fetch(`/api/approvals/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, note }),

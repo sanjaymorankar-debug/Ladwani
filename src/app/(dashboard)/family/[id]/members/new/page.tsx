@@ -57,8 +57,8 @@ export default function AddMemberPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/ladwani/api/relationship-types').then((r) => r.json()),
-      fetch(`/ladwani/api/families/${familyId}/members`).then((r) => r.json()),
+      fetch('/api/relationship-types').then((r) => r.json()),
+      fetch(`/api/families/${familyId}/members`).then((r) => r.json()),
     ]).then(([rels, members]) => {
       setRelTypes(rels?.types ?? [])
       setFamilyMembers(members?.members ?? [])
@@ -79,7 +79,7 @@ export default function AddMemberPage() {
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
     try {
-      const res = await fetch(`/ladwani/api/families/${familyId}/members`, {
+      const res = await fetch(`/api/families/${familyId}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

@@ -43,7 +43,7 @@ export default function EditMemberPage() {
   })
 
   useEffect(() => {
-    fetch(`/ladwani/api/members/${memberId}`)
+    fetch(`/api/members/${memberId}`)
       .then((r) => r.json())
       .then((data) => {
         reset({
@@ -74,7 +74,7 @@ export default function EditMemberPage() {
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
     try {
-      const res = await fetch(`/ladwani/api/members/${memberId}`, {
+      const res = await fetch(`/api/members/${memberId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

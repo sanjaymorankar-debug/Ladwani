@@ -10,7 +10,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   try {
     await prisma.reaction.create({
-      data: { reactionableType: 'post', reactionableId: params.id, userId: session.user.id as string, reactionType },
+      data: { postId: params.id, userId: session.user.id as string, reactionType },
     })
     return NextResponse.json({ message: 'Reacted' })
   } catch {
@@ -23,7 +23,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
   await prisma.reaction.deleteMany({
-    where: { reactionableType: 'post', reactionableId: params.id, userId: session.user.id as string },
+    where: { postId: params.id, userId: session.user.id as string },
   })
   return NextResponse.json({ message: 'Removed' })
 }

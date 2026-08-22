@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const isEmail = emailOrMobile.includes("@");
     const user = await prisma.user.findFirst({
       where: isEmail ? { email: emailOrMobile } : { mobile: emailOrMobile },
-      include: { userRoles: true, member: { select: { id: true, firstName: true, lastName: true, profilePhotoId: true } } },
+      include: { userRoles: { include: { role: true } }, member: { select: { id: true, firstName: true, lastName: true, profilePhotoId: true } } },
     });
 
     if (!user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
@@ -26,9 +26,9 @@ export async function POST(req: NextRequest) {
 
     await prisma.user.update({ where: { id: user.id }, data: { failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date() } });
 
-    const roles = user.userRoles.map((r: any) => r.roleCode as string);
+    const roles = user.userRoles.map((r: any) => r.role.code as string);
     const accessToken = generateAccessToken({ userId: user.id, email: user.email, mobile: user.mobile, roles });
-    const refreshToken = generateRefreshToken(user.id);
+    const refreshToken = generateRefreshToken({ userId: user.id });
     const crypto = await import("crypto");
     const tokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex");
     await prisma.refreshToken.create({ data: { userId: user.id, tokenHash, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) } });
