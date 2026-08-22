@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { ArrowLeft, Loader2, User, MapPin, GraduationCap, Briefcase, Users } from 'lucide-react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
+import LinkExistingMemberForm from '@/components/family/LinkExistingMemberForm'
 
 const schema = z.object({
   firstName: z.string().min(2, 'Required'),
@@ -45,6 +46,7 @@ export default function AddMemberPage() {
   const params = useParams()
   const familyId = params.id as string
 
+  const [mode, setMode] = useState<'new' | 'existing'>('new')
   const [step, setStep] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [relTypes, setRelTypes] = useState<any[]>([])
@@ -106,10 +108,26 @@ export default function AddMemberPage() {
         </Link>
         <div>
           <h1 className="text-xl font-bold text-gray-900">Add Family Member</h1>
-          <p className="text-gray-500 text-sm">Step {step + 1} of {STEPS.length}: {STEPS[step]}</p>
+          {mode === 'new' && <p className="text-gray-500 text-sm">Step {step + 1} of {STEPS.length}: {STEPS[step]}</p>}
         </div>
       </div>
 
+      {/* Mode toggle */}
+      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6">
+        <button type="button" onClick={() => setMode('new')}
+          className={`flex-1 text-sm font-medium py-2 rounded-lg transition-colors ${mode === 'new' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+          Add New Member
+        </button>
+        <button type="button" onClick={() => setMode('existing')}
+          className={`flex-1 text-sm font-medium py-2 rounded-lg transition-colors ${mode === 'existing' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+          Link Existing Member
+        </button>
+      </div>
+
+      {mode === 'existing' ? (
+        <LinkExistingMemberForm familyId={familyId} />
+      ) : (
+      <>
       {/* Progress */}
       <div className="flex gap-1 mb-6">
         {STEPS.map((s, i) => (
@@ -353,6 +371,8 @@ export default function AddMemberPage() {
           )}
         </div>
       </form>
+      </>
+      )}
     </div>
   )
 }

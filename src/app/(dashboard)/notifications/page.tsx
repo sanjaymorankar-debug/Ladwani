@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Bell, Check } from 'lucide-react'
 import { timeAgo } from '@/lib/utils'
+import JoinRequestActions from '@/components/family/JoinRequestActions'
 
 export default async function NotificationsPage() {
   const session = await getServerSession(authOptions)
@@ -13,6 +14,17 @@ export default async function NotificationsPage() {
     orderBy: { createdAt: 'desc' },
     take: 50,
   })
+
+  const joinRequestIds = notifications
+    .filter((n: any) => n.type === 'FAMILY_JOIN_REQUEST' && n.data?.joinRequestId)
+    .map((n: any) => n.data.joinRequestId as string)
+  const pendingJoinRequests = joinRequestIds.length
+    ? await prisma.familyJoinRequest.findMany({
+        where: { id: { in: joinRequestIds }, status: 'PENDING' },
+        select: { id: true },
+      })
+    : []
+  const pendingIds = new Set(pendingJoinRequests.map((r: any) => r.id))
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -46,16 +58,21 @@ export default async function NotificationsPage() {
                   n.type === 'MATRIMONIAL_INTEREST' ? 'bg-pink-100' :
                   n.type === 'APPROVAL_STATUS' ? 'bg-blue-100' :
                   n.type === 'COMMUNITY_POST' ? 'bg-green-100' :
+                  n.type === 'FAMILY_JOIN_REQUEST' ? 'bg-saffron-100' :
                   'bg-gray-100'
                 }`}>
                   {n.type === 'MATRIMONIAL_INTEREST' ? '💌' :
                    n.type === 'APPROVAL_STATUS' ? '✅' :
-                   n.type === 'COMMUNITY_POST' ? '📣' : '🔔'}
+                   n.type === 'COMMUNITY_POST' ? '📣' :
+                   n.type === 'FAMILY_JOIN_REQUEST' ? '👪' : '🔔'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 text-sm">{n.title}</p>
                   {n.body && <p className="text-gray-600 text-xs mt-0.5">{n.body}</p>}
                   <p className="text-gray-400 text-xs mt-1">{timeAgo(n.createdAt)}</p>
+                  {n.type === 'FAMILY_JOIN_REQUEST' && n.data?.joinRequestId && pendingIds.has(n.data.joinRequestId) && (
+                    <JoinRequestActions joinRequestId={n.data.joinRequestId} />
+                  )}
                 </div>
                 {!n.isRead && <div className="w-2 h-2 bg-saffron-500 rounded-full flex-shrink-0 mt-1.5" />}
               </div>

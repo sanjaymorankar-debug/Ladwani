@@ -190,6 +190,7 @@ model Family {
   familyAreas     FamilyArea[]
   userRoles       UserRole[]
   photos          Photo[]
+  joinRequests    FamilyJoinRequest[]
   karta           Member?         @relation("FamilyKarta", fields: [kartaMemberId], references: [id])
 
   @@map("families")
@@ -224,6 +225,24 @@ model FamilyMember {
 
   @@unique([familyId, memberId])
   @@map("family_members")
+}
+
+model FamilyJoinRequest {
+  id                   String    @id @default(cuid())
+  familyId             String
+  memberId             String
+  relatedToMemberId    String?   // existing family member this relationship is anchored to
+  relationshipTypeCode String
+  requestedBy          String    // userId of the karta who sent the request
+  status               String    @default("PENDING") // PENDING, APPROVED, DECLINED
+  respondedAt          DateTime?
+  createdAt            DateTime  @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, memberId, status])
+  @@map("family_join_requests")
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -270,6 +289,7 @@ model Member {
   user                  User?          @relation(fields: [userId], references: [id])
   families              FamilyMember[]
   familiesAsKarta       Family[]       @relation("FamilyKarta")
+  familyJoinRequests    FamilyJoinRequest[]
   relationshipsFrom     MemberRelationship[] @relation("RelationshipFrom")
   relationshipsTo       MemberRelationship[] @relation("RelationshipTo")
   maritalHistory        MaritalStatusHistory[]

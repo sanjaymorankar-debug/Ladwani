@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateMemberNumber } from '@/lib/utils'
+import { isFamilyKartaOrAdmin } from '@/lib/family-auth'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -28,6 +29,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // Check family exists and user has access
   const family = await prisma.family.findUnique({ where: { id: params.id } })
   if (!family) return NextResponse.json({ message: 'Family not found' }, { status: 404 })
+
+  if (!(await isFamilyKartaOrAdmin(params.id, session))) {
+    return NextResponse.json({ message: 'Only the family Karta can add members' }, { status: 403 })
+  }
 
   const result = await prisma.$transaction(async (tx: any) => {
     // Create member
