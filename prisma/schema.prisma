@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -530,7 +530,7 @@ model MatrimonialProfile {
   isVisible  Boolean @default(false)
   about      String? @db.Text
   heightCm   Int?
-  languages  String[]
+  languages  Json?   // string[] stored as JSON (MySQL has no native array type)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   createdBy  String?
@@ -547,11 +547,11 @@ model MatrimonialPreference {
   minAge               Int?
   maxAge               Int?
   preferredGender      Gender?
-  preferredLocations   String[]
+  preferredLocations   Json?   // string[] stored as JSON (MySQL has no native array type)
   educationPreference  String?
   occupationPreference String?
   incomeRangeId        String?
-  maritalStatusPref    MaritalStatus[]
+  maritalStatusPref    Json?   // MaritalStatus[] stored as JSON (MySQL has no native array type)
   otherPreferences     Json?
   updatedAt            DateTime @updatedAt
 

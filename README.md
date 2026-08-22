@@ -7,7 +7,7 @@ Official digital platform for Ladwani Samaj: Family Registry, Member Directory &
 ## Tech Stack
 
 - **Frontend/Backend:** Next.js 14 (App Router + Server Actions + API Routes)
-- **Database:** PostgreSQL 16 + Prisma ORM
+- **Database:** MySQL 8 + Prisma ORM
 - **Auth:** NextAuth.js v4 (JWT strategy)
 - **Styling:** Tailwind CSS
 - **File Storage:** S3-compatible (MinIO for dev, AWS S3 or Cloudflare R2 for prod)
@@ -38,7 +38,7 @@ cp .env.example .env
 ### 4. Start Database (Docker)
 
 ```bash
-docker compose up postgres redis minio -d
+docker compose up mysql redis minio -d
 ```
 
 ### 5. Database Setup
@@ -92,7 +92,7 @@ npm run start
 ### Environment Variables for Production
 
 ```
-DATABASE_URL=postgresql://...
+DATABASE_URL=mysql://user:password@host:3306/dbname
 NEXTAUTH_SECRET=<strong-random-secret>
 NEXTAUTH_URL=https://devmiladwani.agtci.com
 NEXT_PUBLIC_APP_URL=https://devmiladwani.agtci.com
