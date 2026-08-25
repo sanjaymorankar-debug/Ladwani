@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from '../lib/auth-context'
+import { api } from '../lib/api-client'
 
 export function Shell({ children }: { children: ReactNode }) {
   return <div className="shell">{children}</div>
@@ -12,6 +13,15 @@ export function Shell({ children }: { children: ReactNode }) {
 export function TopBar() {
   const { user, logout } = useAuth()
   const router = useRouter()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    if (!user) return
+    api
+      .get<unknown[]>('/notifications?unread=true')
+      .then((rows) => setUnreadCount(rows.length))
+      .catch(() => undefined)
+  }, [user])
 
   async function handleLogout() {
     await logout()
@@ -26,8 +36,21 @@ export function TopBar() {
       {user && (
         <nav>
           <Link href="/dashboard">Dashboard</Link>
+          <Link href="/community">Feed</Link>
+          <Link href="/matrimony">Matrimony</Link>
           <Link href="/members/search">Directory</Link>
           <Link href="/approvals">Approvals</Link>
+          <Link href="/notifications" style={{ position: 'relative' }}>
+            Notifications
+            {unreadCount > 0 && (
+              <span
+                className="pill pill-danger"
+                style={{ position: 'absolute', top: -10, right: -18, padding: '0 6px', fontSize: 10, lineHeight: '16px' }}
+              >
+                {unreadCount}
+              </span>
+            )}
+          </Link>
           <button className="btn btn-outline" onClick={handleLogout} style={{ padding: '4px 12px' }}>
             Log out
           </button>

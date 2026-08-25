@@ -46,6 +46,8 @@ model User {
   refreshTokens      RefreshToken[]
   verificationTokens VerificationToken[]
   consentRecords     ConsentRecord[]
+  notificationsReceived Notification[] @relation("NotificationRecipient")
+  notificationsSent     Notification[] @relation("NotificationSender")
 
   @@map("users")
 }
@@ -212,6 +214,18 @@ model Member {
   addresses           Address[]
   memberAreas         MemberArea[]
 
+  matrimonyProfile           MatrimonyProfile?
+  matrimonyInterestsSent     MatrimonyInterest[] @relation("MatrimonyInterestFrom")
+  matrimonyInterestsReceived MatrimonyInterest[] @relation("MatrimonyInterestTo")
+  matrimonySavesMade         MatrimonySave[]     @relation("MatrimonySaveOwner")
+  matrimonySavedBy           MatrimonySave[]     @relation("MatrimonySaveTarget")
+
+  posts          Post[]
+  comments       Comment[]
+  reactions      Reaction[]
+  reportsFiled   Report[] @relation("ReporterMember")
+  reportsAgainst Report[] @relation("ReportedMember")
+
   @@map("members")
 }
 
@@ -349,6 +363,7 @@ model Area {
   userRoles   UserRole[]
   memberAreas MemberArea[]
   familyAreas FamilyArea[]
+  posts       Post[]
 
   @@map("areas")
 }
@@ -424,4 +439,189 @@ model Approval {
   reviewNote  String?   @map("review_note") @db.Text
 
   @@map("approvals")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// D. MATRIMONY
+// ─────────────────────────────────────────────────────────────────
+
+model MatrimonyProfile {
+  id                   String    @id @default(cuid())
+  memberId             String    @unique @map("member_id")
+  isVisible            Boolean   @default(false) @map("is_visible")
+  about                String?   @db.Text
+  heightCm             Int?      @map("height_cm")
+  languages            Json?
+  allowContactRequests Boolean   @default(true) @map("allow_contact_requests")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  member     Member                @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  preference MatrimonyPreference?
+
+  @@map("matrimonial_profiles")
+}
+
+model MatrimonyPreference {
+  id                   String  @id @default(cuid())
+  matrimonyProfileId   String  @unique @map("matrimonial_profile_id")
+  minAge               Int?    @map("min_age")
+  maxAge               Int?    @map("max_age")
+  preferredGender      String? @map("preferred_gender")
+  preferredLocations   Json?   @map("preferred_locations")
+  educationPreference  String? @map("education_preference")
+  occupationPreference String? @map("occupation_preference")
+
+  profile MatrimonyProfile @relation(fields: [matrimonyProfileId], references: [id], onDelete: Cascade)
+
+  @@map("matrimonial_preferences")
+}
+
+model MatrimonyInterest {
+  id           String    @id @default(cuid())
+  fromMemberId String    @map("from_member_id")
+  toMemberId   String    @map("to_member_id")
+  kind         String    @default("INTEREST")
+  message      String?   @db.Text
+  status       String    @default("PENDING")
+  respondedAt  DateTime? @map("responded_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  fromMember Member @relation("MatrimonyInterestFrom", fields: [fromMemberId], references: [id], onDelete: Cascade)
+  toMember   Member @relation("MatrimonyInterestTo", fields: [toMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([fromMemberId, toMemberId, kind])
+  @@map("matrimonial_interests")
+}
+
+model MatrimonySave {
+  id            String   @id @default(cuid())
+  memberId      String   @map("member_id")
+  savedMemberId String   @map("saved_member_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  member      Member @relation("MatrimonySaveOwner", fields: [memberId], references: [id], onDelete: Cascade)
+  savedMember Member @relation("MatrimonySaveTarget", fields: [savedMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, savedMemberId])
+  @@map("matrimonial_saves")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// E. COMMUNITY SOCIAL NETWORK
+// ─────────────────────────────────────────────────────────────────
+
+model PostType {
+  id               String  @id @default(cuid())
+  code             String  @unique
+  label            String
+  icon             String?
+  requiresApproval Boolean @default(false) @map("requires_approval")
+  isActive         Boolean @default(true) @map("is_active")
+
+  posts Post[]
+
+  @@map("post_types")
+}
+
+model Post {
+  id           String    @id @default(cuid())
+  authorId     String    @map("author_id")
+  postTypeId   String    @map("post_type_id")
+  title        String?
+  content      String    @db.Text
+  targetAreaId String?   @map("target_area_id")
+  status       String    @default("PUBLISHED")
+  isPinned     Boolean   @default(false) @map("is_pinned")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  author     Member     @relation(fields: [authorId], references: [id])
+  postType   PostType   @relation(fields: [postTypeId], references: [id])
+  targetArea Area?      @relation(fields: [targetAreaId], references: [id])
+  comments   Comment[]
+  reactions  Reaction[]
+  reports    Report[]
+
+  @@map("posts")
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  postId    String    @map("post_id")
+  authorId  String    @map("author_id")
+  parentId  String?   @map("parent_id")
+  content   String    @db.Text
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  post      Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    Member     @relation(fields: [authorId], references: [id])
+  parent    Comment?   @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[]  @relation("CommentReplies")
+  reactions Reaction[]
+  reports   Report[]
+
+  @@map("comments")
+}
+
+model Reaction {
+  id        String   @id @default(cuid())
+  postId    String?  @map("post_id")
+  commentId String?  @map("comment_id")
+  memberId  String   @map("member_id")
+  type      String   @default("LIKE")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  member  Member   @relation(fields: [memberId], references: [id])
+
+  @@unique([postId, memberId])
+  @@unique([commentId, memberId])
+  @@map("reactions")
+}
+
+model Report {
+  id         String    @id @default(cuid())
+  postId     String?   @map("post_id")
+  commentId  String?   @map("comment_id")
+  memberId   String?   @map("member_id")
+  reporterId String    @map("reporter_id")
+  reason     String    @db.Text
+  status     String    @default("PENDING")
+  resolvedBy String?   @map("resolved_by")
+  resolvedAt DateTime? @map("resolved_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  post           Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment        Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reportedMember Member?  @relation("ReportedMember", fields: [memberId], references: [id])
+  reporter       Member   @relation("ReporterMember", fields: [reporterId], references: [id])
+
+  @@map("reports")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// I. NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────────
+
+model Notification {
+  id          String   @id @default(cuid())
+  recipientId String   @map("recipient_id")
+  senderId    String?  @map("sender_id")
+  type        String
+  title       String
+  body        String   @db.Text
+  data        Json?
+  isRead      Boolean  @default(false) @map("is_read")
+  emailSent   Boolean  @default(false) @map("email_sent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  recipient User  @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender    User? @relation("NotificationSender", fields: [senderId], references: [id])
+
+  @@map("notifications")
 }

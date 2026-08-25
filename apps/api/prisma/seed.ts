@@ -46,6 +46,15 @@ const APPROVAL_RULES = [
   { actionCode: 'member.edit_own', requiresApproval: false },
 ]
 
+// docs/06-database-schema.md §E — a starter catalog; Admin can add more later
+const POST_TYPES = [
+  { code: 'GENERAL', label: 'General', icon: 'message-circle', requiresApproval: false },
+  { code: 'ANNOUNCEMENT', label: 'Announcement', icon: 'megaphone', requiresApproval: true },
+  { code: 'EVENT', label: 'Event', icon: 'calendar', requiresApproval: false },
+  { code: 'HELP_REQUEST', label: 'Help Request', icon: 'life-buoy', requiresApproval: false },
+  { code: 'CONDOLENCE', label: 'Condolence', icon: 'flower', requiresApproval: false },
+]
+
 async function main() {
   console.log('Seeding communities...')
   await prisma.community.upsert({
@@ -97,6 +106,11 @@ async function main() {
   console.log('Seeding approval rules...')
   for (const rule of APPROVAL_RULES) {
     await prisma.approvalRule.upsert({ where: { actionCode: rule.actionCode }, update: {}, create: rule })
+  }
+
+  console.log('Seeding post types...')
+  for (const pt of POST_TYPES) {
+    await prisma.postType.upsert({ where: { code: pt.code }, update: {}, create: pt })
   }
 
   console.log('Seed complete.')

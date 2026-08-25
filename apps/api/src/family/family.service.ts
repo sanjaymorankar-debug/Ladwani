@@ -8,6 +8,7 @@ import { ApprovalsService } from '../common/approvals/approvals.service'
 import { DuplicateDetectionService, DuplicateMatch } from '../common/duplicate-detection/duplicate-detection.service'
 import { RelationshipsService } from '../common/relationships/relationships.service'
 import { FamilyAuthorizationService } from '../common/family-authorization/family-authorization.service'
+import { NotificationsService } from '../notifications/notifications.service'
 import { CreateFamilyDto } from './dto/create-family.dto'
 import { CreateJoinRequestDto } from './dto/create-join-request.dto'
 
@@ -21,6 +22,7 @@ export class FamilyService {
     private duplicateDetection: DuplicateDetectionService,
     private relationships: RelationshipsService,
     private familyAuth: FamilyAuthorizationService,
+    private notifications: NotificationsService,
   ) {}
 
   async createFamily(userId: string, dto: CreateFamilyDto): Promise<{ family: unknown; duplicates: DuplicateMatch[] }> {
@@ -169,7 +171,10 @@ export class FamilyService {
     })
     if (existing) throw new ConflictException('A join request for this member is already pending.')
 
-    return this.prisma.familyJoinRequest.create({
+    const member = await this.prisma.member.findUnique({ where: { id: memberId } })
+    const isSelfInitiated = member?.userId === requestedBy
+
+    const request = await this.prisma.familyJoinRequest.create({
       data: {
         familyId,
         memberId,
@@ -179,6 +184,31 @@ export class FamilyService {
         status: 'PENDING',
       },
     })
+
+    if (isSelfInitiated) {
+      const karta = family.kartaMemberId ? await this.prisma.member.findUnique({ where: { id: family.kartaMemberId } }) : null
+      if (karta?.userId) {
+        await this.notifications.notify({
+          recipientId: karta.userId,
+          senderId: requestedBy,
+          type: 'family.join_request.received',
+          title: 'New family join request',
+          body: `${member?.firstName ?? 'A member'} asked to join ${family.name}.`,
+          data: { requestId: request.id, familyId },
+        })
+      }
+    } else if (member?.userId) {
+      await this.notifications.notify({
+        recipientId: member.userId,
+        senderId: requestedBy,
+        type: 'family.join_request.received',
+        title: 'You were invited to a family',
+        body: `You were invited to join ${family.name}.`,
+        data: { requestId: request.id, familyId },
+      })
+    }
+
+    return request
   }
 
   async respondToJoinRequest(requestId: string, actorUserId: string, decision: 'APPROVED' | 'DECLINED') {
@@ -201,7 +231,19 @@ export class FamilyService {
     }
 
     if (decision === 'DECLINED') {
-      return this.prisma.familyJoinRequest.update({ where: { id: requestId }, data: { status: 'DECLINED', respondedAt: new Date() } })
+      const updated = await this.prisma.familyJoinRequest.update({
+        where: { id: requestId },
+        data: { status: 'DECLINED', respondedAt: new Date() },
+      })
+      await this.notifications.notify({
+        recipientId: request.requestedBy,
+        senderId: actorUserId,
+        type: 'family.join_request.declined',
+        title: 'Your family request was declined',
+        body: `Your request regarding ${request.family.name} was declined.`,
+        data: { requestId },
+      })
+      return updated
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -221,6 +263,17 @@ export class FamilyService {
           familyId: request.familyId,
           createdBy: actorUserId,
         })
+        await this.notifications.notify(
+          {
+            recipientId: request.requestedBy,
+            senderId: actorUserId,
+            type: 'family.join_request.approved',
+            title: 'You joined a family',
+            body: `You are now a member of ${request.family.name}.`,
+            data: { requestId, familyId: request.familyId },
+          },
+          tx,
+        )
       } else {
         // The invited member consented — now it still needs Operator sign-off (J2 step 3b + approval_rules table).
         await this.approvals.submit(

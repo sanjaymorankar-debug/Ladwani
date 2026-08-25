@@ -71,6 +71,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Permission[]> = {
     'member:mark_deceased',
     'approval:review',
     'moderation:review',
+    'matrimony:manage:own',
     'asset:approve',
     'payment:verify:offline',
     'post:create',
@@ -79,6 +80,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Permission[]> = {
   ],
   ASSET_OWNER: [
     'profile:edit:own',
+    'matrimony:manage:own',
     'asset:register',
     'asset:manage:own',
     'booking:manage:own',

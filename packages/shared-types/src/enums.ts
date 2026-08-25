@@ -21,3 +21,18 @@ export type JoinRequestStatus = (typeof JOIN_REQUEST_STATUSES)[number]
 
 export const APPROVAL_STATUSES = ['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'RETURNED', 'ESCALATED'] as const
 export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number]
+
+export const MATRIMONY_INTEREST_KINDS = ['INTEREST', 'CONTACT_REQUEST'] as const
+export type MatrimonyInterestKind = (typeof MATRIMONY_INTEREST_KINDS)[number]
+
+export const MATRIMONY_INTEREST_STATUSES = ['PENDING', 'ACCEPTED', 'DECLINED', 'WITHDRAWN'] as const
+export type MatrimonyInterestStatus = (typeof MATRIMONY_INTEREST_STATUSES)[number]
+
+export const POST_STATUSES = ['PENDING_APPROVAL', 'PUBLISHED', 'REJECTED', 'REMOVED'] as const
+export type PostStatus = (typeof POST_STATUSES)[number]
+
+export const REACTION_TYPES = ['LIKE', 'LOVE', 'CELEBRATE', 'SUPPORT'] as const
+export type ReactionType = (typeof REACTION_TYPES)[number]
+
+export const REPORT_STATUSES = ['PENDING', 'REVIEWED', 'DISMISSED', 'ACTIONED'] as const
+export type ReportStatus = (typeof REPORT_STATUSES)[number]

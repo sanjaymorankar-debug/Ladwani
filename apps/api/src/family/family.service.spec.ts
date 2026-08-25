@@ -6,6 +6,7 @@ import { ApprovalsService } from '../common/approvals/approvals.service'
 import { DuplicateDetectionService } from '../common/duplicate-detection/duplicate-detection.service'
 import { RelationshipsService } from '../common/relationships/relationships.service'
 import { FamilyAuthorizationService } from '../common/family-authorization/family-authorization.service'
+import { NotificationsService } from '../notifications/notifications.service'
 
 describe('FamilyService', () => {
   let service: FamilyService
@@ -14,12 +15,14 @@ describe('FamilyService', () => {
     family: { create: jest.Mock; findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock }
     familyMember: { create: jest.Mock; findUnique: jest.Mock }
     familyJoinRequest: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock }
+    member: { findUnique: jest.Mock }
     $transaction: jest.Mock
   }
   let duplicateDetection: { checkFamily: jest.Mock }
   let approvals: { submit: jest.Mock }
   let familyAuth: { isKartaOf: jest.Mock; assertIsKarta: jest.Mock }
   let relationships: { linkMembers: jest.Mock }
+  let notifications: { notify: jest.Mock }
 
   beforeEach(async () => {
     prisma = {
@@ -27,12 +30,14 @@ describe('FamilyService', () => {
       family: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
       familyMember: { create: jest.fn(), findUnique: jest.fn() },
       familyJoinRequest: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+      member: { findUnique: jest.fn() },
       $transaction: jest.fn(),
     }
     duplicateDetection = { checkFamily: jest.fn().mockResolvedValue([]) }
     approvals = { submit: jest.fn() }
     familyAuth = { isKartaOf: jest.fn(), assertIsKarta: jest.fn() }
     relationships = { linkMembers: jest.fn() }
+    notifications = { notify: jest.fn() }
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -42,6 +47,7 @@ describe('FamilyService', () => {
         { provide: DuplicateDetectionService, useValue: duplicateDetection },
         { provide: RelationshipsService, useValue: relationships },
         { provide: FamilyAuthorizationService, useValue: familyAuth },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile()
 

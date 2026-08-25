@@ -7,6 +7,9 @@ import { FamilyModule } from './family/family.module'
 import { MembersModule } from './members/members.module'
 import { ApprovalQueueModule } from './approval-queue/approval-queue.module'
 import { LookupsModule } from './lookups/lookups.module'
+import { MatrimonyModule } from './matrimony/matrimony.module'
+import { CommunityModule } from './community/community.module'
+import { NotificationsModule } from './notifications/notifications.module'
 import { AuditInterceptor } from './common/interceptors/audit.interceptor'
 
 @Module({
@@ -17,6 +20,9 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor'
     MembersModule,
     ApprovalQueueModule,
     LookupsModule,
+    MatrimonyModule,
+    CommunityModule,
+    NotificationsModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
   ],
   providers: [

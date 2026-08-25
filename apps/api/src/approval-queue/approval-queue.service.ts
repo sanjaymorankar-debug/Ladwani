@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { ApprovalsService, ApprovalDecision } from '../common/approvals/approvals.service'
 import { FamilyService } from '../family/family.service'
 import { MembersService } from '../members/members.service'
+import { NotificationsService } from '../notifications/notifications.service'
 
 type Tx = Prisma.TransactionClient
 
@@ -19,6 +20,7 @@ export class ApprovalQueueService {
     private approvals: ApprovalsService,
     private familyService: FamilyService,
     private membersService: MembersService,
+    private notifications: NotificationsService,
   ) {}
 
   list(status?: string) {
@@ -32,6 +34,21 @@ export class ApprovalQueueService {
     return this.prisma.$transaction(async (tx) => {
       const approval = await this.approvals.decide(approvalId, decision, reviewerId, note, tx)
       await this.apply(tx, approval)
+
+      if (decision === 'APPROVED' || decision === 'REJECTED') {
+        await this.notifications.notify(
+          {
+            recipientId: approval.submittedBy,
+            senderId: reviewerId,
+            type: 'approval.decided',
+            title: `Your request was ${decision.toLowerCase()}`,
+            body: note || `${approval.actionCode.replace(/[._]/g, ' ')} — ${decision.toLowerCase()}.`,
+            data: { approvalId: approval.id, actionCode: approval.actionCode },
+          },
+          tx,
+        )
+      }
+
       return approval
     })
   }

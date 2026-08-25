@@ -8,9 +8,10 @@ import { DuplicateDetectionModule } from '../common/duplicate-detection/duplicat
 import { RelationshipsModule } from '../common/relationships/relationships.module'
 import { FamilyAuthorizationModule } from '../common/family-authorization/family-authorization.module'
 import { PrivacyModule } from '../common/privacy/privacy.module'
+import { NotificationsModule } from '../notifications/notifications.module'
 
 @Module({
-  imports: [MembersModule, ApprovalsModule, DuplicateDetectionModule, RelationshipsModule, FamilyAuthorizationModule, PrivacyModule],
+  imports: [MembersModule, ApprovalsModule, DuplicateDetectionModule, RelationshipsModule, FamilyAuthorizationModule, PrivacyModule, NotificationsModule],
   providers: [FamilyService],
   controllers: [FamilyController, JoinRequestsController],
   exports: [FamilyService],
