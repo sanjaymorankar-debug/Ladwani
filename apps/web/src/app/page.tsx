@@ -1,8 +1,17 @@
+'use client'
+
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '../lib/auth-context'
+
 export default function HomePage() {
-  return (
-    <main style={{ padding: '48px', maxWidth: 640 }}>
-      <h1>Mi Samaj</h1>
-      <p>Community + Family + Trust — M0 scaffold. UI screens land starting M1.</p>
-    </main>
-  )
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (loading) return
+    router.replace(user ? '/dashboard' : '/login')
+  }, [loading, user, router])
+
+  return null
 }

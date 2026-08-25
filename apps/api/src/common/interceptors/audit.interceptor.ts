@@ -30,7 +30,11 @@ export class AuditInterceptor implements NestInterceptor {
               actorId: user?.sub ?? 'system',
               actorRole: user?.roles?.[0] ?? null,
               action,
-              entityId: (result as { id?: string })?.id ?? request.params?.id ?? null,
+              entityId:
+                (result as { id?: string })?.id ??
+                (result as { data?: { id?: string } })?.data?.id ??
+                request.params?.id ??
+                null,
               newValue: request.body ?? undefined,
               ipAddress: request.ip,
             },

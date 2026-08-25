@@ -75,9 +75,12 @@ async function main() {
     })
 
     const permissions = DEFAULT_ROLE_PERMISSIONS[roleCode]
-    for (const permCode of permissions) {
-      const permissionId = permissionIdByCode.get(permCode)
-      if (!permissionId) continue
+    const permissionIds = permissions.map((code) => permissionIdByCode.get(code)).filter((id): id is string => !!id)
+
+    await prisma.rolePermission.deleteMany({
+      where: { roleId: role.id, permissionId: { notIn: permissionIds } },
+    })
+    for (const permissionId of permissionIds) {
       await prisma.rolePermission.upsert({
         where: { roleId_permissionId: { roleId: role.id, permissionId } },
         update: {},
