@@ -36,3 +36,26 @@ export type ReactionType = (typeof REACTION_TYPES)[number]
 
 export const REPORT_STATUSES = ['PENDING', 'REVIEWED', 'DISMISSED', 'ACTIONED'] as const
 export type ReportStatus = (typeof REPORT_STATUSES)[number]
+
+export const ASSET_STATUSES = ['PENDING_VERIFICATION', 'ACTIVE', 'SUSPENDED', 'REJECTED'] as const
+export type AssetStatus = (typeof ASSET_STATUSES)[number]
+
+export const ASSET_AVAILABILITY_STATUSES = ['AVAILABLE', 'PENDING', 'RESERVED', 'BLOCKED', 'MAINTENANCE', 'HOLIDAY'] as const
+export type AssetAvailabilityStatus = (typeof ASSET_AVAILABILITY_STATUSES)[number]
+
+export const ASSET_PRICE_TYPES = ['BASE', 'SEASONAL', 'WEEKEND', 'COMMUNITY_MEMBER'] as const
+export type AssetPriceType = (typeof ASSET_PRICE_TYPES)[number]
+
+export const BOOKING_TYPES = ['INSTANT', 'REQUEST'] as const
+export type BookingType = (typeof BOOKING_TYPES)[number]
+
+export const BOOKING_STATUSES = [
+  'REQUESTED',
+  'APPROVED',
+  'DECLINED',
+  'CONFIRMED',
+  'CANCELLED',
+  'COMPLETED',
+  'EXPIRED',
+] as const
+export type BookingStatus = (typeof BOOKING_STATUSES)[number]

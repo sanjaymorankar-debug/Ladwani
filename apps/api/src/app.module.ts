@@ -10,6 +10,8 @@ import { LookupsModule } from './lookups/lookups.module'
 import { MatrimonyModule } from './matrimony/matrimony.module'
 import { CommunityModule } from './community/community.module'
 import { NotificationsModule } from './notifications/notifications.module'
+import { AssetsModule } from './assets/assets.module'
+import { BookingsModule } from './bookings/bookings.module'
 import { AuditInterceptor } from './common/interceptors/audit.interceptor'
 
 @Module({
@@ -23,6 +25,8 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor'
     MatrimonyModule,
     CommunityModule,
     NotificationsModule,
+    AssetsModule,
+    BookingsModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
   ],
   providers: [

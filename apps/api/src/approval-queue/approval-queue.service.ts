@@ -5,6 +5,7 @@ import { ApprovalsService, ApprovalDecision } from '../common/approvals/approval
 import { FamilyService } from '../family/family.service'
 import { MembersService } from '../members/members.service'
 import { NotificationsService } from '../notifications/notifications.service'
+import { AssetsService } from '../assets/assets.service'
 
 type Tx = Prisma.TransactionClient
 
@@ -21,6 +22,7 @@ export class ApprovalQueueService {
     private familyService: FamilyService,
     private membersService: MembersService,
     private notifications: NotificationsService,
+    private assetsService: AssetsService,
   ) {}
 
   list(status?: string) {
@@ -63,6 +65,10 @@ export class ApprovalQueueService {
         return this.membersService.applyMaritalStatusApproval(tx, approval)
       case 'member.mark_deceased':
         return this.membersService.applyMarkDeceasedApproval(tx, approval)
+      case 'asset.register':
+        return this.assetsService.applyAssetRegisterApproval(tx, approval)
+      case 'asset.suspend':
+        return this.assetsService.applyAssetSuspendApproval(tx, approval)
       default:
         return
     }

@@ -55,6 +55,14 @@ const POST_TYPES = [
   { code: 'CONDOLENCE', label: 'Condolence', icon: 'flower', requiresApproval: false },
 ]
 
+// docs/06-database-schema.md §F — a starter catalog; Admin can add more later
+const ASSET_CATEGORIES = [
+  { code: 'MARRIAGE_HALL', label: 'Marriage Hall', sortOrder: 1 },
+  { code: 'COMMUNITY_HALL', label: 'Community Hall', sortOrder: 2 },
+  { code: 'GUEST_HOUSE', label: 'Guest House', sortOrder: 3 },
+  { code: 'GROUND', label: 'Open Ground', sortOrder: 4 },
+]
+
 async function main() {
   console.log('Seeding communities...')
   await prisma.community.upsert({
@@ -111,6 +119,11 @@ async function main() {
   console.log('Seeding post types...')
   for (const pt of POST_TYPES) {
     await prisma.postType.upsert({ where: { code: pt.code }, update: {}, create: pt })
+  }
+
+  console.log('Seeding asset categories...')
+  for (const cat of ASSET_CATEGORIES) {
+    await prisma.assetCategory.upsert({ where: { code: cat.code }, update: {}, create: cat })
   }
 
   console.log('Seed complete.')

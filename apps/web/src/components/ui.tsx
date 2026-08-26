@@ -38,6 +38,8 @@ export function TopBar() {
           <Link href="/dashboard">Dashboard</Link>
           <Link href="/community">Feed</Link>
           <Link href="/matrimony">Matrimony</Link>
+          <Link href="/assets">Services</Link>
+          <Link href="/bookings">My Bookings</Link>
           <Link href="/members/search">Directory</Link>
           <Link href="/approvals">Approvals</Link>
           <Link href="/notifications" style={{ position: 'relative' }}>
@@ -77,15 +79,12 @@ export function ErrorBanner({ message }: { message: string | null }) {
   return <div className="error-banner">{message}</div>
 }
 
+const SUCCESS_STATUSES = new Set(['ACTIVE', 'VERIFIED', 'APPROVED', 'MARRIED', 'CONFIRMED', 'COMPLETED', 'AVAILABLE'])
+const WARNING_STATUSES = new Set(['PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'REQUESTED', 'PENDING_VERIFICATION', 'PENDING_APPROVAL', 'RESERVED'])
+const DANGER_STATUSES = new Set(['REJECTED', 'DECEASED', 'DECLINED', 'INACTIVE', 'CANCELLED', 'EXPIRED', 'SUSPENDED', 'REMOVED'])
+
 export function StatusPill({ status }: { status: string }) {
-  const tone =
-    status === 'ACTIVE' || status === 'VERIFIED' || status === 'APPROVED' || status === 'MARRIED'
-      ? 'success'
-      : status === 'PENDING' || status === 'SUBMITTED' || status === 'UNDER_REVIEW'
-        ? 'warning'
-        : status === 'REJECTED' || status === 'DECEASED' || status === 'DECLINED' || status === 'INACTIVE'
-          ? 'danger'
-          : 'neutral'
+  const tone = SUCCESS_STATUSES.has(status) ? 'success' : WARNING_STATUSES.has(status) ? 'warning' : DANGER_STATUSES.has(status) ? 'danger' : 'neutral'
   return <span className={`pill pill-${tone}`}>{status.replace(/_/g, ' ')}</span>
 }
 

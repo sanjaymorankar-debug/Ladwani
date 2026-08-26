@@ -12,11 +12,11 @@ datasource db {
 // ─────────────────────────────────────────────────────────────────
 
 model Community {
-  id       String   @id @default(cuid())
-  name     String
-  slug     String   @unique
-  logoUrl  String?  @map("logo_url")
-  settings Json?
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?  @map("logo_url")
+  settings  Json?
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -41,13 +41,17 @@ model User {
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
 
-  member             Member?
-  userRoles          UserRole[]
-  refreshTokens      RefreshToken[]
-  verificationTokens VerificationToken[]
-  consentRecords     ConsentRecord[]
-  notificationsReceived Notification[] @relation("NotificationRecipient")
-  notificationsSent     Notification[] @relation("NotificationSender")
+  member                Member?
+  userRoles             UserRole[]
+  refreshTokens         RefreshToken[]
+  verificationTokens    VerificationToken[]
+  consentRecords        ConsentRecord[]
+  notificationsReceived Notification[]      @relation("NotificationRecipient")
+  notificationsSent     Notification[]      @relation("NotificationSender")
+
+  assetOwner AssetOwner?
+  bookings   Booking[]
+  reviews    Review[]
 
   @@map("users")
 }
@@ -87,12 +91,12 @@ model RolePermission {
 }
 
 model UserRole {
-  id        String    @id @default(cuid())
-  userId    String    @map("user_id")
-  roleId    String    @map("role_id")
-  familyId  String?   @map("family_id") // scoped Karta role
-  areaId    String?   @map("area_id") // scoped Operator role
-  grantedAt DateTime  @default(now()) @map("granted_at")
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  familyId  String?  @map("family_id") // scoped Karta role
+  areaId    String?  @map("area_id") // scoped Operator role
+  grantedAt DateTime @default(now()) @map("granted_at")
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   role   Role    @relation(fields: [roleId], references: [id])
@@ -181,26 +185,26 @@ model Family {
 }
 
 model Member {
-  id              String    @id @default(cuid())
-  userId          String?   @unique @map("user_id")
-  firstName       String    @map("first_name")
-  middleName      String?   @map("middle_name")
-  lastName        String?   @map("last_name")
-  gender          String    @default("NOT_STATED")
-  dateOfBirth     DateTime? @map("date_of_birth")
-  maritalStatus   String    @default("UNMARRIED") @map("marital_status")
-  status          String    @default("ACTIVE")
-  deceasedAt      DateTime? @map("deceased_at")
-  deceasedPlace   String?   @map("deceased_place")
-  currentCity     String?   @map("current_city")
-  currentState    String?   @map("current_state")
-  nativeVillage   String?   @map("native_village")
-  profilePhotoId  String?   @unique @map("profile_photo_id")
-  createdBy       String?   @map("created_by")
-  updatedBy       String?   @map("updated_by")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-  deletedAt       DateTime? @map("deleted_at")
+  id             String    @id @default(cuid())
+  userId         String?   @unique @map("user_id")
+  firstName      String    @map("first_name")
+  middleName     String?   @map("middle_name")
+  lastName       String?   @map("last_name")
+  gender         String    @default("NOT_STATED")
+  dateOfBirth    DateTime? @map("date_of_birth")
+  maritalStatus  String    @default("UNMARRIED") @map("marital_status")
+  status         String    @default("ACTIVE")
+  deceasedAt     DateTime? @map("deceased_at")
+  deceasedPlace  String?   @map("deceased_place")
+  currentCity    String?   @map("current_city")
+  currentState   String?   @map("current_state")
+  nativeVillage  String?   @map("native_village")
+  profilePhotoId String?   @unique @map("profile_photo_id")
+  createdBy      String?   @map("created_by")
+  updatedBy      String?   @map("updated_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
 
   user                User?                  @relation(fields: [userId], references: [id])
   families            FamilyMember[]
@@ -223,8 +227,10 @@ model Member {
   posts          Post[]
   comments       Comment[]
   reactions      Reaction[]
-  reportsFiled   Report[] @relation("ReporterMember")
-  reportsAgainst Report[] @relation("ReportedMember")
+  reportsFiled   Report[]   @relation("ReporterMember")
+  reportsAgainst Report[]   @relation("ReportedMember")
+
+  assetReportsFiled AssetReport[]
 
   @@map("members")
 }
@@ -327,18 +333,18 @@ model MarriageRecord {
 }
 
 model Address {
-  id              String    @id @default(cuid())
-  addressableType String    @map("addressable_type") // family | member — disambiguation only, not a discriminator for the FK below
-  familyId        String?   @map("family_id")
-  memberId        String?   @map("member_id")
-  addressType     String    @map("address_type") // CURRENT, NATIVE, WORK, OTHER
+  id              String   @id @default(cuid())
+  addressableType String   @map("addressable_type") // family | member — disambiguation only, not a discriminator for the FK below
+  familyId        String?  @map("family_id")
+  memberId        String?  @map("member_id")
+  addressType     String   @map("address_type") // CURRENT, NATIVE, WORK, OTHER
   line1           String?
   city            String?
   state           String?
-  country         String    @default("India")
+  country         String   @default("India")
   pincode         String?
-  isPrimary       Boolean   @default(false) @map("is_primary")
-  createdAt       DateTime  @default(now()) @map("created_at")
+  isPrimary       Boolean  @default(false) @map("is_primary")
+  createdAt       DateTime @default(now()) @map("created_at")
 
   family Family? @relation(fields: [familyId], references: [id], onDelete: Cascade)
   member Member? @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -364,6 +370,7 @@ model Area {
   memberAreas MemberArea[]
   familyAreas FamilyArea[]
   posts       Post[]
+  assets      Asset[]
 
   @@map("areas")
 }
@@ -446,17 +453,17 @@ model Approval {
 // ─────────────────────────────────────────────────────────────────
 
 model MatrimonyProfile {
-  id                   String    @id @default(cuid())
-  memberId             String    @unique @map("member_id")
-  isVisible            Boolean   @default(false) @map("is_visible")
-  about                String?   @db.Text
-  heightCm             Int?      @map("height_cm")
+  id                   String   @id @default(cuid())
+  memberId             String   @unique @map("member_id")
+  isVisible            Boolean  @default(false) @map("is_visible")
+  about                String?  @db.Text
+  heightCm             Int?     @map("height_cm")
   languages            Json?
-  allowContactRequests Boolean   @default(true) @map("allow_contact_requests")
-  createdAt            DateTime  @default(now()) @map("created_at")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
+  allowContactRequests Boolean  @default(true) @map("allow_contact_requests")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
-  member     Member                @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  member     Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
   preference MatrimonyPreference?
 
   @@map("matrimonial_profiles")
@@ -624,4 +631,262 @@ model Notification {
   sender    User? @relation("NotificationSender", fields: [senderId], references: [id])
 
   @@map("notifications")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// F. COMMUNITY SERVICES, ASSETS & BOOKING
+// ─────────────────────────────────────────────────────────────────
+
+model AssetCategory {
+  id        String  @id @default(cuid())
+  code      String  @unique
+  label     String
+  parentId  String? @map("parent_id")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  parent   AssetCategory?  @relation("AssetCategoryTree", fields: [parentId], references: [id])
+  children AssetCategory[] @relation("AssetCategoryTree")
+  assets   Asset[]
+
+  @@map("asset_categories")
+}
+
+model AssetOwner {
+  id           String    @id @default(cuid())
+  userId       String    @unique @map("user_id")
+  businessName String?   @map("business_name")
+  verifiedAt   DateTime? @map("verified_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assets Asset[]
+
+  @@map("asset_owners")
+}
+
+// Cancellation policy lives directly on the asset (deadline/refund tiers/flat charge) — docs/11-booking-architecture.md §5.
+model Asset {
+  id                        String    @id @default(cuid())
+  assetOwnerId              String    @map("asset_owner_id")
+  categoryId                String    @map("category_id")
+  name                      String
+  description               String?   @db.Text
+  addressLine               String?   @map("address_line")
+  city                      String?
+  district                  String?
+  state                     String?
+  pincode                   String?
+  areaId                    String?   @map("area_id")
+  capacity                  Int?
+  status                    String    @default("PENDING_VERIFICATION")
+  bookingApprovalRequired   Boolean   @default(false) @map("booking_approval_required")
+  cancellationDeadlineDays  Int       @default(7) @map("cancellation_deadline_days")
+  cancellationRefundPercent Int       @default(50) @map("cancellation_refund_percent")
+  flatCancellationCharge    Decimal   @default(0) @map("flat_cancellation_charge") @db.Decimal(10, 2)
+  taxPercent                Decimal   @default(0) @map("tax_percent") @db.Decimal(5, 2)
+  communityDiscountPercent  Decimal   @default(0) @map("community_discount_percent") @db.Decimal(5, 2)
+  createdAt                 DateTime  @default(now()) @map("created_at")
+  updatedAt                 DateTime  @updatedAt @map("updated_at")
+  deletedAt                 DateTime? @map("deleted_at")
+
+  assetOwner   AssetOwner          @relation(fields: [assetOwnerId], references: [id])
+  category     AssetCategory       @relation(fields: [categoryId], references: [id])
+  area         Area?               @relation(fields: [areaId], references: [id])
+  photos       AssetPhoto[]
+  facilities   AssetFacility[]
+  pricing      AssetPricing[]
+  availability AssetAvailability[]
+  blockedDates AssetBlockedDate[]
+  services     AssetService[]
+  bookings     Booking[]
+  reviews      Review[]
+  reports      AssetReport[]
+
+  @@map("assets")
+}
+
+model AssetPhoto {
+  id        String   @id @default(cuid())
+  assetId   String   @map("asset_id")
+  url       String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("asset_photos")
+}
+
+model AssetFacility {
+  id           String @id @default(cuid())
+  assetId      String @map("asset_id")
+  facilityCode String @map("facility_code")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, facilityCode])
+  @@map("asset_facilities")
+}
+
+model AssetPricing {
+  id        String    @id @default(cuid())
+  assetId   String    @map("asset_id")
+  priceType String    @map("price_type")
+  amount    Decimal   @db.Decimal(10, 2)
+  validFrom DateTime? @map("valid_from")
+  validTo   DateTime? @map("valid_to")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("asset_pricing")
+}
+
+// The row docs/11-booking-architecture.md §2's SELECT ... FOR UPDATE transaction locks — the single writable source of truth for whether a slot can be booked.
+model AssetAvailability {
+  id      String   @id @default(cuid())
+  assetId String   @map("asset_id")
+  date    DateTime @db.Date
+  slot    String   @default("FULL_DAY")
+  status  String   @default("AVAILABLE")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, date, slot])
+  @@map("asset_availability")
+}
+
+model AssetBlockedDate {
+  id       String   @id @default(cuid())
+  assetId  String   @map("asset_id")
+  dateFrom DateTime @map("date_from") @db.Date
+  dateTo   DateTime @map("date_to") @db.Date
+  reason   String?
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("asset_blocked_dates")
+}
+
+model AssetService {
+  id      String @id @default(cuid())
+  assetId String @map("asset_id")
+  code    String
+  label   String
+
+  asset   Asset                @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  pricing AssetServicePricing?
+
+  @@unique([assetId, code])
+  @@map("asset_services")
+}
+
+model AssetServicePricing {
+  id             String  @id @default(cuid())
+  assetServiceId String  @unique @map("asset_service_id")
+  amount         Decimal @db.Decimal(10, 2)
+  unit           String  @default("FLAT")
+
+  assetService AssetService @relation(fields: [assetServiceId], references: [id], onDelete: Cascade)
+
+  @@map("asset_service_pricing")
+}
+
+model AssetReport {
+  id         String    @id @default(cuid())
+  assetId    String    @map("asset_id")
+  reporterId String    @map("reporter_id")
+  reason     String    @db.Text
+  status     String    @default("PENDING")
+  resolvedBy String?   @map("resolved_by")
+  resolvedAt DateTime? @map("resolved_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  asset    Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  reporter Member @relation(fields: [reporterId], references: [id])
+
+  @@map("asset_reports")
+}
+
+model Booking {
+  id              String   @id @default(cuid())
+  assetId         String   @map("asset_id")
+  userId          String   @map("user_id")
+  status          String   @default("REQUESTED")
+  bookingType     String   @map("booking_type")
+  date            DateTime @db.Date
+  slot            String   @default("FULL_DAY")
+  totalAmount     Decimal  @default(0) @map("total_amount") @db.Decimal(10, 2)
+  securityDeposit Decimal  @default(0) @map("security_deposit") @db.Decimal(10, 2)
+  qrTokenHash     String?  @map("qr_token_hash")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  asset         Asset                  @relation(fields: [assetId], references: [id])
+  user          User                   @relation(fields: [userId], references: [id])
+  items         BookingItem[]
+  guests        BookingGuest[]
+  statusHistory BookingStatusHistory[]
+  review        Review?
+
+  @@map("bookings")
+}
+
+model BookingItem {
+  id          String  @id @default(cuid())
+  bookingId   String  @map("booking_id")
+  itemType    String  @map("item_type")
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Decimal @map("unit_price") @db.Decimal(10, 2)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_items")
+}
+
+model BookingGuest {
+  id        String  @id @default(cuid())
+  bookingId String  @map("booking_id")
+  name      String
+  contact   String?
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_guests")
+}
+
+model BookingStatusHistory {
+  id         String   @id @default(cuid())
+  bookingId  String   @map("booking_id")
+  fromStatus String?  @map("from_status")
+  toStatus   String   @map("to_status")
+  changedBy  String?  @map("changed_by")
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_status_history")
+}
+
+// Gated on booking.status = COMPLETED and booking.userId = reviewer at write time — docs/11 §7 — not just a UI affordance.
+model Review {
+  id               String   @id @default(cuid())
+  bookingId        String   @unique @map("booking_id")
+  assetId          String   @map("asset_id")
+  reviewerId       String   @map("reviewer_id")
+  overallScore     Int      @map("overall_score")
+  cleanlinessScore Int?     @map("cleanliness_score")
+  facilitiesScore  Int?     @map("facilities_score")
+  serviceScore     Int?     @map("service_score")
+  valueScore       Int?     @map("value_score")
+  locationScore    Int?     @map("location_score")
+  comment          String?  @db.Text
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  booking  Booking @relation(fields: [bookingId], references: [id])
+  asset    Asset   @relation(fields: [assetId], references: [id])
+  reviewer User    @relation(fields: [reviewerId], references: [id])
+
+  @@map("reviews")
 }
