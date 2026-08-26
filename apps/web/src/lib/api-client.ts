@@ -66,10 +66,43 @@ async function tryRefresh(): Promise<boolean> {
   }
 }
 
+/**
+ * Plain <a href> navigation can't carry the Authorization header the JWT
+ * guard requires, so file-download endpoints (CSV exports) go through this
+ * instead — fetch with the header, then hand the caller a Blob to save via
+ * a client-side object URL.
+ */
+async function requestBlob(path: string, retry = true): Promise<Blob> {
+  const token = getAccessToken()
+  const res = await fetch(`/api/v1${path}`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+
+  if (res.status === 401 && retry) {
+    const refreshed = await tryRefresh()
+    if (refreshed) return requestBlob(path, false)
+  }
+
+  if (!res.ok) {
+    const text = await res.text()
+    let json: unknown = null
+    try {
+      json = text ? JSON.parse(text) : null
+    } catch {
+      // response wasn't JSON — leave json null
+    }
+    throw new ApiError((json as { message?: string })?.message ?? 'Request failed', res.status, json)
+  }
+  return res.blob()
+}
+
 export const api = {
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
   delete: <T>(path: string) => request<T>('DELETE', path),
+  getBlob: (path: string) => requestBlob(path),
 }

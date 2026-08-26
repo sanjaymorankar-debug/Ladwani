@@ -1,24 +1,35 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '../../../lib/api-client'
 import { errorMessage } from '../../../lib/auth-context'
 import { RequireAuth, TopBar, Shell, ErrorBanner } from '../../../components/ui'
 
-const POST_TYPES = [
-  { code: 'GENERAL', label: 'General' },
-  { code: 'ANNOUNCEMENT', label: 'Announcement (needs Operator approval)' },
-  { code: 'EVENT', label: 'Event' },
-  { code: 'HELP_REQUEST', label: 'Help Request' },
-  { code: 'CONDOLENCE', label: 'Condolence' },
-]
+interface PostType {
+  code: string
+  label: string
+  requiresApproval: boolean
+  isActive: boolean
+}
 
 export default function NewPostPage() {
   const router = useRouter()
-  const [form, setForm] = useState({ postTypeCode: 'GENERAL', title: '', content: '' })
+  const [postTypes, setPostTypes] = useState<PostType[]>([])
+  const [form, setForm] = useState({ postTypeCode: '', title: '', content: '' })
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    api
+      .get<PostType[]>('/config/post-types')
+      .then((types) => {
+        const active = types.filter((t) => t.isActive)
+        setPostTypes(active)
+        if (active.length > 0) setForm((f) => ({ ...f, postTypeCode: f.postTypeCode || active[0].code }))
+      })
+      .catch((err) => setError(errorMessage(err)))
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -48,9 +59,10 @@ export default function NewPostPage() {
           <div className="field">
             <label htmlFor="postType">Type</label>
             <select id="postType" value={form.postTypeCode} onChange={(e) => setForm({ ...form, postTypeCode: e.target.value })}>
-              {POST_TYPES.map((t) => (
+              {postTypes.map((t) => (
                 <option key={t.code} value={t.code}>
                   {t.label}
+                  {t.requiresApproval ? ' (needs Operator approval)' : ''}
                 </option>
               ))}
             </select>

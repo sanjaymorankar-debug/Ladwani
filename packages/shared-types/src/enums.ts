@@ -92,3 +92,12 @@ export type OfflinePaymentMethod = (typeof OFFLINE_PAYMENT_METHODS)[number]
 
 export const OFFLINE_PAYMENT_STATUSES = ['PENDING_VERIFICATION', 'VERIFIED', 'REJECTED'] as const
 export type OfflinePaymentStatus = (typeof OFFLINE_PAYMENT_STATUSES)[number]
+
+export const AREA_TYPES = ['COUNTRY', 'STATE', 'DISTRICT', 'CITY', 'AREA', 'GROUP'] as const
+export type AreaType = (typeof AREA_TYPES)[number]
+
+export const UPLOAD_PURPOSES = ['PROFILE_PHOTO', 'ASSET_PHOTO', 'DOCUMENT'] as const
+export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number]
+
+export const UPLOADED_FILE_STATUSES = ['PENDING', 'ACTIVE', 'REJECTED'] as const
+export type UploadedFileStatus = (typeof UPLOADED_FILE_STATUSES)[number]

@@ -45,6 +45,9 @@ export function TopBar() {
           <Link href="/approvals">Approvals</Link>
           {user.roles.includes('ADMIN') && <Link href="/admin/fees">Fee admin</Link>}
           {user.roles.includes('ADMIN') && <Link href="/admin/payments">Payments admin</Link>}
+          {user.roles.includes('ADMIN') && <Link href="/admin/config">Configuration</Link>}
+          {(user.roles.includes('ADMIN') || user.roles.includes('OPERATOR')) && <Link href="/admin/audit-log">Audit log</Link>}
+          {(user.roles.includes('ADMIN') || user.roles.includes('OPERATOR')) && <Link href="/admin/reports">Reports</Link>}
           <Link href="/notifications" style={{ position: 'relative' }}>
             Notifications
             {unreadCount > 0 && (

@@ -34,6 +34,8 @@ export const PERMISSIONS = [
   'refund:approve',
   'role:manage',
   'audit:view',
+  'config:manage',
+  'report:view',
 ] as const
 export type Permission = (typeof PERMISSIONS)[number]
 
@@ -77,6 +79,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, Permission[]> = {
     'post:create',
     'booking:create',
     'audit:view',
+    'report:view',
   ],
   ASSET_OWNER: [
     'profile:edit:own',

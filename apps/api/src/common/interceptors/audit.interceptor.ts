@@ -30,6 +30,7 @@ export class AuditInterceptor implements NestInterceptor {
               actorId: user?.sub ?? 'system',
               actorRole: user?.roles?.[0] ?? null,
               action,
+              entityType: action.split('.')[0] ?? null,
               entityId:
                 (result as { id?: string })?.id ??
                 (result as { data?: { id?: string } })?.data?.id ??

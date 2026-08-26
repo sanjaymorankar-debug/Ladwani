@@ -55,7 +55,9 @@ model User {
 
   paymentTransactions PaymentTransaction[]
   donations           Donation[]
+  uploadedFiles       UploadedFile[]
 
+  @@index([deletedAt])
   @@map("users")
 }
 
@@ -106,6 +108,7 @@ model UserRole {
   family Family? @relation(fields: [familyId], references: [id])
   area   Area?   @relation(fields: [areaId], references: [id])
 
+  @@index([userId, familyId])
   @@map("user_roles")
 }
 
@@ -134,6 +137,7 @@ model VerificationToken {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, type, usedAt])
   @@map("verification_tokens")
 }
 
@@ -188,6 +192,7 @@ model Family {
   feeInvoices    FeeInvoice[]
   ledgerEntries  FinancialLedgerEntry[]
 
+  @@index([deletedAt])
   @@map("families")
 }
 
@@ -241,6 +246,9 @@ model Member {
 
   ledgerEntries FinancialLedgerEntry[]
 
+  @@index([deletedAt, gender])
+  @@index([deletedAt, maritalStatus])
+  @@index([deletedAt, status])
   @@map("members")
 }
 
@@ -258,6 +266,8 @@ model FamilyMember {
   member Member @relation(fields: [memberId], references: [id])
 
   @@unique([familyId, memberId])
+  @@index([memberId, leftAt])
+  @@index([familyId, leftAt])
   @@map("family_members")
 }
 
@@ -276,6 +286,7 @@ model FamilyJoinRequest {
   member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@unique([familyId, memberId, status])
+  @@index([familyId, status])
   @@map("family_join_requests")
 }
 
@@ -309,6 +320,7 @@ model MemberRelationship {
   relationshipType RelationshipType @relation(fields: [relationshipTypeId], references: [id])
 
   @@unique([fromMemberId, toMemberId, relationshipTypeId])
+  @@index([isActive, fromMemberId])
   @@map("member_relationships")
 }
 
@@ -371,6 +383,7 @@ model Area {
   parentId    String? @map("parent_id")
   name        String
   type        String // COUNTRY, STATE, DISTRICT, CITY, AREA, GROUP
+  isActive    Boolean @default(true) @map("is_active")
 
   community   Community    @relation(fields: [communityId], references: [id])
   parent      Area?        @relation("AreaHierarchy", fields: [parentId], references: [id])
@@ -406,6 +419,7 @@ model FamilyArea {
   area   Area   @relation(fields: [areaId], references: [id])
 
   @@id([familyId, areaId])
+  @@index([areaId])
   @@map("family_areas")
 }
 
@@ -425,7 +439,33 @@ model AuditLog {
   ipAddress  String?  @map("ip_address")
   createdAt  DateTime @default(now()) @map("created_at")
 
+  @@index([actorId, createdAt])
+  @@index([entityType, createdAt])
   @@map("audit_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// UPLOADS (docs/18-file-storage-design.md — dev-mode gateway pending
+// real Cloudflare R2 + malware-scan credentials, same pattern as M4's
+// payment gateway)
+// ─────────────────────────────────────────────────────────────────
+
+model UploadedFile {
+  id              String    @id @default(cuid())
+  uploaderId      String    @map("uploader_id")
+  purpose         String // PROFILE_PHOTO | ASSET_PHOTO | DOCUMENT
+  storageProvider String    @map("storage_provider")
+  storageKey      String    @unique @map("storage_key")
+  mimeType        String?   @map("mime_type")
+  sizeBytes       Int?      @map("size_bytes")
+  status          String    @default("PENDING") // PENDING | ACTIVE | REJECTED
+  rejectionReason String?   @map("rejection_reason")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  activatedAt     DateTime? @map("activated_at")
+
+  uploader User @relation(fields: [uploaderId], references: [id])
+
+  @@map("uploaded_files")
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -455,6 +495,7 @@ model Approval {
   reviewedAt  DateTime? @map("reviewed_at")
   reviewNote  String?   @map("review_note") @db.Text
 
+  @@index([status, submittedAt])
   @@map("approvals")
 }
 
@@ -476,6 +517,7 @@ model MatrimonyProfile {
   member     Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
   preference MatrimonyPreference?
 
+  @@index([isVisible])
   @@map("matrimonial_profiles")
 }
 
@@ -508,6 +550,9 @@ model MatrimonyInterest {
   toMember   Member @relation("MatrimonyInterestTo", fields: [toMemberId], references: [id], onDelete: Cascade)
 
   @@unique([fromMemberId, toMemberId, kind])
+  @@index([toMemberId, createdAt])
+  @@index([fromMemberId, createdAt])
+  @@index([status])
   @@map("matrimonial_interests")
 }
 
@@ -561,6 +606,7 @@ model Post {
   reactions  Reaction[]
   reports    Report[]
 
+  @@index([deletedAt, status, isPinned, createdAt])
   @@map("posts")
 }
 
@@ -618,6 +664,7 @@ model Report {
   reportedMember Member?  @relation("ReportedMember", fields: [memberId], references: [id])
   reporter       Member   @relation("ReporterMember", fields: [reporterId], references: [id])
 
+  @@index([status, createdAt])
   @@map("reports")
 }
 
@@ -640,6 +687,7 @@ model Notification {
   recipient User  @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
   sender    User? @relation("NotificationSender", fields: [senderId], references: [id])
 
+  @@index([recipientId, isRead, createdAt])
   @@map("notifications")
 }
 
@@ -653,6 +701,7 @@ model AssetCategory {
   label     String
   parentId  String? @map("parent_id")
   sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
 
   parent   AssetCategory?  @relation("AssetCategoryTree", fields: [parentId], references: [id])
   children AssetCategory[] @relation("AssetCategoryTree")
@@ -712,6 +761,8 @@ model Asset {
   reviews      Review[]
   reports      AssetReport[]
 
+  @@index([deletedAt, status])
+  @@index([deletedAt, categoryId])
   @@map("assets")
 }
 
@@ -840,6 +891,8 @@ model Booking {
   invoice       BookingInvoice?
   ledgerEntries FinancialLedgerEntry[]
 
+  @@index([userId, createdAt])
+  @@index([status, assetId])
   @@map("bookings")
 }
 
@@ -900,6 +953,7 @@ model Review {
   asset    Asset   @relation(fields: [assetId], references: [id])
   reviewer User    @relation(fields: [reviewerId], references: [id])
 
+  @@index([assetId, createdAt])
   @@map("reviews")
 }
 
@@ -929,6 +983,7 @@ model PaymentTransaction {
   donation           Donation?
   ledgerEntries      FinancialLedgerEntry[]
 
+  @@index([gatewayCode, status, updatedAt])
   @@map("payment_transactions")
 }
 
@@ -942,6 +997,7 @@ model PaymentGatewayTransaction {
 
   paymentTransaction PaymentTransaction @relation(fields: [paymentTransactionId], references: [id], onDelete: Cascade)
 
+  @@index([gatewayOrderId])
   @@map("payment_gateway_transactions")
 }
 
@@ -1085,6 +1141,7 @@ model FeeInvoice {
   offlinePayments OfflinePayment[]
   ledgerEntries   FinancialLedgerEntry[]
 
+  @@index([familyId, createdAt])
   @@map("fee_invoices")
 }
 
@@ -1155,6 +1212,7 @@ model Donation {
   paymentTransaction PaymentTransaction?    @relation(fields: [paymentTransactionId], references: [id])
   ledgerEntries      FinancialLedgerEntry[]
 
+  @@index([donorUserId, createdAt])
   @@map("donations")
 }
 
@@ -1186,6 +1244,7 @@ model FinancialLedgerEntry {
   refund             Refund?             @relation(fields: [refundId], references: [id])
   financialYear      FinancialYear?      @relation(fields: [financialYearId], references: [id])
 
+  @@index([entryType])
   @@map("financial_ledger")
 }
 

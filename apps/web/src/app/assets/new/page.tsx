@@ -1,22 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '../../../lib/api-client'
 import { errorMessage } from '../../../lib/auth-context'
 import { RequireAuth, TopBar, Shell, ErrorBanner } from '../../../components/ui'
 
-const CATEGORIES = [
-  { code: 'MARRIAGE_HALL', label: 'Marriage Hall' },
-  { code: 'COMMUNITY_HALL', label: 'Community Hall' },
-  { code: 'GUEST_HOUSE', label: 'Guest House' },
-  { code: 'GROUND', label: 'Open Ground' },
-]
+interface AssetCategory {
+  code: string
+  label: string
+  isActive: boolean
+}
 
 export default function NewAssetPage() {
   const router = useRouter()
+  const [categories, setCategories] = useState<AssetCategory[]>([])
   const [form, setForm] = useState({
-    categoryCode: 'MARRIAGE_HALL',
+    categoryCode: '',
     name: '',
     description: '',
     city: '',
@@ -26,6 +26,17 @@ export default function NewAssetPage() {
   })
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    api
+      .get<AssetCategory[]>('/config/asset-categories')
+      .then((cats) => {
+        const active = cats.filter((c) => c.isActive)
+        setCategories(active)
+        if (active.length > 0) setForm((f) => ({ ...f, categoryCode: f.categoryCode || active[0].code }))
+      })
+      .catch((err) => setError(errorMessage(err)))
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -60,7 +71,7 @@ export default function NewAssetPage() {
           <div className="field">
             <label htmlFor="categoryCode">Category</label>
             <select id="categoryCode" value={form.categoryCode} onChange={(e) => setForm({ ...form, categoryCode: e.target.value })}>
-              {CATEGORIES.map((c) => (
+              {categories.map((c) => (
                 <option key={c.code} value={c.code}>
                   {c.label}
                 </option>

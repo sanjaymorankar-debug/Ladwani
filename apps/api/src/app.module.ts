@@ -14,6 +14,10 @@ import { AssetsModule } from './assets/assets.module'
 import { BookingsModule } from './bookings/bookings.module'
 import { FeesModule } from './fees/fees.module'
 import { PaymentsModule } from './payments/payments.module'
+import { ConfigModule } from './config/config.module'
+import { AuditLogModule } from './audit-log/audit-log.module'
+import { ReportsModule } from './reports/reports.module'
+import { UploadsModule } from './uploads/uploads.module'
 import { AuditInterceptor } from './common/interceptors/audit.interceptor'
 
 @Module({
@@ -31,6 +35,10 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor'
     BookingsModule,
     FeesModule,
     PaymentsModule,
+    ConfigModule,
+    AuditLogModule,
+    ReportsModule,
+    UploadsModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
   ],
   providers: [
