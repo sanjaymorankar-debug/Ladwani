@@ -53,6 +53,9 @@ model User {
   bookings   Booking[]
   reviews    Review[]
 
+  paymentTransactions PaymentTransaction[]
+  donations           Donation[]
+
   @@map("users")
 }
 
@@ -181,6 +184,10 @@ model Family {
   familyAreas  FamilyArea[]
   userRoles    UserRole[]
 
+  feeAssignments FamilyFeeAssignment[]
+  feeInvoices    FeeInvoice[]
+  ledgerEntries  FinancialLedgerEntry[]
+
   @@map("families")
 }
 
@@ -231,6 +238,8 @@ model Member {
   reportsAgainst Report[]   @relation("ReportedMember")
 
   assetReportsFiled AssetReport[]
+
+  ledgerEntries FinancialLedgerEntry[]
 
   @@map("members")
 }
@@ -371,6 +380,7 @@ model Area {
   familyAreas FamilyArea[]
   posts       Post[]
   assets      Asset[]
+  feeRules    FeeRule[]
 
   @@map("areas")
 }
@@ -827,6 +837,8 @@ model Booking {
   guests        BookingGuest[]
   statusHistory BookingStatusHistory[]
   review        Review?
+  invoice       BookingInvoice?
+  ledgerEntries FinancialLedgerEntry[]
 
   @@map("bookings")
 }
@@ -889,4 +901,301 @@ model Review {
   reviewer User    @relation(fields: [reviewerId], references: [id])
 
   @@map("reviews")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// G. PAYMENTS
+// ─────────────────────────────────────────────────────────────────
+
+// The single row every payment flow (fee, booking, donation) creates one of — docs/10 §1.
+model PaymentTransaction {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  purposeType    String   @map("purpose_type") // FEE | BOOKING | DONATION
+  purposeId      String   @map("purpose_id")
+  gatewayCode    String   @map("gateway_code") // DEV | RAZORPAY
+  amount         Decimal  @db.Decimal(10, 2)
+  currency       String   @default("INR")
+  status         String   @default("CREATED")
+  idempotencyKey String?  @unique @map("idempotency_key")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user               User                       @relation(fields: [userId], references: [id])
+  gatewayTransaction PaymentGatewayTransaction?
+  webhooks           PaymentWebhook[]
+  refunds            Refund[]
+  receipt            PaymentReceipt?
+  donation           Donation?
+  ledgerEntries      FinancialLedgerEntry[]
+
+  @@map("payment_transactions")
+}
+
+model PaymentGatewayTransaction {
+  id                   String  @id @default(cuid())
+  paymentTransactionId String  @unique @map("payment_transaction_id")
+  gatewayOrderId       String? @map("gateway_order_id")
+  gatewayPaymentId     String? @map("gateway_payment_id")
+  gatewaySignature     String? @map("gateway_signature")
+  rawResponse          Json?   @map("raw_response")
+
+  paymentTransaction PaymentTransaction @relation(fields: [paymentTransactionId], references: [id], onDelete: Cascade)
+
+  @@map("payment_gateway_transactions")
+}
+
+// Every inbound webhook, verified or not, persisted before any business logic runs — docs/19 §3.
+model PaymentWebhook {
+  id                   String   @id @default(cuid())
+  paymentTransactionId String?  @map("payment_transaction_id")
+  gatewayCode          String   @map("gateway_code")
+  gatewayEventId       String   @map("gateway_event_id")
+  eventType            String   @map("event_type")
+  signatureValid       Boolean  @map("signature_valid")
+  payload              Json
+  receivedAt           DateTime @default(now()) @map("received_at")
+
+  paymentTransaction PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id])
+
+  @@unique([gatewayCode, gatewayEventId])
+  @@map("payment_webhooks")
+}
+
+model PaymentReceipt {
+  id                   String   @id @default(cuid())
+  paymentTransactionId String   @unique @map("payment_transaction_id")
+  receiptNumber        String   @unique @map("receipt_number")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  paymentTransaction PaymentTransaction @relation(fields: [paymentTransactionId], references: [id])
+
+  @@map("payment_receipts")
+}
+
+model Refund {
+  id                   String   @id @default(cuid())
+  paymentTransactionId String   @map("payment_transaction_id")
+  amount               Decimal  @db.Decimal(10, 2)
+  reason               String?  @db.Text
+  status               String   @default("PENDING")
+  gatewayRefundId      String?  @map("gateway_refund_id")
+  cancellationCharge   Decimal? @map("cancellation_charge") @db.Decimal(10, 2)
+  approvedBy           String?  @map("approved_by")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  paymentTransaction PaymentTransaction     @relation(fields: [paymentTransactionId], references: [id])
+  ledgerEntries      FinancialLedgerEntry[]
+
+  @@map("refunds")
+}
+
+model BookingInvoice {
+  id            String   @id @default(cuid())
+  bookingId     String   @unique @map("booking_id")
+  invoiceNumber String   @unique @map("invoice_number")
+  taxAmount     Decimal  @map("tax_amount") @db.Decimal(10, 2)
+  totalAmount   Decimal  @map("total_amount") @db.Decimal(10, 2)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@map("booking_invoices")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// H. COMMUNITY FEES & DONATIONS
+// ─────────────────────────────────────────────────────────────────
+
+model FinancialYear {
+  id        String   @id @default(cuid())
+  label     String   @unique
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+
+  feeRules      FeeRule[]
+  invoices      FeeInvoice[]
+  ledgerEntries FinancialLedgerEntry[]
+
+  @@map("financial_years")
+}
+
+model CommunityFeeType {
+  id            String  @id @default(cuid())
+  code          String  @unique
+  label         String
+  defaultAmount Decimal @map("default_amount") @db.Decimal(10, 2)
+  frequency     String // ANNUAL | MONTHLY | ONE_TIME | EVENT
+
+  rules FeeRule[]
+
+  @@map("community_fee_types")
+}
+
+model FeeRule {
+  id              String  @id @default(cuid())
+  feeTypeId       String  @map("fee_type_id")
+  financialYearId String  @map("financial_year_id")
+  amount          Decimal @db.Decimal(10, 2)
+  areaId          String? @map("area_id")
+  lateFeeAmount   Decimal @default(0) @map("late_fee_amount") @db.Decimal(10, 2)
+  gracePeriodDays Int     @default(0) @map("grace_period_days")
+
+  feeType       CommunityFeeType      @relation(fields: [feeTypeId], references: [id])
+  financialYear FinancialYear         @relation(fields: [financialYearId], references: [id])
+  area          Area?                 @relation(fields: [areaId], references: [id])
+  assignments   FamilyFeeAssignment[]
+  invoices      FeeInvoice[]
+
+  @@map("fee_rules")
+}
+
+model FamilyFeeAssignment {
+  id            String   @id @default(cuid())
+  familyId      String   @map("family_id")
+  feeRuleId     String   @map("fee_rule_id")
+  effectiveDate DateTime @map("effective_date") @db.Date
+
+  family  Family  @relation(fields: [familyId], references: [id])
+  feeRule FeeRule @relation(fields: [feeRuleId], references: [id])
+
+  @@unique([familyId, feeRuleId])
+  @@map("family_fee_assignments")
+}
+
+// Late fees are computed at read time from the rule's grace period + amount, not accrued by a cron
+// (no job scheduler exists yet, same limitation noted in M3 for booking expiry).
+model FeeInvoice {
+  id              String   @id @default(cuid())
+  familyId        String   @map("family_id")
+  feeRuleId       String   @map("fee_rule_id")
+  financialYearId String   @map("financial_year_id")
+  amountBilled    Decimal  @map("amount_billed") @db.Decimal(10, 2)
+  amountPaid      Decimal  @default(0) @map("amount_paid") @db.Decimal(10, 2)
+  status          String   @default("UNPAID")
+  dueDate         DateTime @map("due_date") @db.Date
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  family          Family                 @relation(fields: [familyId], references: [id])
+  feeRule         FeeRule                @relation(fields: [feeRuleId], references: [id])
+  financialYear   FinancialYear          @relation(fields: [financialYearId], references: [id])
+  items           FeeInvoiceItem[]
+  waivers         FeeWaiver[]
+  offlinePayments OfflinePayment[]
+  ledgerEntries   FinancialLedgerEntry[]
+
+  @@map("fee_invoices")
+}
+
+model FeeInvoiceItem {
+  id           String  @id @default(cuid())
+  feeInvoiceId String  @map("fee_invoice_id")
+  description  String
+  amount       Decimal @db.Decimal(10, 2)
+
+  feeInvoice FeeInvoice @relation(fields: [feeInvoiceId], references: [id], onDelete: Cascade)
+
+  @@map("fee_invoice_items")
+}
+
+model FeeWaiver {
+  id              String   @id @default(cuid())
+  feeInvoiceId    String   @map("fee_invoice_id")
+  type            String // DISCOUNT | WAIVER
+  originalAmount  Decimal  @map("original_amount") @db.Decimal(10, 2)
+  reductionAmount Decimal  @map("reduction_amount") @db.Decimal(10, 2)
+  reason          String   @db.Text
+  approvedBy      String   @map("approved_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  feeInvoice FeeInvoice @relation(fields: [feeInvoiceId], references: [id])
+
+  @@map("fee_waivers")
+}
+
+model OfflinePayment {
+  id           String    @id @default(cuid())
+  feeInvoiceId String    @map("fee_invoice_id")
+  amount       Decimal   @db.Decimal(10, 2)
+  method       String // CASH | BANK_TRANSFER | CHEQUE
+  reference    String?
+  status       String    @default("PENDING_VERIFICATION")
+  recordedBy   String    @map("recorded_by")
+  verifiedBy   String?   @map("verified_by")
+  verifiedAt   DateTime? @map("verified_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  feeInvoice FeeInvoice @relation(fields: [feeInvoiceId], references: [id])
+
+  @@map("offline_payments")
+}
+
+model DonationCause {
+  id       String  @id @default(cuid())
+  code     String  @unique
+  label    String
+  isActive Boolean @default(true) @map("is_active")
+
+  donations Donation[]
+
+  @@map("donation_causes")
+}
+
+model Donation {
+  id                   String   @id @default(cuid())
+  donorUserId          String   @map("donor_user_id")
+  causeId              String   @map("cause_id")
+  amount               Decimal  @db.Decimal(10, 2)
+  paymentTransactionId String?  @unique @map("payment_transaction_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  donor              User                   @relation(fields: [donorUserId], references: [id])
+  cause              DonationCause          @relation(fields: [causeId], references: [id])
+  paymentTransaction PaymentTransaction?    @relation(fields: [paymentTransactionId], references: [id])
+  ledgerEntries      FinancialLedgerEntry[]
+
+  @@map("donations")
+}
+
+// The append-only source of truth for every rupee — docs/06 §H.
+model FinancialLedgerEntry {
+  id                   String   @id @default(cuid())
+  entryType            String   @map("entry_type") // FEE | BOOKING | DONATION | REFUND | ADJUSTMENT | GATEWAY_FEE
+  familyId             String?  @map("family_id")
+  memberId             String?  @map("member_id")
+  bookingId            String?  @map("booking_id")
+  feeInvoiceId         String?  @map("fee_invoice_id")
+  donationId           String?  @map("donation_id")
+  paymentTransactionId String?  @map("payment_transaction_id")
+  refundId             String?  @map("refund_id")
+  amount               Decimal  @db.Decimal(10, 2)
+  tax                  Decimal  @default(0) @db.Decimal(10, 2)
+  discount             Decimal  @default(0) @db.Decimal(10, 2)
+  netAmount            Decimal  @map("net_amount") @db.Decimal(10, 2)
+  financialYearId      String?  @map("financial_year_id")
+  createdBy            String?  @map("created_by")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  family             Family?             @relation(fields: [familyId], references: [id])
+  member             Member?             @relation(fields: [memberId], references: [id])
+  booking            Booking?            @relation(fields: [bookingId], references: [id])
+  feeInvoice         FeeInvoice?         @relation(fields: [feeInvoiceId], references: [id])
+  donation           Donation?           @relation(fields: [donationId], references: [id])
+  paymentTransaction PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id])
+  refund             Refund?             @relation(fields: [refundId], references: [id])
+  financialYear      FinancialYear?      @relation(fields: [financialYearId], references: [id])
+
+  @@map("financial_ledger")
+}
+
+model PaymentReconciliation {
+  id          String    @id @default(cuid())
+  runDate     DateTime  @default(now()) @map("run_date")
+  gatewayCode String    @map("gateway_code")
+  mismatches  Json
+  resolvedBy  String?   @map("resolved_by")
+  resolvedAt  DateTime? @map("resolved_at")
+
+  @@map("payment_reconciliation")
 }

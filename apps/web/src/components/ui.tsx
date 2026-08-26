@@ -41,7 +41,10 @@ export function TopBar() {
           <Link href="/assets">Services</Link>
           <Link href="/bookings">My Bookings</Link>
           <Link href="/members/search">Directory</Link>
+          <Link href="/donations">Donations</Link>
           <Link href="/approvals">Approvals</Link>
+          {user.roles.includes('ADMIN') && <Link href="/admin/fees">Fee admin</Link>}
+          {user.roles.includes('ADMIN') && <Link href="/admin/payments">Payments admin</Link>}
           <Link href="/notifications" style={{ position: 'relative' }}>
             Notifications
             {unreadCount > 0 && (
@@ -79,9 +82,24 @@ export function ErrorBanner({ message }: { message: string | null }) {
   return <div className="error-banner">{message}</div>
 }
 
-const SUCCESS_STATUSES = new Set(['ACTIVE', 'VERIFIED', 'APPROVED', 'MARRIED', 'CONFIRMED', 'COMPLETED', 'AVAILABLE'])
-const WARNING_STATUSES = new Set(['PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'REQUESTED', 'PENDING_VERIFICATION', 'PENDING_APPROVAL', 'RESERVED'])
-const DANGER_STATUSES = new Set(['REJECTED', 'DECEASED', 'DECLINED', 'INACTIVE', 'CANCELLED', 'EXPIRED', 'SUSPENDED', 'REMOVED'])
+const SUCCESS_STATUSES = new Set(['ACTIVE', 'VERIFIED', 'APPROVED', 'MARRIED', 'CONFIRMED', 'COMPLETED', 'AVAILABLE', 'PAID', 'SUCCESSFUL'])
+const WARNING_STATUSES = new Set([
+  'PENDING',
+  'SUBMITTED',
+  'UNDER_REVIEW',
+  'REQUESTED',
+  'PENDING_VERIFICATION',
+  'PENDING_APPROVAL',
+  'RESERVED',
+  'PARTIAL',
+  'UNPAID',
+  'PROCESSING',
+  'INITIATED',
+  'CREATED',
+  'UNDER_VERIFICATION',
+  'PARTIALLY_REFUNDED',
+])
+const DANGER_STATUSES = new Set(['REJECTED', 'DECEASED', 'DECLINED', 'INACTIVE', 'CANCELLED', 'EXPIRED', 'SUSPENDED', 'REMOVED', 'OVERDUE', 'FAILED'])
 
 export function StatusPill({ status }: { status: string }) {
   const tone = SUCCESS_STATUSES.has(status) ? 'success' : WARNING_STATUSES.has(status) ? 'warning' : DANGER_STATUSES.has(status) ? 'danger' : 'neutral'

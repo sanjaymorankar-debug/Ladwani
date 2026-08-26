@@ -59,3 +59,36 @@ export const BOOKING_STATUSES = [
   'EXPIRED',
 ] as const
 export type BookingStatus = (typeof BOOKING_STATUSES)[number]
+
+export const PAYMENT_PURPOSE_TYPES = ['FEE', 'BOOKING', 'DONATION'] as const
+export type PaymentPurposeType = (typeof PAYMENT_PURPOSE_TYPES)[number]
+
+// docs/10-payment-architecture.md §4
+export const PAYMENT_TRANSACTION_STATUSES = [
+  'CREATED',
+  'PENDING',
+  'INITIATED',
+  'PROCESSING',
+  'SUCCESSFUL',
+  'FAILED',
+  'CANCELLED',
+  'UNDER_VERIFICATION',
+  'REFUNDED',
+  'PARTIALLY_REFUNDED',
+] as const
+export type PaymentTransactionStatus = (typeof PAYMENT_TRANSACTION_STATUSES)[number]
+
+export const REFUND_STATUSES = ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'] as const
+export type RefundStatus = (typeof REFUND_STATUSES)[number]
+
+export const FEE_INVOICE_STATUSES = ['UNPAID', 'PARTIAL', 'PAID', 'OVERDUE', 'WAIVED'] as const
+export type FeeInvoiceStatus = (typeof FEE_INVOICE_STATUSES)[number]
+
+export const FEE_FREQUENCIES = ['ONE_TIME', 'MONTHLY', 'ANNUAL', 'EVENT'] as const
+export type FeeFrequency = (typeof FEE_FREQUENCIES)[number]
+
+export const OFFLINE_PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE'] as const
+export type OfflinePaymentMethod = (typeof OFFLINE_PAYMENT_METHODS)[number]
+
+export const OFFLINE_PAYMENT_STATUSES = ['PENDING_VERIFICATION', 'VERIFIED', 'REJECTED'] as const
+export type OfflinePaymentStatus = (typeof OFFLINE_PAYMENT_STATUSES)[number]

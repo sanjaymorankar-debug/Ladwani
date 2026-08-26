@@ -6,6 +6,7 @@ import { FamilyService } from '../family/family.service'
 import { MembersService } from '../members/members.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { AssetsService } from '../assets/assets.service'
+import { FeesService } from '../fees/fees.service'
 
 type Tx = Prisma.TransactionClient
 
@@ -23,6 +24,7 @@ export class ApprovalQueueService {
     private membersService: MembersService,
     private notifications: NotificationsService,
     private assetsService: AssetsService,
+    private feesService: FeesService,
   ) {}
 
   list(status?: string) {
@@ -69,6 +71,8 @@ export class ApprovalQueueService {
         return this.assetsService.applyAssetRegisterApproval(tx, approval)
       case 'asset.suspend':
         return this.assetsService.applyAssetSuspendApproval(tx, approval)
+      case 'offline_payment.verify':
+        return this.feesService.applyOfflinePaymentApproval(tx, approval)
       default:
         return
     }

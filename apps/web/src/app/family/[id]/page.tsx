@@ -109,6 +109,11 @@ export default function FamilyDetailPage() {
                   Add a member
                 </Link>
               )}
+              {family.isKarta && (
+                <Link href={`/family/${family.id}/fees`} className="btn btn-outline">
+                  Fee invoices
+                </Link>
+              )}
             </div>
 
             {family.isKarta && joinRequests.length > 0 && (
