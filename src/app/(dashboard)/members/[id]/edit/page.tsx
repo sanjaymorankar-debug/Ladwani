@@ -12,6 +12,7 @@ import EmploymentManager from '@/components/profile/EmploymentManager'
 import SkillsManager from '@/components/profile/SkillsManager'
 import AddressesManager from '@/components/profile/AddressesManager'
 import SpouseLink from '@/components/profile/SpouseLink'
+import PhotoManager from '@/components/profile/PhotoManager'
 
 const schema = z.object({
   firstName: z.string().min(2),
@@ -244,6 +245,7 @@ export default function EditMemberPage() {
 
       {/* These sections save independently — no need to hit "Save Changes" above for them. */}
       <div className="space-y-6 mt-6">
+        <PhotoManager memberId={memberId} />
         <AddressesManager memberId={memberId} />
         <EducationManager memberId={memberId} />
         <EmploymentManager memberId={memberId} />

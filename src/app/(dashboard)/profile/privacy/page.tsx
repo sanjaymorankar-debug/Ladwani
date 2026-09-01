@@ -1,6 +1,7 @@
 'use client'
-import { useState } from 'react'
-import { Lock, Eye, EyeOff, Save, Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
+import { Lock, Save, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const VISIBILITY_OPTIONS = [
@@ -27,20 +28,47 @@ const FIELD_SETTINGS = [
 ]
 
 export default function PrivacySettingsPage() {
+  const { data: session } = useSession()
+  const memberId = (session?.user as any)?.memberId as string | undefined
+
   const [settings, setSettings] = useState<Record<string, string>>(
     Object.fromEntries(FIELD_SETTINGS.map((f) => [f.key, f.default]))
   )
   const [isSaving, setIsSaving] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    if (!memberId) return
+    fetch(`/api/members/${memberId}/visibility`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.settings) {
+          setSettings((s) => ({ ...s, ...d.settings }))
+        }
+      })
+      .finally(() => setIsLoading(false))
+  }, [memberId])
 
   const update = (key: string, value: string) => {
     setSettings((s) => ({ ...s, [key]: value }))
   }
 
   const save = async () => {
+    if (!memberId) return
     setIsSaving(true)
-    await new Promise((r) => setTimeout(r, 600)) // simulate save
-    toast.success('Privacy settings saved!')
-    setIsSaving(false)
+    try {
+      const res = await fetch(`/api/members/${memberId}/visibility`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings }),
+      })
+      if (!res.ok) throw new Error((await res.json()).message ?? 'Failed to save')
+      toast.success('Privacy settings saved!')
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -82,7 +110,7 @@ export default function PrivacySettingsPage() {
         ))}
       </div>
 
-      <button onClick={save} disabled={isSaving}
+      <button onClick={save} disabled={isSaving || isLoading || !memberId}
         className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-70">
         {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         {isSaving ? 'Saving...' : 'Save Privacy Settings'}

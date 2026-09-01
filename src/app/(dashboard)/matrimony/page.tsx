@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { Heart, Search, Filter, MapPin, GraduationCap, Briefcase } from 'lucide-react'
 import { calculateAge, genderLabel, maritalLabel, GENDER_LABELS } from '@/lib/utils'
+import SendInterestButton from '@/components/matrimony/SendInterestButton'
 
 export default async function MatrimonyPage() {
   const session = await getServerSession(authOptions)
@@ -45,11 +46,11 @@ export default async function MatrimonyPage() {
         </div>
         <div className="flex gap-3">
           {!myProfile ? (
-            <Link href="/dashboard/matrimony/create-profile" className="btn-primary flex items-center gap-2 text-sm">
+            <Link href="/matrimony/create-profile" className="btn-primary flex items-center gap-2 text-sm">
               <Heart className="w-4 h-4" /> Create My Profile
             </Link>
           ) : (
-            <Link href="/dashboard/matrimony/my-profile" className="btn-secondary flex items-center gap-2 text-sm">
+            <Link href="/matrimony/my-profile" className="btn-secondary flex items-center gap-2 text-sm">
               <Heart className="w-4 h-4" /> {myProfile.isVisible ? 'My Profile (Visible)' : 'My Profile (Hidden)'}
             </Link>
           )}
@@ -163,13 +164,11 @@ export default async function MatrimonyPage() {
                 )}
 
                 <div className="flex gap-2">
-                  <Link href={`/dashboard/matrimony/${profile.id}`}
+                  <Link href={`/matrimony/${profile.id}`}
                     className="flex-1 btn-secondary text-sm text-center py-2">
                     View Profile
                   </Link>
-                  <button className="flex-1 btn-primary text-sm py-2 flex items-center justify-center gap-1">
-                    <Heart className="w-3.5 h-3.5" /> Send Interest
-                  </button>
+                  <SendInterestButton toMemberId={member.id} />
                 </div>
               </div>
             )

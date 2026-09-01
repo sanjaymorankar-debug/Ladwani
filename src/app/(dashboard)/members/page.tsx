@@ -58,7 +58,7 @@ export default async function MembersDirectoryPage() {
           const family = member.families[0]?.family
           const edu = member.education[0]
           return (
-            <Link key={member.id} href={`/dashboard/members/${member.id}`} className="card-hover block text-center group">
+            <Link key={member.id} href={`/members/${member.id}`} className="card-hover block text-center group">
               <div className={`w-16 h-16 rounded-2xl mx-auto mb-3 flex items-center justify-center text-white text-xl font-bold font-display group-hover:scale-105 transition-transform ${
                 member.gender === 'MALE' ? 'bg-gradient-to-br from-blue-400 to-blue-600' :
                 member.gender === 'FEMALE' ? 'bg-gradient-to-br from-pink-400 to-pink-600' :

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { redactMemberForViewer } from '@/lib/visibility'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -16,7 +17,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     },
   })
   if (!member) return NextResponse.json({ message: 'Not found' }, { status: 404 })
-  return NextResponse.json(member)
+  return NextResponse.json(await redactMemberForViewer(session, member))
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {

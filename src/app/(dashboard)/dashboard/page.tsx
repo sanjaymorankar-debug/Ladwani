@@ -49,10 +49,10 @@ export default async function DashboardPage() {
   const family = member?.families[0]?.family
 
   const quickLinks = [
-    { href: '/dashboard/family', icon: Home, label: 'My Family', desc: family?.name ?? 'Set up your family', color: 'text-orange-600 bg-orange-50' },
-    { href: '/dashboard/family/tree', icon: TreePine, label: 'Family Tree', desc: 'View your family tree', color: 'text-green-600 bg-green-50' },
-    { href: '/dashboard/members', icon: Users, label: 'Directory', desc: 'Find community members', color: 'text-blue-600 bg-blue-50' },
-    { href: '/dashboard/matrimony', icon: Heart, label: 'Matrimony', desc: member?.matrimonialProfile?.isVisible ? 'Profile visible' : 'Set up profile', color: 'text-pink-600 bg-pink-50' },
+    { href: '/family', icon: Home, label: 'My Family', desc: family?.name ?? 'Set up your family', color: 'text-orange-600 bg-orange-50' },
+    { href: family ? `/family/${family.id}/tree` : '/family', icon: TreePine, label: 'Family Tree', desc: 'View your family tree', color: 'text-green-600 bg-green-50' },
+    { href: '/members', icon: Users, label: 'Directory', desc: 'Find community members', color: 'text-blue-600 bg-blue-50' },
+    { href: '/matrimony', icon: Heart, label: 'Matrimony', desc: member?.matrimonialProfile?.isVisible ? 'Profile visible' : 'Set up profile', color: 'text-pink-600 bg-pink-50' },
   ]
 
   return (
@@ -116,7 +116,7 @@ export default async function DashboardPage() {
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-900">Community Updates</h2>
-            <Link href="/dashboard/community" className="text-sm text-saffron-600 hover:text-saffron-700 flex items-center gap-1">
+            <Link href="/community" className="text-sm text-saffron-600 hover:text-saffron-700 flex items-center gap-1">
               View all <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
@@ -128,7 +128,7 @@ export default async function DashboardPage() {
               </div>
             ) : (
               recentPosts.map((post: any) => (
-                <Link key={post.id} href={`/dashboard/community/${post.id}`} className="card-hover block">
+                <Link key={post.id} href={`/community/${post.id}`} className="card-hover block">
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 bg-saffron-100 rounded-lg flex items-center justify-center flex-shrink-0 text-sm">
                       {post.postType?.icon ?? '📌'}
@@ -157,7 +157,7 @@ export default async function DashboardPage() {
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-sm font-medium text-amber-800">No family linked</p>
                 <p className="text-xs text-amber-700 mt-0.5 mb-2">Join or register your family to get started.</p>
-                <Link href="/dashboard/family/setup" className="text-xs font-medium text-amber-700 underline">
+                <Link href="/family/setup" className="text-xs font-medium text-amber-700 underline">
                   Set up family →
                 </Link>
               </div>
@@ -178,7 +178,7 @@ export default async function DashboardPage() {
               )}
             </div>
             <div className="pt-2 border-t border-gray-100">
-              <Link href="/dashboard/profile" className="btn-secondary text-sm w-full text-center block py-2">
+              <Link href="/profile" className="btn-secondary text-sm w-full text-center block py-2">
                 Complete Profile
               </Link>
             </div>

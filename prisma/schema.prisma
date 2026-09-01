@@ -785,6 +785,7 @@ model Photo {
   height           Int?
   isProfilePhoto   Boolean  @default(false)
   caption          String?
+  visibility       String   @default("PRIVATE") // PRIVATE, SAME_FAMILY, REGISTERED_MEMBERS, SAME_AREA, MATRIMONY_ONLY, PUBLIC_COMMUNITY, ADMIN_OPERATOR
   status           String   @default("ACTIVE") // ACTIVE, FLAGGED, REMOVED
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
