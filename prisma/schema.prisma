@@ -190,6 +190,7 @@ model Family {
   familyAreas     FamilyArea[]
   userRoles       UserRole[]
   photos          Photo[]
+  joinRequests    FamilyJoinRequest[]
   karta           Member?         @relation("FamilyKarta", fields: [kartaMemberId], references: [id])
 
   @@map("families")
@@ -207,6 +208,26 @@ enum VerificationStatus {
   UNVERIFIED
   VERIFIED
   REJECTED
+}
+
+model FamilyJoinRequest {
+  id                    String    @id @default(cuid())
+  familyId              String
+  memberId              String
+  relatedToMemberId     String?
+  relationshipTypeCode  String?
+  requestedBy           String
+  status                String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  respondedBy           String?
+  respondedAt           DateTime?
+  responseNote          String?
+  createdAt             DateTime  @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, memberId, status])
+  @@map("family_join_requests")
 }
 
 model FamilyMember {
@@ -288,6 +309,7 @@ model Member {
   savedByProfiles       MatrimonialSave[]  @relation("Saved")
   memberAreas           MemberArea[]
   fieldVisibility       MemberFieldVisibility[]
+  joinRequests          FamilyJoinRequest[]
   profilePhoto          Photo?         @relation("ProfilePhoto", fields: [profilePhotoId], references: [id])
 
   @@map("members")

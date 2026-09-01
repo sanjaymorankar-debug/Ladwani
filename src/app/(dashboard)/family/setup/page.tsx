@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -27,11 +28,13 @@ type Mode = 'choose' | 'search' | 'register'
 
 export default function FamilySetupPage() {
   const router = useRouter()
+  const { update } = useSession()
   const [mode, setMode] = useState<Mode>('choose')
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [joiningFamilyId, setJoiningFamilyId] = useState<string | null>(null)
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -49,8 +52,22 @@ export default function FamilySetupPage() {
   }
 
   const requestJoin = async (familyId: string, familyName: string) => {
-    toast.success(`Join request sent for ${familyName}! The family head will be notified.`)
-    router.push('/dashboard')
+    setJoiningFamilyId(familyId)
+    try {
+      const res = await fetch(`/api/families/${familyId}/join-requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.message ?? 'Failed to send request')
+      toast.success(`Join request sent for ${familyName}! The family head will be notified.`)
+      router.push('/dashboard')
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setJoiningFamilyId(null)
+    }
   }
 
   const onSubmit = async (data: FormData) => {
@@ -63,8 +80,10 @@ export default function FamilySetupPage() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? json.message ?? 'Failed')
-      toast.success('Family registration submitted! An operator will review and approve it.')
-      router.push('/dashboard')
+      // Pick up the freshly-granted KARTA role without forcing a re-login.
+      await update()
+      toast.success('Family registered — you are now its Karta. Submitted for verification.')
+      router.push(`/family/${json.familyId}`)
     } catch (e: any) {
       toast.error(e.message)
     } finally {
@@ -145,8 +164,12 @@ export default function FamilySetupPage() {
                         <span>· {f._count?.members ?? 0} members</span>
                       </div>
                     </div>
-                    <button onClick={() => requestJoin(f.id, f.name)} className="btn-primary text-xs px-3 py-1.5">
-                      Request to Join
+                    <button
+                      onClick={() => requestJoin(f.id, f.name)}
+                      disabled={joiningFamilyId === f.id}
+                      className="btn-primary text-xs px-3 py-1.5 disabled:opacity-70"
+                    >
+                      {joiningFamilyId === f.id ? 'Sending...' : 'Request to Join'}
                     </button>
                   </div>
                 ))}

@@ -31,6 +31,20 @@ function LoginForm() {
   const onSubmit = async (data: LoginInput) => {
     setIsLoading(true)
     try {
+      // Pre-flight check first: NextAuth collapses every authorize() failure
+      // into a generic "CredentialsSignin" error, so we can't tell suspended
+      // from locked from wrong-password through signIn() alone.
+      const checkRes = await fetch('/api/auth/login-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: data.identifier, password: data.password }),
+      })
+      const checkJson = await checkRes.json()
+      if (!checkRes.ok) {
+        toast.error(checkJson.message ?? 'Something went wrong. Please try again.')
+        return
+      }
+
       const res = await signIn('credentials', {
         identifier: data.identifier,
         password: data.password,
@@ -38,7 +52,7 @@ function LoginForm() {
         callbackUrl,
       })
       if (res?.error) {
-        toast.error(res.error === 'CredentialsSignin' ? 'Invalid email/mobile or password' : res.error)
+        toast.error('Something went wrong. Please try again.')
       } else if (res?.url) {
         router.push(res.url)
         router.refresh()

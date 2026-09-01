@@ -2,10 +2,14 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { canViewFamily } from '@/lib/family-auth'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  if (!(await canViewFamily(session, params.id))) {
+    return NextResponse.json({ message: 'You do not have access to this family' }, { status: 403 })
+  }
 
   const family = await prisma.family.findUnique({
     where: { id: params.id },

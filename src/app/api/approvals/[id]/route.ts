@@ -37,25 +37,56 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     escalate: 'ESCALATED',
   }
 
-  const updated = await prisma.approval.update({
-    where: { id: params.id },
-    data: {
-      status: statusMap[action] as any,
-      reviewedBy: session.user?.id as string,
-      reviewedAt: new Date(),
-      reviewNote: note,
-    },
-  })
+  const existing = await prisma.approval.findUnique({ where: { id: params.id } })
+  if (!existing) return NextResponse.json({ message: 'Not found' }, { status: 404 })
+  if (existing.status !== 'SUBMITTED' && existing.status !== 'UNDER_REVIEW') {
+    return NextResponse.json({ message: 'This request has already been reviewed' }, { status: 409 })
+  }
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: session.user?.id as string,
-      actorRole: roles[0],
-      action: `approval.${action}`,
-      entityType: 'approval',
-      entityId: params.id,
-      newValue: { status: statusMap[action], note },
-    },
+  const updated = await prisma.$transaction(async (tx) => {
+    const approval = await tx.approval.update({
+      where: { id: params.id },
+      data: {
+        status: statusMap[action] as any,
+        reviewedBy: session.user?.id as string,
+        reviewedAt: new Date(),
+        reviewNote: note,
+      },
+    })
+
+    // Apply the actual side effect on the entity this approval gates —
+    // flipping Approval.status alone doesn't change anything the rest of
+    // the app looks at (e.g. Family.verificationStatus).
+    if (approval.entityId && (action === 'approve' || action === 'reject')) {
+      if (approval.actionCode === 'family.create' && approval.entityType === 'family') {
+        await tx.family.update({
+          where: { id: approval.entityId },
+          data: action === 'approve'
+            ? {
+                status: 'ACTIVE',
+                verificationStatus: 'VERIFIED',
+                verifiedBy: session.user?.id as string,
+                verifiedAt: new Date(),
+              }
+            : {
+                verificationStatus: 'REJECTED',
+              },
+        })
+      }
+    }
+
+    await tx.auditLog.create({
+      data: {
+        actorId: session.user?.id as string,
+        actorRole: roles[0],
+        action: `approval.${action}`,
+        entityType: 'approval',
+        entityId: params.id,
+        newValue: { status: statusMap[action], note },
+      },
+    })
+
+    return approval
   })
 
   return NextResponse.json({ message: 'Updated', approval: updated })

@@ -40,27 +40,90 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const memberId = (session.user as any).memberId as string | null
+  if (!memberId) {
+    return NextResponse.json({ error: 'Your member profile could not be found. Please contact support.' }, { status: 400 })
+  }
 
   const body = await req.json()
   if (!body.name) return NextResponse.json({ error: 'Family name is required' }, { status: 400 })
 
-  const family = await prisma.family.create({
-    data: {
-      registrationNumber: `FAM-${new Date().getFullYear()}-${Math.floor(Math.random() * 90000 + 10000)}`,
-      name: body.name,
-      surname: body.surname ?? null,
-      description: body.description ?? null,
-      kuladevata: body.kuladevata ?? null,
-      gotra: body.gotra ?? null,
-      nativeVillage: body.nativeVillage ?? null,
-      nativeDistrict: body.nativeDistrict ?? null,
-      nativeState: body.nativeState ?? null,
-      nativeCountry: body.nativeCountry ?? 'India',
-      status: 'PENDING',
-      createdBy: session.user.id,
-    },
+  // A member can only actively belong to one family at a time — registering
+  // a second one while already linked would silently orphan the first.
+  const existingMembership = await prisma.familyMember.findFirst({
+    where: { memberId, leftAt: null },
+  })
+  if (existingMembership) {
+    return NextResponse.json({ error: 'You are already linked to a family.' }, { status: 409 })
+  }
+
+  const family = await prisma.$transaction(async (tx) => {
+    const created = await tx.family.create({
+      data: {
+        registrationNumber: `FAM-${new Date().getFullYear()}-${Math.floor(Math.random() * 90000 + 10000)}`,
+        name: body.name,
+        surname: body.surname ?? null,
+        description: body.description ?? null,
+        kuladevata: body.kuladevata ?? null,
+        kuladevi: body.kuladevi ?? null,
+        gotra: body.gotra ?? null,
+        traditionalOccupation: body.traditionalOccupation ?? null,
+        nativeVillage: body.nativeVillage ?? null,
+        nativeDistrict: body.nativeDistrict ?? null,
+        nativeState: body.nativeState ?? null,
+        nativeCountry: body.nativeCountry ?? 'India',
+        status: 'PENDING',
+        kartaMemberId: memberId,
+        createdBy: session.user.id,
+      },
+    })
+
+    await tx.familyMember.create({
+      data: { familyId: created.id, memberId, isKarta: true, joinedBy: session.user.id },
+    })
+
+    let kartaRole = await tx.role.findUnique({ where: { code: 'KARTA' } })
+    if (!kartaRole) {
+      kartaRole = await tx.role.create({ data: { code: 'KARTA', label: 'Karta', isSystem: true } })
+    }
+    await tx.userRole.create({
+      data: {
+        userId: session.user.id,
+        roleId: kartaRole.id,
+        familyId: created.id,
+        grantedBy: session.user.id,
+      },
+    })
+
+    await tx.approval.create({
+      data: {
+        actionCode: 'family.create',
+        entityType: 'family',
+        entityId: created.id,
+        newValue: { name: created.name, registrationNumber: created.registrationNumber },
+        status: 'SUBMITTED',
+        submittedBy: session.user.id,
+      },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        actorId: session.user.id,
+        actorRole: 'KARTA',
+        action: 'family.create',
+        entityType: 'family',
+        entityId: created.id,
+        newValue: { name: created.name },
+      },
+    })
+
+    return created
   })
 
-  return NextResponse.json({ message: 'Family created', familyId: family.id }, { status: 201 })
+  return NextResponse.json(
+    { message: 'Family created — you are now its Karta. Submitted for verification.', familyId: family.id },
+    { status: 201 }
+  )
 }

@@ -1,14 +1,18 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { canManageFamily } from '@/lib/family-auth'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, MapPin, TreePine, Users, CheckCircle2, Home, Calendar } from 'lucide-react'
+import { ArrowLeft, MapPin, TreePine, Users, CheckCircle2, Home, Calendar, Plus } from 'lucide-react'
 import { formatDate, calculateAge, GENDER_LABELS, MARITAL_STATUS_LABELS } from '@/lib/utils'
+import JoinRequestsInbox from '@/components/family/JoinRequestsInbox'
 
 export default async function FamilyDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session) return null
+
+  const isKarta = await canManageFamily(session, params.id)
 
   const family = await prisma.family.findUnique({
     where: { id: params.id, deletedAt: null },
@@ -63,9 +67,16 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
                   </span>
                 </div>
               </div>
-              <Link href={`/family/${family.id}/tree`} className="btn-secondary text-sm flex items-center gap-1.5 flex-shrink-0">
-                <TreePine className="w-4 h-4" /> View Tree
-              </Link>
+              <div className="flex gap-2 flex-shrink-0">
+                <Link href={`/family/${family.id}/tree`} className="btn-secondary text-sm flex items-center gap-1.5">
+                  <TreePine className="w-4 h-4" /> View Tree
+                </Link>
+                {isKarta && (
+                  <Link href={`/family/${family.id}/members/new`} className="btn-primary text-sm flex items-center gap-1.5">
+                    <Plus className="w-4 h-4" /> Add Member
+                  </Link>
+                )}
+              </div>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 mt-4 text-sm">
@@ -115,6 +126,8 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
           </p>
         )}
       </div>
+
+      {isKarta && <JoinRequestsInbox familyId={family.id} />}
 
       {/* Members */}
       <div>

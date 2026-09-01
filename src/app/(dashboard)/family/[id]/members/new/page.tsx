@@ -4,7 +4,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ArrowLeft, Loader2, User, MapPin, GraduationCap, Briefcase, Users } from 'lucide-react'
+import { ArrowLeft, Loader2, User, MapPin, GraduationCap, Briefcase, Users, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 
@@ -49,6 +49,7 @@ export default function AddMemberPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [relTypes, setRelTypes] = useState<any[]>([])
   const [familyMembers, setFamilyMembers] = useState<any[]>([])
+  const [possibleDuplicates, setPossibleDuplicates] = useState<any[] | null>(null)
 
   const { register, handleSubmit, watch, formState: { errors }, trigger } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -76,15 +77,19 @@ export default function AddMemberPage() {
     if (valid) setStep((s) => Math.min(s + 1, STEPS.length - 1))
   }
 
-  const onSubmit = async (data: FormData) => {
+  const submitMember = async (data: FormData, forceCreate: boolean) => {
     setIsLoading(true)
     try {
       const res = await fetch(`/api/families/${familyId}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, forceCreate }),
       })
       const json = await res.json()
+      if (res.status === 409 && json.possibleDuplicates) {
+        setPossibleDuplicates(json.possibleDuplicates)
+        return
+      }
       if (!res.ok) throw new Error(json.message || 'Failed to add member')
       toast.success('Member added successfully!')
       router.push(`/family/${familyId}`)
@@ -94,6 +99,9 @@ export default function AddMemberPage() {
       setIsLoading(false)
     }
   }
+
+  const onSubmit = (data: FormData) => submitMember(data, false)
+  const addAsNewAnyway = () => submitMember(watch(), true)
 
   const genderWatch = watch('gender')
 
@@ -332,6 +340,31 @@ export default function AddMemberPage() {
             </>
           )}
         </div>
+
+        {possibleDuplicates && possibleDuplicates.length > 0 && (
+          <div className="card mt-4 border-2 border-amber-200 bg-amber-50">
+            <div className="flex items-start gap-2 mb-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-amber-900">This person may already be registered</p>
+                <p className="text-sm text-amber-700">We found existing member records that look similar. Please check before creating a new one.</p>
+              </div>
+            </div>
+            <div className="space-y-2 mb-3">
+              {possibleDuplicates.map((m: any) => (
+                <Link key={m.id} href={`/members/${m.id}`} target="_blank"
+                  className="block p-2.5 bg-white rounded-lg border border-amber-100 text-sm hover:border-amber-300">
+                  <span className="font-medium text-gray-900">{m.firstName} {m.lastName ?? ''}</span>
+                  <span className="text-gray-500 ml-2">{m.memberNumber} · {[m.mobilePrimary, m.email].filter(Boolean).join(', ')}</span>
+                </Link>
+              ))}
+            </div>
+            <button type="button" onClick={addAsNewAnyway} disabled={isLoading}
+              className="btn-secondary text-sm w-full disabled:opacity-70">
+              None of these match — add as a new person
+            </button>
+          </div>
+        )}
 
         {/* Navigation buttons */}
         <div className="flex gap-3 mt-4">
