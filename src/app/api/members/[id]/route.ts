@@ -34,6 +34,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const canEdit = isOwn || roles.includes('ADMIN') || roles.includes('OPERATOR')
   if (!canEdit) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
 
+  // Marrying someone links two people's records and the family tree, so it
+  // always goes through the dedicated /spouse endpoint (which applies the
+  // approval gate). Every other marital-status value is a simple field edit.
+  if (body.maritalStatus === 'MARRIED' && member.maritalStatus !== 'MARRIED') {
+    return NextResponse.json(
+      { message: "To set status to Married, use the spouse-linking flow so the relationship can be recorded." },
+      { status: 400 }
+    )
+  }
+
   const updated = await prisma.member.update({
     where: { id: params.id },
     data: {
@@ -43,14 +53,21 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       gender: body.gender,
       dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
       bloodGroup: body.bloodGroup || null,
+      heightCm: body.heightCm ? parseInt(body.heightCm) : null,
+      weightKg: body.weightKg ? parseInt(body.weightKg) : null,
+      bodyType: body.bodyType || null,
+      physicalDisability: body.physicalDisability || null,
       mobilePrimary: body.mobilePrimary || null,
       email: body.email || null,
-      currentCity: body.currentCity || null,
-      currentState: body.currentState || null,
-      currentCountry: body.currentCountry || null,
-      nativeVillage: body.nativeVillage || null,
-      nativeDistrict: body.nativeDistrict || null,
-      nativeState: body.nativeState || null,
+      // Address fields are edited via /api/members/[id]/addresses now, which
+      // keeps these flat copies in sync. Only touch them here if the caller
+      // explicitly sent one — omitting a field must never blank it out.
+      ...(body.currentCity !== undefined ? { currentCity: body.currentCity || null } : {}),
+      ...(body.currentState !== undefined ? { currentState: body.currentState || null } : {}),
+      ...(body.currentCountry !== undefined ? { currentCountry: body.currentCountry || null } : {}),
+      ...(body.nativeVillage !== undefined ? { nativeVillage: body.nativeVillage || null } : {}),
+      ...(body.nativeDistrict !== undefined ? { nativeDistrict: body.nativeDistrict || null } : {}),
+      ...(body.nativeState !== undefined ? { nativeState: body.nativeState || null } : {}),
       maritalStatus: body.maritalStatus,
       employmentStatus: body.employmentStatus || null,
       occupationCategory: body.occupationCategory || null,

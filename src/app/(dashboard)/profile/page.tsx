@@ -20,7 +20,9 @@ export default async function ProfilePage() {
           skills: { include: { skill: { select: { name: true } } }, take: 6 },
           families: { include: { family: { select: { id: true, name: true } } }, take: 1 },
           matrimonialProfile: { select: { isVisible: true } },
-          _count: { select: { relationshipsFrom: true } },
+          addresses: { select: { addressType: true } },
+          photos: { where: { isProfilePhoto: true }, take: 1 },
+          _count: { select: { relationshipsFrom: true, education: true, employment: true, skills: true } },
         },
       },
     },
@@ -31,6 +33,23 @@ export default async function ProfilePage() {
   const age = calculateAge(member?.dateOfBirth)
   const edu = member?.education[0]
   const job = member?.employment[0]
+
+  const completionChecks = member
+    ? [
+        { label: 'Date of birth', done: !!member.dateOfBirth },
+        { label: 'Profile photo', done: member.photos.length > 0 },
+        { label: 'Education', done: member._count.education > 0 },
+        { label: 'Employment / occupation', done: member._count.employment > 0 || !!member.employmentStatus },
+        { label: 'Skills', done: member._count.skills > 0 },
+        { label: 'Current address', done: member.addresses.some((a) => a.addressType === 'CURRENT') },
+        { label: 'Native address', done: member.addresses.some((a) => a.addressType === 'NATIVE') },
+        { label: 'Biography', done: !!member.biography },
+      ]
+    : []
+  const completionPct = completionChecks.length
+    ? Math.round((completionChecks.filter((c) => c.done).length / completionChecks.length) * 100)
+    : 0
+  const missing = completionChecks.filter((c) => !c.done).map((c) => c.label)
 
   const settingsLinks = [
     { href: '/members/' + (member?.id ?? '') + '/edit', icon: Edit, label: 'Edit Profile', desc: 'Update your personal information' },
@@ -102,6 +121,22 @@ export default async function ProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Profile completion */}
+      {member && completionPct < 100 && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-gray-700">Profile {completionPct}% Complete</h2>
+            <Link href={`/members/${member.id}/edit`} className="text-xs text-saffron-600 font-medium hover:text-saffron-700">
+              Complete Profile
+            </Link>
+          </div>
+          <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-2">
+            <div className="h-full bg-saffron-500 rounded-full transition-all" style={{ width: `${completionPct}%` }} />
+          </div>
+          <p className="text-xs text-gray-500">Missing: {missing.join(', ')}</p>
+        </div>
+      )}
 
       {/* Settings shortcuts */}
       <div>

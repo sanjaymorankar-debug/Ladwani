@@ -7,6 +7,11 @@ import { z } from 'zod'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
+import EducationManager from '@/components/profile/EducationManager'
+import EmploymentManager from '@/components/profile/EmploymentManager'
+import SkillsManager from '@/components/profile/SkillsManager'
+import AddressesManager from '@/components/profile/AddressesManager'
+import SpouseLink from '@/components/profile/SpouseLink'
 
 const schema = z.object({
   firstName: z.string().min(2),
@@ -15,14 +20,12 @@ const schema = z.object({
   gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'NOT_STATED']),
   dateOfBirth: z.string().optional(),
   bloodGroup: z.string().optional(),
+  heightCm: z.string().optional(),
+  weightKg: z.string().optional(),
+  bodyType: z.string().optional(),
+  physicalDisability: z.string().optional(),
   mobilePrimary: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
-  currentCity: z.string().optional(),
-  currentState: z.string().optional(),
-  currentCountry: z.string().optional(),
-  nativeVillage: z.string().optional(),
-  nativeDistrict: z.string().optional(),
-  nativeState: z.string().optional(),
   maritalStatus: z.enum(['UNMARRIED', 'MARRIED', 'WIDOWED', 'DIVORCED', 'SEPARATED', 'NOT_STATED']),
   employmentStatus: z.string().optional(),
   occupationCategory: z.string().optional(),
@@ -37,15 +40,17 @@ export default function EditMemberPage() {
   const memberId = params.id as string
   const [isLoading, setIsLoading] = useState(false)
   const [isFetching, setIsFetching] = useState(true)
+  const [currentMaritalStatus, setCurrentMaritalStatus] = useState<string | null>(null)
 
   const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
 
-  useEffect(() => {
+  const fetchMember = () =>
     fetch(`/api/members/${memberId}`)
       .then((r) => r.json())
       .then((data) => {
+        setCurrentMaritalStatus(data.maritalStatus)
         reset({
           firstName: data.firstName,
           middleName: data.middleName ?? '',
@@ -53,14 +58,12 @@ export default function EditMemberPage() {
           gender: data.gender,
           dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth).toISOString().split('T')[0] : '',
           bloodGroup: data.bloodGroup ?? '',
+          heightCm: data.heightCm?.toString() ?? '',
+          weightKg: data.weightKg?.toString() ?? '',
+          bodyType: data.bodyType ?? '',
+          physicalDisability: data.physicalDisability ?? '',
           mobilePrimary: data.mobilePrimary ?? '',
           email: data.email ?? '',
-          currentCity: data.currentCity ?? '',
-          currentState: data.currentState ?? '',
-          currentCountry: data.currentCountry ?? 'India',
-          nativeVillage: data.nativeVillage ?? '',
-          nativeDistrict: data.nativeDistrict ?? '',
-          nativeState: data.nativeState ?? '',
           maritalStatus: data.maritalStatus,
           employmentStatus: data.employmentStatus ?? '',
           occupationCategory: data.occupationCategory ?? '',
@@ -69,7 +72,8 @@ export default function EditMemberPage() {
         setIsFetching(false)
       })
       .catch(() => setIsFetching(false))
-  }, [memberId, reset])
+
+  useEffect(() => { fetchMember() }, [memberId])
 
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
@@ -135,7 +139,9 @@ export default function EditMemberPage() {
               <label className="form-label">Marital Status</label>
               <select {...register('maritalStatus')} className="form-input">
                 <option value="UNMARRIED">Unmarried</option>
-                <option value="MARRIED">Married</option>
+                <option value="MARRIED" disabled={currentMaritalStatus !== 'MARRIED'}>
+                  Married{currentMaritalStatus !== 'MARRIED' ? ' (use Link Spouse below)' : ''}
+                </option>
                 <option value="WIDOWED">Widowed</option>
                 <option value="DIVORCED">Divorced</option>
                 <option value="SEPARATED">Separated</option>
@@ -159,10 +165,37 @@ export default function EditMemberPage() {
               </select>
             </div>
           </div>
+          {currentMaritalStatus !== 'MARRIED' && (
+            <SpouseLink memberId={memberId} onDone={fetchMember} />
+          )}
           <div>
             <label className="form-label">Biography / About</label>
             <textarea {...register('biography')} className="form-input min-h-[100px]"
               placeholder="Brief introduction about yourself..." />
+          </div>
+        </div>
+
+        <div className="card space-y-4">
+          <h3 className="font-semibold text-gray-900 border-b border-gray-100 pb-2">
+            Physical Details <span className="text-xs text-gray-400 font-normal">(optional)</span>
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="form-label">Height (cm)</label>
+              <input {...register('heightCm')} type="number" className="form-input" placeholder="170" />
+            </div>
+            <div>
+              <label className="form-label">Weight (kg)</label>
+              <input {...register('weightKg')} type="number" className="form-input" placeholder="65" />
+            </div>
+            <div>
+              <label className="form-label">Body Type</label>
+              <input {...register('bodyType')} className="form-input" placeholder="e.g. Athletic, Average" />
+            </div>
+            <div>
+              <label className="form-label">Physical Disability</label>
+              <input {...register('physicalDisability')} className="form-input" placeholder="Leave blank if none" />
+            </div>
           </div>
         </div>
 
@@ -181,45 +214,7 @@ export default function EditMemberPage() {
         </div>
 
         <div className="card space-y-4">
-          <h3 className="font-semibold text-gray-900 border-b border-gray-100 pb-2">Address</h3>
-          <div>
-            <p className="text-sm font-medium text-gray-600 mb-2">Current Residence</p>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="form-label">City</label>
-                <input {...register('currentCity')} className="form-input" />
-              </div>
-              <div>
-                <label className="form-label">State</label>
-                <input {...register('currentState')} className="form-input" />
-              </div>
-              <div>
-                <label className="form-label">Country</label>
-                <input {...register('currentCountry')} className="form-input" />
-              </div>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-600 mb-2">Native / Original Place</p>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="form-label">Village</label>
-                <input {...register('nativeVillage')} className="form-input" />
-              </div>
-              <div>
-                <label className="form-label">District</label>
-                <input {...register('nativeDistrict')} className="form-input" />
-              </div>
-              <div>
-                <label className="form-label">State</label>
-                <input {...register('nativeState')} className="form-input" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="card space-y-4">
-          <h3 className="font-semibold text-gray-900 border-b border-gray-100 pb-2">Employment</h3>
+          <h3 className="font-semibold text-gray-900 border-b border-gray-100 pb-2">Employment Status</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="form-label">Employment Status</label>
@@ -246,6 +241,14 @@ export default function EditMemberPage() {
           </button>
         </div>
       </form>
+
+      {/* These sections save independently — no need to hit "Save Changes" above for them. */}
+      <div className="space-y-6 mt-6">
+        <AddressesManager memberId={memberId} />
+        <EducationManager memberId={memberId} />
+        <EmploymentManager memberId={memberId} />
+        <SkillsManager memberId={memberId} />
+      </div>
     </div>
   )
 }

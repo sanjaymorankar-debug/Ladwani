@@ -262,6 +262,10 @@ model Member {
   dateOfBirth           DateTime?
   dateOfBirthApprox     Boolean        @default(false)
   bloodGroup            String?
+  heightCm              Int?
+  weightKg              Int?
+  bodyType              String?
+  physicalDisability    String?
   mobilePrimary         String?
   mobileAlternate       String?
   email                 String?

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { applySpouseLink } from '@/lib/approvals'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -72,6 +73,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 verificationStatus: 'REJECTED',
               },
         })
+      }
+
+      if (approval.actionCode === 'member.marital_status_change' && approval.entityType === 'member' && action === 'approve') {
+        const payload = (approval.newValue ?? {}) as { spouseMemberId?: string | null; externalSpouseName?: string | null }
+        await applySpouseLink(tx, approval.entityId, payload, session.user?.id as string, approval.id)
       }
     }
 

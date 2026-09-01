@@ -119,6 +119,31 @@ export default async function FamilyPage() {
         )}
       </div>
 
+      {(() => {
+        const checks = [
+          { label: 'Family photo', done: !!family.familyPhotoId },
+          { label: 'Native village', done: !!family.nativeVillage },
+          { label: 'Family description', done: !!family.description },
+          { label: 'Current address', done: !!address },
+        ]
+        const pct = Math.round((checks.filter((c) => c.done).length / checks.length) * 100)
+        if (pct === 100) return null
+        return (
+          <div className="card">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-gray-700">Family Profile {pct}% Complete</h2>
+              <Link href={`/family/${family.id}/edit`} className="text-xs text-saffron-600 font-medium hover:text-saffron-700">
+                Complete Family Profile
+              </Link>
+            </div>
+            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-2">
+              <div className="h-full bg-saffron-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            <p className="text-xs text-gray-500">Missing: {checks.filter((c) => !c.done).map((c) => c.label).join(', ')}</p>
+          </div>
+        )
+      })()}
+
       <div className="flex flex-wrap gap-3">
         <Link href={`/family/${family.id}/tree`} className="btn-primary flex items-center gap-2 text-sm">
           <TreePine className="w-4 h-4" /> View Family Tree
