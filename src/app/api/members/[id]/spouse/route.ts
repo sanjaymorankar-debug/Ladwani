@@ -6,7 +6,7 @@ import { getMemberAccess } from '@/lib/member-auth'
 import { requiresApproval, createApprovalRecord, applySpouseLink } from '@/lib/approvals'
 
 // Marking a member MARRIED and linking (or recording) their spouse.
-// Gated by ApprovalRule('member.marital_status_change') — conservative
+// Gated by ApprovalRule('member.marital_status.change') — conservative
 // default requires Operator/Admin review since it mutates two people's
 // records and the family tree.
 export async function POST(req: Request, { params }: { params: { id: string } }) {
@@ -29,10 +29,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     externalSpouseName: body.externalSpouseName ?? null,
   }
 
-  if (await requiresApproval('member.marital_status_change')) {
+  if (await requiresApproval('member.marital_status.change')) {
     await prisma.$transaction(async (tx) => {
       await createApprovalRecord(tx, {
-        actionCode: 'member.marital_status_change',
+        actionCode: 'member.marital_status.change',
         entityType: 'member',
         entityId: params.id,
         newValue: payload,

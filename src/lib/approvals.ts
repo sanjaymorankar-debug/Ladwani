@@ -22,7 +22,7 @@ export interface SpouseLinkPayload {
 /**
  * Applies a marital-status-to-MARRIED change plus spouse relationship
  * linking. Shared by the direct (approval-not-required) path and by the
- * approvals PATCH route when a queued 'member.marital_status_change' gets
+ * approvals PATCH route when a queued 'member.marital_status.change' gets
  * approved — the two must produce identical results.
  */
 export async function applySpouseLink(

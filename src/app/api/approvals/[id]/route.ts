@@ -75,7 +75,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         })
       }
 
-      if (approval.actionCode === 'member.marital_status_change' && approval.entityType === 'member' && action === 'approve') {
+      if (approval.actionCode === 'member.marital_status.change' && approval.entityType === 'member' && action === 'approve') {
         const payload = (approval.newValue ?? {}) as { spouseMemberId?: string | null; externalSpouseName?: string | null }
         await applySpouseLink(tx, approval.entityId, payload, session.user?.id as string, approval.id)
       }

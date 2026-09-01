@@ -100,7 +100,7 @@ export default async function DashboardPage() {
         <h2 className="text-lg font-semibold text-gray-900 mb-3">Quick Access</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {quickLinks.map((l) => (
-            <Link key={l.href} href={l.href} className="card-hover group">
+            <Link key={l.label} href={l.href} className="card-hover group">
               <div className={`w-10 h-10 ${l.color} rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                 <l.icon className="w-5 h-5" />
               </div>
