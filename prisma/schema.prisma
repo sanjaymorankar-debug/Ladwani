@@ -1,0 +1,922 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// AUTHENTICATION & ROLES
+// ─────────────────────────────────────────────────────────────────
+
+model User {
+  id              String    @id @default(cuid())
+  email           String?   @unique
+  mobile          String?   @unique
+  passwordHash    String
+  emailVerified   Boolean   @default(false)
+  mobileVerified  Boolean   @default(false)
+  status          UserStatus @default(PENDING)
+  lastLoginAt     DateTime?
+  lastLoginIp     String?
+  failedAttempts  Int       @default(0)
+  lockedUntil     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  member          Member?
+  userRoles       UserRole[]
+  refreshTokens   RefreshToken[]
+  verificationTokens VerificationToken[]
+  consentRecords  ConsentRecord[]
+  posts           Post[]
+  comments        Comment[]
+  reactions       Reaction[]
+  reports         Report[]
+  sentNotifications Notification[] @relation("NotificationSender")
+  receivedNotifications Notification[] @relation("NotificationRecipient")
+  approvalSubmissions Approval[] @relation("ApprovalSubmitter")
+  approvalReviews Approval[] @relation("ApprovalReviewer")
+  auditLogs       AuditLog[]
+  blockedBy       BlockedUser[] @relation("Blocker")
+  blocking        BlockedUser[] @relation("Blocked")
+  uploadedPhotos  Photo[]
+
+  @@map("users")
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  BLOCKED
+  DEACTIVATED
+}
+
+model Role {
+  id          String @id @default(cuid())
+  code        String @unique // MEMBER, KARTA, OPERATOR, ADMIN
+  label       String
+  description String?
+  isSystem    Boolean @default(false)
+  createdAt   DateTime @default(now())
+
+  userRoles        UserRole[]
+  rolePermissions  RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id     String @id @default(cuid())
+  code   String @unique // e.g. family:create, member:mark_deceased
+  label  String
+  module String // family, member, matrimony, etc.
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  familyId  String?  // scoped Karta role
+  areaId    String?  // scoped Operator role
+  grantedBy String?
+  grantedAt DateTime @default(now())
+  expiresAt DateTime?
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role    @relation(fields: [roleId], references: [id])
+  family Family? @relation(fields: [familyId], references: [id])
+  area   Area?   @relation(fields: [areaId], references: [id])
+
+  @@map("user_roles")
+}
+
+model VerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String    // EMAIL_VERIFY, MOBILE_VERIFY, PASSWORD_RESET
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("verification_tokens")
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  deviceInfo Json?
+  ipAddress  String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model ConsentRecord {
+  id          String    @id @default(cuid())
+  userId      String
+  consentType String    // PROFILE_STORAGE, FAMILY_INFO, PHOTO_UPLOAD, MATRIMONIAL_VISIBILITY, NOTIFICATIONS
+  granted     Boolean
+  version     String?
+  ipAddress   String?
+  userAgent   String?
+  grantedAt   DateTime  @default(now())
+  revokedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("consent_records")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// FAMILY
+// ─────────────────────────────────────────────────────────────────
+
+model Family {
+  id                  String       @id @default(cuid())
+  registrationNumber  String       @unique
+  name                String
+  surname             String?
+  description         String?      @db.Text
+  kuladevata          String?
+  kuladevi            String?
+  gotra               String?
+  traditionalOccupation String?
+  nativeVillage       String?
+  nativeDistrict      String?
+  nativeState         String?
+  nativeCountry       String       @default("India")
+  kartaMemberId       String?
+  familyPhotoId       String?
+  status              FamilyStatus @default(PENDING)
+  verificationStatus  VerificationStatus @default(UNVERIFIED)
+  verifiedBy          String?
+  verifiedAt          DateTime?
+  communityId         String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  createdBy           String?
+  updatedBy           String?
+  deletedAt           DateTime?
+
+  members         FamilyMember[]
+  addresses       Address[]
+  familyAreas     FamilyArea[]
+  userRoles       UserRole[]
+  photos          Photo[]
+  karta           Member?         @relation("FamilyKarta", fields: [kartaMemberId], references: [id])
+
+  @@map("families")
+}
+
+enum FamilyStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  MERGED
+  ARCHIVED
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  VERIFIED
+  REJECTED
+}
+
+model FamilyMember {
+  id         String    @id @default(cuid())
+  familyId   String
+  memberId   String
+  isKarta    Boolean   @default(false)
+  joinedAt   DateTime  @default(now())
+  joinedBy   String?
+  leftAt     DateTime?
+  leftReason String?   // MARRIED_OUT, DECEASED, SEPARATED, ERROR, MERGED
+
+  family Family @relation(fields: [familyId], references: [id])
+  member Member @relation(fields: [memberId], references: [id])
+
+  @@unique([familyId, memberId])
+  @@map("family_members")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MEMBERS
+// ─────────────────────────────────────────────────────────────────
+
+model Member {
+  id                    String         @id @default(cuid())
+  memberNumber          String         @unique
+  userId                String?        @unique
+  firstName             String
+  middleName            String?
+  lastName              String?
+  gender                Gender         @default(NOT_STATED)
+  dateOfBirth           DateTime?
+  dateOfBirthApprox     Boolean        @default(false)
+  bloodGroup            String?
+  mobilePrimary         String?
+  mobileAlternate       String?
+  email                 String?
+  profilePhotoId        String?        @unique
+  biography             String?        @db.Text
+  currentCity           String?
+  currentState          String?
+  currentCountry        String?
+  nativeVillage         String?
+  nativeDistrict        String?
+  nativeState           String?
+  nationality           String         @default("Indian")
+  maritalStatus         MaritalStatus  @default(UNMARRIED)
+  employmentStatus      String?
+  occupationCategory    String?
+  status                MemberStatus   @default(ACTIVE)
+  deceasedAt            DateTime?
+  deceasedPlace         String?
+  deceasedNotes         String?        @db.Text
+  verificationStatus    VerificationStatus @default(UNVERIFIED)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  createdBy             String?
+  updatedBy             String?
+  deletedAt             DateTime?
+
+  user                  User?          @relation(fields: [userId], references: [id])
+  families              FamilyMember[]
+  familiesAsKarta       Family[]       @relation("FamilyKarta")
+  relationshipsFrom     MemberRelationship[] @relation("RelationshipFrom")
+  relationshipsTo       MemberRelationship[] @relation("RelationshipTo")
+  maritalHistory        MaritalStatusHistory[]
+  marriageRecordsA      MarriageRecord[] @relation("MarriagePartnerA")
+  marriageRecordsB      MarriageRecord[] @relation("MarriagePartnerB")
+  addresses             Address[]
+  education             EducationRecord[]
+  employment            EmploymentRecord[]
+  businesses            Business[]
+  skills                MemberSkill[]
+  matrimonialProfile    MatrimonialProfile?
+  photos                Photo[]
+  sentInterests         MatrimonialInterest[] @relation("InterestFrom")
+  receivedInterests     MatrimonialInterest[] @relation("InterestTo")
+  savedProfiles         MatrimonialSave[]  @relation("SavedBy")
+  savedByProfiles       MatrimonialSave[]  @relation("Saved")
+  memberAreas           MemberArea[]
+  fieldVisibility       MemberFieldVisibility[]
+  profilePhoto          Photo?         @relation("ProfilePhoto", fields: [profilePhotoId], references: [id])
+
+  @@map("members")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  NOT_STATED
+}
+
+enum MaritalStatus {
+  UNMARRIED
+  MARRIED
+  WIDOWED
+  DIVORCED
+  SEPARATED
+  NOT_STATED
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  DECEASED
+  SUSPENDED
+}
+
+model RelationshipType {
+  id               String  @id @default(cuid())
+  code             String  @unique
+  label            String
+  inverseCode      String?
+  genderApplicable String? // MALE, FEMALE, ANY
+  isSpouse         Boolean @default(false)
+  isActive         Boolean @default(true)
+  sortOrder        Int     @default(0)
+
+  relationships MemberRelationship[]
+
+  @@map("relationship_types")
+}
+
+model MemberRelationship {
+  id                 String   @id @default(cuid())
+  fromMemberId       String
+  toMemberId         String
+  relationshipTypeId String
+  familyId           String?
+  isActive           Boolean  @default(true)
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  createdBy          String?
+
+  fromMember       Member           @relation("RelationshipFrom", fields: [fromMemberId], references: [id])
+  toMember         Member           @relation("RelationshipTo", fields: [toMemberId], references: [id])
+  relationshipType RelationshipType @relation(fields: [relationshipTypeId], references: [id])
+
+  @@unique([fromMemberId, toMemberId, relationshipTypeId])
+  @@map("member_relationships")
+}
+
+model MaritalStatusHistory {
+  id            String    @id @default(cuid())
+  memberId      String
+  status        MaritalStatus
+  effectiveDate DateTime?
+  notes         String?
+  changedBy     String?
+  approvalId    String?
+  createdAt     DateTime  @default(now())
+
+  member   Member   @relation(fields: [memberId], references: [id])
+  approval Approval? @relation(fields: [approvalId], references: [id])
+
+  @@map("marital_status_history")
+}
+
+model MarriageRecord {
+  id                  String        @id @default(cuid())
+  memberId1           String
+  memberId2           String?
+  externalSpouseName  String?
+  externalSpouseInfo  Json?
+  marriageDate        DateTime?
+  marriagePlace       String?
+  status              String        @default("MARRIED") // MARRIED, DIVORCED, WIDOWED
+  dissolutionDate     DateTime?
+  notes               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  createdBy           String?
+
+  partnerA Member  @relation("MarriagePartnerA", fields: [memberId1], references: [id])
+  partnerB Member? @relation("MarriagePartnerB", fields: [memberId2], references: [id])
+
+  @@map("marriage_records")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PROFESSIONAL PROFILE
+// ─────────────────────────────────────────────────────────────────
+
+model EducationRecord {
+  id             String   @id @default(cuid())
+  memberId       String
+  level          String?  // SCHOOL, DIPLOMA, ITI, UG, PG, DOCTORATE, PROFESSIONAL, OTHER
+  qualification  String?
+  specialization String?
+  institution    String?
+  yearCompleted  Int?
+  isHighest      Boolean  @default(false)
+  isOngoing      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id])
+
+  @@map("education_records")
+}
+
+model EmploymentRecord {
+  id             String   @id @default(cuid())
+  memberId       String
+  employmentType String?  // JOB, BUSINESS, PROFESSION, AGRICULTURE, OTHER
+  employerName   String?
+  designation    String?
+  industry       String?
+  city           String?
+  country        String?
+  incomeRangeId  String?
+  startDate      DateTime?
+  endDate        DateTime?
+  isCurrent      Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  member      Member       @relation(fields: [memberId], references: [id])
+  incomeRange IncomeRange? @relation(fields: [incomeRangeId], references: [id])
+
+  @@map("employment_records")
+}
+
+model Business {
+  id              String   @id @default(cuid())
+  memberId        String
+  businessName    String?
+  businessType    String?
+  industry        String?
+  city            String?
+  country         String?
+  description     String?  @db.Text
+  website         String?
+  establishedYear Int?
+  incomeRangeId   String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  member      Member       @relation(fields: [memberId], references: [id])
+  incomeRange IncomeRange? @relation(fields: [incomeRangeId], references: [id])
+
+  @@map("businesses")
+}
+
+model Skill {
+  id        String  @id @default(cuid())
+  name      String  @unique
+  category  String?
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  memberSkills MemberSkill[]
+
+  @@map("skills")
+}
+
+model MemberSkill {
+  memberId String
+  skillId  String
+  level    String? // BEGINNER, INTERMEDIATE, EXPERT
+
+  member Member @relation(fields: [memberId], references: [id])
+  skill  Skill  @relation(fields: [skillId], references: [id])
+
+  @@id([memberId, skillId])
+  @@map("member_skills")
+}
+
+model IncomeRange {
+  id         String  @id @default(cuid())
+  label      String  // "₹5–10 lakh"
+  minValue   BigInt?
+  maxValue   BigInt?
+  sortOrder  Int     @default(0)
+  isActive   Boolean @default(true)
+
+  employmentRecords EmploymentRecord[]
+  businesses        Business[]
+  matrimonialPreferences MatrimonialPreference[]
+
+  @@map("income_ranges")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ADDRESSES
+// ─────────────────────────────────────────────────────────────────
+
+model Address {
+  id              String  @id @default(cuid())
+  addressableType String  // family | member
+  familyId        String?
+  memberId        String?
+  addressType     String  // CURRENT, NATIVE, WORK, OTHER
+  line1           String?
+  line2           String?
+  city            String?
+  district        String?
+  state           String?
+  country         String  @default("India")
+  pincode         String?
+  isPrimary       Boolean @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  family Family? @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  member Member? @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MATRIMONY
+// ─────────────────────────────────────────────────────────────────
+
+model MatrimonialProfile {
+  id         String  @id @default(cuid())
+  memberId   String  @unique
+  isVisible  Boolean @default(false)
+  about      String? @db.Text
+  heightCm   Int?
+  languages  String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  createdBy  String?
+
+  member     Member @relation(fields: [memberId], references: [id])
+  preferences MatrimonialPreference?
+
+  @@map("matrimonial_profiles")
+}
+
+model MatrimonialPreference {
+  id                   String   @id @default(cuid())
+  matrimonialProfileId String   @unique
+  minAge               Int?
+  maxAge               Int?
+  preferredGender      Gender?
+  preferredLocations   String[]
+  educationPreference  String?
+  occupationPreference String?
+  incomeRangeId        String?
+  maritalStatusPref    MaritalStatus[]
+  otherPreferences     Json?
+  updatedAt            DateTime @updatedAt
+
+  matrimonialProfile MatrimonialProfile @relation(fields: [matrimonialProfileId], references: [id])
+  incomeRange        IncomeRange?       @relation(fields: [incomeRangeId], references: [id])
+
+  @@map("matrimonial_preferences")
+}
+
+model MatrimonialInterest {
+  id              String   @id @default(cuid())
+  fromMemberId    String
+  toMemberId      String
+  message         String?  @db.Text
+  status          String   @default("PENDING") // PENDING, ACCEPTED, DECLINED, WITHDRAWN
+  statusChangedAt DateTime?
+  statusNote      String?
+  createdAt       DateTime @default(now())
+
+  fromMember Member @relation("InterestFrom", fields: [fromMemberId], references: [id])
+  toMember   Member @relation("InterestTo", fields: [toMemberId], references: [id])
+
+  @@map("matrimonial_interests")
+}
+
+model MatrimonialSave {
+  memberId      String
+  savedMemberId String
+  savedAt       DateTime @default(now())
+
+  member      Member @relation("SavedBy", fields: [memberId], references: [id])
+  savedMember Member @relation("Saved", fields: [savedMemberId], references: [id])
+
+  @@id([memberId, savedMemberId])
+  @@map("matrimonial_saves")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// COMMUNITY & AREAS
+// ─────────────────────────────────────────────────────────────────
+
+model Area {
+  id        String  @id @default(cuid())
+  parentId  String?
+  name      String
+  type      String  // COUNTRY, STATE, DISTRICT, CITY, AREA, GROUP
+  code      String?
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  parent      Area?       @relation("AreaHierarchy", fields: [parentId], references: [id])
+  children    Area[]      @relation("AreaHierarchy")
+  memberAreas MemberArea[]
+  familyAreas FamilyArea[]
+  posts       Post[]
+  userRoles   UserRole[]
+
+  @@map("areas")
+}
+
+model MemberArea {
+  memberId  String
+  areaId    String
+  isPrimary Boolean @default(false)
+
+  member Member @relation(fields: [memberId], references: [id])
+  area   Area   @relation(fields: [areaId], references: [id])
+
+  @@id([memberId, areaId])
+  @@map("member_areas")
+}
+
+model FamilyArea {
+  familyId  String
+  areaId    String
+  isPrimary Boolean @default(false)
+
+  family Family @relation(fields: [familyId], references: [id])
+  area   Area   @relation(fields: [areaId], references: [id])
+
+  @@id([familyId, areaId])
+  @@map("family_areas")
+}
+
+model PostType {
+  id               String  @id @default(cuid())
+  code             String  @unique
+  label            String
+  icon             String?
+  requiresApproval Boolean @default(false)
+  isActive         Boolean @default(true)
+
+  posts Post[]
+
+  @@map("post_types")
+}
+
+model Post {
+  id             String     @id @default(cuid())
+  authorId       String
+  postTypeId     String
+  title          String?
+  content        String?    @db.Text
+  visibility     String     @default("COMMUNITY") // LOCAL_AREA, CITY, STATE, COMMUNITY, PRIVATE
+  targetAreaId   String?
+  status         PostStatus @default(PUBLISHED)
+  isPinned       Boolean    @default(false)
+  isAnnouncement Boolean    @default(false)
+  eventDate      DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+
+  author   User     @relation(fields: [authorId], references: [id])
+  postType PostType @relation(fields: [postTypeId], references: [id])
+  area     Area?    @relation(fields: [targetAreaId], references: [id])
+  comments Comment[]
+  reactions Reaction[]
+  photos   Photo[]
+
+  @@map("posts")
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
+  REMOVED
+  FLAGGED
+}
+
+model Comment {
+  id        String     @id @default(cuid())
+  postId    String
+  authorId  String
+  parentId  String?
+  content   String     @db.Text
+  status    String     @default("ACTIVE") // ACTIVE, HIDDEN, REMOVED
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  deletedAt DateTime?
+
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorId], references: [id])
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  reactions Reaction[]
+
+  @@map("comments")
+}
+
+model Reaction {
+  id           String   @id @default(cuid())
+  postId       String?
+  commentId    String?
+  userId       String
+  reactionType String   @default("LIKE") // LIKE, LOVE, SUPPORT, CELEBRATE, CONDOLENCE
+  createdAt    DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@unique([commentId, userId])
+  @@map("reactions")
+}
+
+model Report {
+  id              String   @id @default(cuid())
+  reportableType  String   // post | comment | member | photo | matrimonial_profile
+  reportableId    String
+  reporterId      String
+  reason          String
+  description     String?  @db.Text
+  status          String   @default("PENDING") // PENDING, UNDER_REVIEW, RESOLVED, DISMISSED
+  resolvedBy      String?
+  resolutionNote  String?
+  resolvedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  reporter User @relation(fields: [reporterId], references: [id])
+
+  @@map("reports")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MEDIA
+// ─────────────────────────────────────────────────────────────────
+
+model Photo {
+  id               String   @id @default(cuid())
+  ownerType        String   // member | family | post
+  memberId         String?
+  familyId         String?
+  postId           String?
+  uploadedBy       String
+  storageKey       String   // S3 key (not public URL)
+  thumbnailKey     String?
+  optimizedKey     String?
+  originalFilename String?
+  mimeType         String?
+  fileSizeBytes    BigInt?
+  width            Int?
+  height           Int?
+  isProfilePhoto   Boolean  @default(false)
+  caption          String?
+  status           String   @default("ACTIVE") // ACTIVE, FLAGGED, REMOVED
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  uploader    User    @relation(fields: [uploadedBy], references: [id])
+  member      Member? @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  family      Family? @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  post        Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  profileOf   Member? @relation("ProfilePhoto")
+
+  @@map("photos")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// APPROVAL WORKFLOW & AUDIT
+// ─────────────────────────────────────────────────────────────────
+
+model ApprovalRule {
+  id               String  @id @default(cuid())
+  actionCode       String  @unique
+  requiresApproval Boolean @default(true)
+  approverRole     String? // OPERATOR | ADMIN
+  autoApproveRole  String?
+  isActive         Boolean @default(true)
+  updatedAt        DateTime @updatedAt
+
+  @@map("approval_rules")
+}
+
+model Approval {
+  id            String         @id @default(cuid())
+  actionCode    String
+  entityType    String?        // member | family | relationship | etc.
+  entityId      String?
+  fieldName     String?
+  oldValue      Json?
+  newValue      Json?
+  status        ApprovalStatus @default(SUBMITTED)
+  submittedBy   String
+  submittedAt   DateTime       @default(now())
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  reviewNote    String?        @db.Text
+  reason        String?        @db.Text
+  escalatedTo   String?
+  escalatedAt   DateTime?
+  escalationNote String?       @db.Text
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  submitter              User                   @relation("ApprovalSubmitter", fields: [submittedBy], references: [id])
+  reviewer               User?                  @relation("ApprovalReviewer", fields: [reviewedBy], references: [id])
+  maritalStatusHistories MaritalStatusHistory[]
+
+  @@map("approvals")
+}
+
+enum ApprovalStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  RETURNED
+  ESCALATED
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorRole  String?
+  action     String
+  entityType String?
+  entityId   String?
+  fieldName  String?
+  oldValue   Json?
+  newValue   Json?
+  approvalId String?
+  ipAddress  String?
+  userAgent  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  // IMMUTABLE: no updatedAt, no deletedAt
+
+  actor User @relation(fields: [actorId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────────
+
+model Notification {
+  id          String   @id @default(cuid())
+  recipientId String
+  senderId    String?
+  type        String   // APPROVAL_STATUS, MATRIMONIAL_INTEREST, COMMUNITY_POST, ANNOUNCEMENT, BIRTHDAY, SYSTEM
+  title       String
+  body        String?  @db.Text
+  data        Json?
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  emailSent   Boolean  @default(false)
+  smsSent     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  recipient User  @relation("NotificationRecipient", fields: [recipientId], references: [id])
+  sender    User? @relation("NotificationSender", fields: [senderId], references: [id])
+
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SETTINGS & PRIVACY
+// ─────────────────────────────────────────────────────────────────
+
+model Setting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Json
+  description String?
+  updatedBy   String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model FieldVisibilityDefault {
+  entityType          String
+  fieldName           String
+  defaultVisibility   String // PUBLIC_COMMUNITY, REGISTERED_MEMBERS, SAME_AREA, SAME_FAMILY, MATRIMONY_ONLY, ADMIN_OPERATOR, PRIVATE
+  isUserConfigurable  Boolean @default(true)
+
+  @@id([entityType, fieldName])
+  @@map("field_visibility_defaults")
+}
+
+model MemberFieldVisibility {
+  memberId   String
+  fieldName  String
+  visibility String // same options as above
+
+  member Member @relation(fields: [memberId], references: [id])
+
+  @@id([memberId, fieldName])
+  @@map("member_field_visibility")
+}
+
+model BlockedUser {
+  blockerId String
+  blockedId String
+  reason    String?
+  blockedAt DateTime @default(now())
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id])
+  blocked User @relation("Blocked", fields: [blockedId], references: [id])
+
+  @@id([blockerId, blockedId])
+  @@map("blocked_users")
+}
