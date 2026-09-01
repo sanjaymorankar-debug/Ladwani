@@ -154,10 +154,189 @@ async function main() {
   })
   console.log('✅ Settings created')
 
+  // ── Test Accounts (dev/test only - obviously fake data) ─────────
+  const testPwdHash = await hash('TestPass@123', 12)
+
+  const operatorUser = await prisma.user.upsert({
+    where: { email: 'test.operator@example.test' },
+    update: {},
+    create: {
+      email: 'test.operator@example.test',
+      mobile: '9000000002',
+      passwordHash: testPwdHash,
+      emailVerified: true,
+      mobileVerified: true,
+      status: 'ACTIVE',
+    },
+  })
+  await prisma.userRole.upsert({
+    where: { id: `test-operator-role-${operatorUser.id}` },
+    update: {},
+    create: { id: `test-operator-role-${operatorUser.id}`, userId: operatorUser.id, roleId: operatorRole.id },
+  })
+  await prisma.member.upsert({
+    where: { memberNumber: 'MEM-TEST-OPERATOR' },
+    update: {},
+    create: {
+      memberNumber: 'MEM-TEST-OPERATOR',
+      userId: operatorUser.id,
+      firstName: 'Test',
+      lastName: 'Operator',
+      gender: 'FEMALE',
+      status: 'ACTIVE',
+    },
+  })
+
+  const kartaUser = await prisma.user.upsert({
+    where: { email: 'test.karta@example.test' },
+    update: {},
+    create: {
+      email: 'test.karta@example.test',
+      mobile: '9000000003',
+      passwordHash: testPwdHash,
+      emailVerified: true,
+      mobileVerified: true,
+      status: 'ACTIVE',
+    },
+  })
+  await prisma.userRole.upsert({
+    where: { id: `test-karta-role-${kartaUser.id}` },
+    update: {},
+    create: { id: `test-karta-role-${kartaUser.id}`, userId: kartaUser.id, roleId: kartaRole.id },
+  })
+  const kartaMember = await prisma.member.upsert({
+    where: { memberNumber: 'MEM-TEST-KARTA' },
+    update: {},
+    create: {
+      memberNumber: 'MEM-TEST-KARTA',
+      userId: kartaUser.id,
+      firstName: 'Test',
+      lastName: 'Karta',
+      gender: 'MALE',
+      status: 'ACTIVE',
+    },
+  })
+  const testFamily = await prisma.family.upsert({
+    where: { registrationNumber: 'FAM-TEST-0001' },
+    update: {},
+    create: {
+      registrationNumber: 'FAM-TEST-0001',
+      name: 'Test',
+      status: 'ACTIVE',
+      verificationStatus: 'VERIFIED',
+      kartaMemberId: kartaMember.id,
+      createdBy: kartaUser.id,
+    },
+  })
+  await prisma.familyMember.upsert({
+    where: { familyId_memberId: { familyId: testFamily.id, memberId: kartaMember.id } },
+    update: { isKarta: true },
+    create: { familyId: testFamily.id, memberId: kartaMember.id, isKarta: true, joinedBy: kartaUser.id },
+  })
+  await prisma.userRole.updateMany({
+    where: { userId: kartaUser.id, roleId: kartaRole.id },
+    data: { familyId: testFamily.id },
+  })
+
+  const memberUser = await prisma.user.upsert({
+    where: { email: 'test.member@example.test' },
+    update: {},
+    create: {
+      email: 'test.member@example.test',
+      mobile: '9000000004',
+      passwordHash: testPwdHash,
+      emailVerified: true,
+      mobileVerified: true,
+      status: 'ACTIVE',
+    },
+  })
+  await prisma.userRole.upsert({
+    where: { id: `test-member-role-${memberUser.id}` },
+    update: {},
+    create: { id: `test-member-role-${memberUser.id}`, userId: memberUser.id, roleId: memberRole.id },
+  })
+  const testMember = await prisma.member.upsert({
+    where: { memberNumber: 'MEM-TEST-MEMBER' },
+    update: {},
+    create: {
+      memberNumber: 'MEM-TEST-MEMBER',
+      userId: memberUser.id,
+      firstName: 'Test',
+      lastName: 'Member',
+      gender: 'FEMALE',
+      status: 'ACTIVE',
+    },
+  })
+  await prisma.familyMember.upsert({
+    where: { familyId_memberId: { familyId: testFamily.id, memberId: testMember.id } },
+    update: {},
+    create: { familyId: testFamily.id, memberId: testMember.id, joinedBy: kartaUser.id },
+  })
+
+  // A second, unrelated family + Karta - needed by authorization tests to
+  // prove cross-family access is actually blocked, not just untested.
+  const otherKartaUser = await prisma.user.upsert({
+    where: { email: 'test.other-karta@example.test' },
+    update: {},
+    create: {
+      email: 'test.other-karta@example.test',
+      mobile: '9000000005',
+      passwordHash: testPwdHash,
+      emailVerified: true,
+      mobileVerified: true,
+      status: 'ACTIVE',
+    },
+  })
+  await prisma.userRole.upsert({
+    where: { id: `test-other-karta-role-${otherKartaUser.id}` },
+    update: {},
+    create: { id: `test-other-karta-role-${otherKartaUser.id}`, userId: otherKartaUser.id, roleId: kartaRole.id },
+  })
+  const otherKartaMember = await prisma.member.upsert({
+    where: { memberNumber: 'MEM-TEST-OTHER-KARTA' },
+    update: {},
+    create: {
+      memberNumber: 'MEM-TEST-OTHER-KARTA',
+      userId: otherKartaUser.id,
+      firstName: 'Other',
+      lastName: 'Karta',
+      gender: 'MALE',
+      status: 'ACTIVE',
+    },
+  })
+  const otherFamily = await prisma.family.upsert({
+    where: { registrationNumber: 'FAM-TEST-0002' },
+    update: {},
+    create: {
+      registrationNumber: 'FAM-TEST-0002',
+      name: 'Other',
+      status: 'ACTIVE',
+      verificationStatus: 'VERIFIED',
+      kartaMemberId: otherKartaMember.id,
+      createdBy: otherKartaUser.id,
+    },
+  })
+  await prisma.familyMember.upsert({
+    where: { familyId_memberId: { familyId: otherFamily.id, memberId: otherKartaMember.id } },
+    update: { isKarta: true },
+    create: { familyId: otherFamily.id, memberId: otherKartaMember.id, isKarta: true, joinedBy: otherKartaUser.id },
+  })
+  await prisma.userRole.updateMany({
+    where: { userId: otherKartaUser.id, roleId: kartaRole.id },
+    data: { familyId: otherFamily.id },
+  })
+
+  console.log('✅ Test accounts created (MEMBER, KARTA x2, OPERATOR, ADMIN)')
+
   console.log('\n🎉 Seed complete!\n')
   console.log('Admin credentials:')
   console.log(`  Email:    ${process.env.ADMIN_EMAIL ?? 'admin@miladwani.com'}`)
   console.log(`  Password: ${process.env.ADMIN_PASSWORD ?? 'Admin@123456'}`)
+  console.log('\nTest accounts (password for all: TestPass@123):')
+  console.log('  test.member@example.test       - MEMBER, no family')
+  console.log('  test.karta@example.test        - KARTA of "Test" family')
+  console.log('  test.other-karta@example.test  - KARTA of "Other" family (for cross-family authz tests)')
+  console.log('  test.operator@example.test     - OPERATOR')
 }
 
 main()
