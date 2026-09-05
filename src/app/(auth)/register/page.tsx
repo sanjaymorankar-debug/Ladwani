@@ -24,6 +24,7 @@ export default function RegisterPage() {
   })
 
   const mobile = watch('mobile')
+  const joinIntent = watch('joinIntent')
 
   const onSubmit = async (data: RegisterInput) => {
     setIsLoading(true)
@@ -37,6 +38,7 @@ export default function RegisterPage() {
           email: data.email,
           mobile: data.mobile,
           password: data.password,
+          joinIntent: data.joinIntent,
           consentAccepted: data.consentAccepted,
         }),
       })
@@ -169,6 +171,41 @@ export default function RegisterPage() {
                     {errors.confirmPassword && <p className="form-error">{errors.confirmPassword.message}</p>}
                   </div>
 
+                  <div className="border-t border-gray-100 pt-4">
+                    <label className="form-label">How do you want to join the community? *</label>
+                    <div className="space-y-2 mt-1">
+                      <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${
+                        joinIntent === 'KARTA' ? 'border-saffron-400 bg-saffron-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}>
+                        <input {...register('joinIntent')} type="radio" value="KARTA" className="mt-1 accent-saffron-600" />
+                        <span>
+                          <span className="block text-sm font-medium text-gray-900">
+                            I am the Karta (head) of my family
+                          </span>
+                          <span className="block text-xs text-gray-500 mt-0.5">
+                            Register a new family and add your family members. You&apos;ll become the Karta of that
+                            family once you complete its registration.
+                          </span>
+                        </span>
+                      </label>
+
+                      <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${
+                        joinIntent === 'JOIN_EXISTING' ? 'border-saffron-400 bg-saffron-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}>
+                        <input {...register('joinIntent')} type="radio" value="JOIN_EXISTING" className="mt-1 accent-saffron-600" />
+                        <span>
+                          <span className="block text-sm font-medium text-gray-900">
+                            Join my existing family
+                          </span>
+                          <span className="block text-xs text-gray-500 mt-0.5">
+                            Your family is already on the platform. Search for it and send a join request to its Karta.
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                    {errors.joinIntent && <p className="form-error">{errors.joinIntent.message}</p>}
+                  </div>
+
                   <div className="bg-saffron-50 rounded-lg p-4 text-sm text-gray-600 border border-saffron-100">
                     <p className="font-medium text-gray-800 mb-1">Data Privacy Notice</p>
                     By creating an account, you consent to your information being stored on the Mi Ladwani community
@@ -227,9 +264,16 @@ export default function RegisterPage() {
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Mi Ladwani!</h2>
                 <p className="text-gray-500 mb-6">
-                  Your account has been created. You can now sign in and join your family.
+                  {joinIntent === 'KARTA'
+                    ? 'Your account is verified. Sign in to register your family — you become its Karta once the family is created.'
+                    : 'Your account is verified. Sign in to find your family and send a join request.'}
                 </p>
-                <Link href="/login" className="btn-primary inline-flex items-center gap-2 px-8 py-3">
+                <Link
+                  href={`/login?callbackUrl=${encodeURIComponent(
+                    joinIntent === 'KARTA' ? '/family/setup?mode=register' : '/family/setup?mode=search'
+                  )}`}
+                  className="btn-primary inline-flex items-center gap-2 px-8 py-3"
+                >
                   Sign In Now
                   <ChevronRight className="w-4 h-4" />
                 </Link>

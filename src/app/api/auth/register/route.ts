@@ -37,7 +37,11 @@ export async function POST(req: Request) {
     }
 
     const result = await prisma.$transaction(async (tx: any) => {
-      // Create user
+      // Create user. joinIntent records the signup choice ("I'm the Karta of
+      // a new family" vs "join an existing family") so the post-verification
+      // flow can route correctly. It deliberately does NOT grant KARTA here —
+      // roles are never taken from client input; the KARTA role is granted
+      // server-side in POST /api/families once a family actually exists.
       const user = await tx.user.create({
         data: {
           email: data.email || null,
@@ -45,6 +49,7 @@ export async function POST(req: Request) {
           passwordHash,
           status: 'PENDING',
           mobileVerified: false,
+          joinIntent: data.joinIntent,
         },
       })
 

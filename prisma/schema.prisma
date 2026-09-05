@@ -19,6 +19,11 @@ model User {
   emailVerified   Boolean   @default(false)
   mobileVerified  Boolean   @default(false)
   status          UserStatus @default(PENDING)
+  // What the user chose at signup: KARTA (register a new family and head it)
+  // or JOIN_EXISTING (find and join a family already on the platform).
+  // This records INTENT only — it never grants a role by itself. The KARTA
+  // role is granted server-side when a family is actually created.
+  joinIntent      String?
   lastLoginAt     DateTime?
   lastLoginIp     String?
   failedAttempts  Int       @default(0)

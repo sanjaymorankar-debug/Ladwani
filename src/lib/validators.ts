@@ -11,6 +11,9 @@ export const registerSchema = z.object({
     .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
     .regex(/[0-9]/, 'Must contain at least one number'),
   confirmPassword: z.string(),
+  joinIntent: z.enum(['KARTA', 'JOIN_EXISTING'], {
+    errorMap: () => ({ message: 'Please choose how you want to join the community' }),
+  }),
   consentAccepted: z.literal(true, {
     errorMap: () => ({ message: 'You must accept the terms to register' }),
   }),

@@ -1,6 +1,6 @@
 'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -27,9 +27,24 @@ type FormData = z.infer<typeof schema>
 type Mode = 'choose' | 'search' | 'register'
 
 export default function FamilySetupPage() {
+  return (
+    <Suspense fallback={null}>
+      <FamilySetup />
+    </Suspense>
+  )
+}
+
+function FamilySetup() {
   const router = useRouter()
   const { update } = useSession()
-  const [mode, setMode] = useState<Mode>('choose')
+  const searchParams = useSearchParams()
+  // ?mode=register / ?mode=search comes from the choice made at registration,
+  // so a user who said "I am the Karta" lands straight on the family
+  // registration form instead of being asked to choose again.
+  const initialMode = searchParams.get('mode')
+  const [mode, setMode] = useState<Mode>(
+    initialMode === 'register' || initialMode === 'search' ? initialMode : 'choose'
+  )
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])

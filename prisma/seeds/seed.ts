@@ -12,9 +12,66 @@ async function main() {
     prisma.role.upsert({ where: { code: 'KARTA' }, update: {}, create: { code: 'KARTA', label: 'Family Head (Karta)', isSystem: true } }),
     prisma.role.upsert({ where: { code: 'OPERATOR' }, update: {}, create: { code: 'OPERATOR', label: 'Operator', isSystem: true } }),
     prisma.role.upsert({ where: { code: 'ADMIN' }, update: {}, create: { code: 'ADMIN', label: 'Administrator', isSystem: true } }),
+    prisma.role.upsert({ where: { code: 'ASSET_OWNER' }, update: {}, create: { code: 'ASSET_OWNER', label: 'Asset Owner', isSystem: true } }),
   ])
-  const [memberRole, kartaRole, operatorRole, adminRole] = roles
+  const [memberRole, kartaRole, operatorRole, adminRole, assetOwnerRole] = roles
   console.log('✅ Roles created')
+
+  // ── Permissions + role→permission matrix ───────────────────────
+  // Spec §6: "The role should come from the database and permission system."
+  // These rows make the permission matrix inspectable and admin-editable
+  // instead of living only as hardcoded role-code checks in route handlers.
+  const permissions: { code: string; label: string; module: string }[] = [
+    { code: 'family:create', label: 'Register a new family', module: 'family' },
+    { code: 'family:edit_own', label: 'Edit own family', module: 'family' },
+    { code: 'family:edit_any', label: 'Edit any family', module: 'family' },
+    { code: 'family:member_add', label: 'Add members to own family', module: 'family' },
+    { code: 'family:view_tree', label: 'View own family tree', module: 'family' },
+    { code: 'family:approve', label: 'Verify/approve families', module: 'family' },
+    { code: 'member:edit_own', label: 'Edit own member profile', module: 'member' },
+    { code: 'member:edit_any', label: 'Edit any member profile', module: 'member' },
+    { code: 'member:mark_deceased', label: 'Mark a member deceased', module: 'member' },
+    { code: 'matrimony:manage_own', label: 'Manage own matrimonial profile', module: 'matrimony' },
+    { code: 'approval:review', label: 'Review approval requests', module: 'approval' },
+    { code: 'admin:users', label: 'Manage users and roles', module: 'admin' },
+    { code: 'admin:settings', label: 'Manage platform settings', module: 'admin' },
+    { code: 'admin:audit', label: 'View audit logs', module: 'admin' },
+    { code: 'asset:manage_own', label: 'Manage own assets', module: 'asset' },
+  ]
+  const permissionRecords: Record<string, string> = {}
+  for (const p of permissions) {
+    const rec = await prisma.permission.upsert({ where: { code: p.code }, update: {}, create: p })
+    permissionRecords[p.code] = rec.id
+  }
+
+  const ROLE_PERMISSIONS: Record<string, string[]> = {
+    MEMBER: ['member:edit_own', 'matrimony:manage_own', 'family:view_tree'],
+    KARTA: [
+      'member:edit_own', 'matrimony:manage_own', 'family:view_tree',
+      'family:create', 'family:edit_own', 'family:member_add',
+    ],
+    ASSET_OWNER: ['member:edit_own', 'matrimony:manage_own', 'family:view_tree', 'asset:manage_own'],
+    OPERATOR: [
+      'member:edit_own', 'matrimony:manage_own', 'family:view_tree',
+      'member:edit_any', 'member:mark_deceased', 'family:edit_any',
+      'family:member_add', 'family:approve', 'approval:review',
+    ],
+    ADMIN: permissions.map((p) => p.code), // full access
+  }
+  const roleByCode: Record<string, string> = {
+    MEMBER: memberRole.id, KARTA: kartaRole.id, OPERATOR: operatorRole.id,
+    ADMIN: adminRole.id, ASSET_OWNER: assetOwnerRole.id,
+  }
+  for (const [roleCode, permCodes] of Object.entries(ROLE_PERMISSIONS)) {
+    for (const permCode of permCodes) {
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: roleByCode[roleCode], permissionId: permissionRecords[permCode] } },
+        update: {},
+        create: { roleId: roleByCode[roleCode], permissionId: permissionRecords[permCode] },
+      })
+    }
+  }
+  console.log('✅ Permissions + role matrix created')
 
   // ── Admin User ────────────────────────────────────────────────
   const adminPwdHash = await hash(process.env.ADMIN_PASSWORD ?? 'Admin@123456', 12)
@@ -326,7 +383,38 @@ async function main() {
     data: { familyId: otherFamily.id },
   })
 
-  console.log('✅ Test accounts created (MEMBER, KARTA x2, OPERATOR, ADMIN)')
+  const assetOwnerUser = await prisma.user.upsert({
+    where: { email: 'test.assetowner@example.test' },
+    update: {},
+    create: {
+      email: 'test.assetowner@example.test',
+      mobile: '9000000006',
+      passwordHash: testPwdHash,
+      emailVerified: true,
+      mobileVerified: true,
+      status: 'ACTIVE',
+      joinIntent: 'JOIN_EXISTING',
+    },
+  })
+  await prisma.userRole.upsert({
+    where: { id: `test-assetowner-role-${assetOwnerUser.id}` },
+    update: {},
+    create: { id: `test-assetowner-role-${assetOwnerUser.id}`, userId: assetOwnerUser.id, roleId: assetOwnerRole.id },
+  })
+  await prisma.member.upsert({
+    where: { memberNumber: 'MEM-TEST-ASSETOWNER' },
+    update: {},
+    create: {
+      memberNumber: 'MEM-TEST-ASSETOWNER',
+      userId: assetOwnerUser.id,
+      firstName: 'Test',
+      lastName: 'AssetOwner',
+      gender: 'MALE',
+      status: 'ACTIVE',
+    },
+  })
+
+  console.log('✅ Test accounts created (MEMBER, KARTA x2, OPERATOR, ASSET_OWNER, ADMIN)')
 
   console.log('\n🎉 Seed complete!\n')
   console.log('Admin credentials:')
@@ -337,6 +425,7 @@ async function main() {
   console.log('  test.karta@example.test        - KARTA of "Test" family')
   console.log('  test.other-karta@example.test  - KARTA of "Other" family (for cross-family authz tests)')
   console.log('  test.operator@example.test     - OPERATOR')
+  console.log('  test.assetowner@example.test   - ASSET_OWNER')
 }
 
 main()

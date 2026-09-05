@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate, calculateAge } from '@/lib/utils'
+import { resolveDashboardLabel, resolveOnboardingPath } from '@/lib/dashboard-routing'
 
 async function getDashboardData(userId: string) {
   const [user, recentPosts, stats] = await Promise.all([
@@ -47,6 +48,11 @@ export default async function DashboardPage() {
   const { user, recentPosts, stats } = await getDashboardData(session.user.id)
   const member = user?.member
   const family = member?.families[0]?.family
+  const roles = ((session.user as any).roles ?? []) as string[]
+  const isKarta = member?.families[0]?.isKarta ?? false
+  // Where this user said they wanted to go at signup, if they haven't
+  // completed family setup yet.
+  const onboardingPath = resolveOnboardingPath(user?.joinIntent)
 
   const quickLinks = [
     { href: '/family', icon: Home, label: 'My Family', desc: family?.name ?? 'Set up your family', color: 'text-orange-600 bg-orange-50' },
@@ -61,13 +67,14 @@ export default async function DashboardPage() {
       <div className="bg-gradient-to-r from-saffron-600 to-orange-500 rounded-2xl p-6 text-white shadow-sm">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-saffron-100 text-sm">Welcome back,</p>
+            <p className="text-saffron-100 text-sm">{resolveDashboardLabel(roles)} · Welcome back,</p>
             <h1 className="text-2xl font-bold mt-0.5 font-display">
               {member ? `${member.firstName} ${member.lastName ?? ''}`.trim() : session.user.name}
             </h1>
             {family && (
               <p className="text-saffron-100 text-sm mt-1 flex items-center gap-1">
                 <Home className="w-3.5 h-3.5" /> {family.name}
+                {isKarta && <span className="ml-1 bg-white/20 rounded px-1.5 py-0.5 text-xs">Karta</span>}
               </p>
             )}
           </div>
@@ -155,10 +162,18 @@ export default async function DashboardPage() {
           <div className="card space-y-3">
             {!family && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <p className="text-sm font-medium text-amber-800">No family linked</p>
-                <p className="text-xs text-amber-700 mt-0.5 mb-2">Join or register your family to get started.</p>
-                <Link href="/family/setup" className="text-xs font-medium text-amber-700 underline">
-                  Set up family →
+                <p className="text-sm font-medium text-amber-800">
+                  {user?.joinIntent === 'KARTA' ? 'Register your family' : 'No family linked'}
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5 mb-2">
+                  {user?.joinIntent === 'KARTA'
+                    ? 'You signed up as the Karta of a new family. Register it to become its Karta.'
+                    : user?.joinIntent === 'JOIN_EXISTING'
+                      ? 'Find your family and send a join request to its Karta.'
+                      : 'Join or register your family to get started.'}
+                </p>
+                <Link href={onboardingPath ?? '/family/setup'} className="text-xs font-medium text-amber-700 underline">
+                  {user?.joinIntent === 'KARTA' ? 'Register my family →' : 'Set up family →'}
                 </Link>
               </div>
             )}

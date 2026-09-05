@@ -1,7 +1,8 @@
 'use client'
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { signIn } from 'next-auth/react'
+import { signIn, getSession } from 'next-auth/react'
+import { resolveDashboardPath } from '@/lib/dashboard-routing'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -20,7 +21,10 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
+  // An explicit callbackUrl (from a protected-route redirect, or from the
+  // "finish signing up" link after registration) always wins; otherwise we
+  // pick the dashboard that matches the user's role once we have a session.
+  const explicitCallbackUrl = searchParams.get('callbackUrl')
   const [showPwd, setShowPwd] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -49,12 +53,19 @@ function LoginForm() {
         identifier: data.identifier,
         password: data.password,
         redirect: false,
-        callbackUrl,
+        callbackUrl: explicitCallbackUrl ?? '/dashboard',
       })
       if (res?.error) {
         toast.error('Something went wrong. Please try again.')
-      } else if (res?.url) {
-        router.push(res.url)
+      } else if (res?.ok) {
+        // Spec §35: role-based dashboard routing. Read the freshly-created
+        // session rather than trusting anything the client supplied.
+        let destination = explicitCallbackUrl
+        if (!destination) {
+          const session = await getSession()
+          destination = resolveDashboardPath((session?.user as any)?.roles)
+        }
+        router.push(destination)
         router.refresh()
       }
     } catch {
