@@ -16,7 +16,7 @@ and members can maintain full profiles. Roughly **32 of 52 sections are complete
 | § | Requirement | Status | Notes |
 |---|---|---|---|
 | 1 | Audit + Root Cause Analysis | ✅ | Delivered; root causes in commit `bc6ce76` |
-| 2 | Registration + join choice | ✅ | Karta / join-existing choice now required at signup |
+| 2 | Registration + join choice | ✅ | Karta / join-existing choice now required at signup. **OTP verification is currently switched off by request** — see "Authentication mode" below |
 | 3 | Login | ✅ | Mobile **or** email + password; distinct error messages |
 | 4 | Session management | ✅ | NextAuth JWT; survives refresh; logout clears |
 | 5 | Protected routes | 🟡 | Auth enforced in middleware **and** server-side per route. But `/community-services`, `/my-bookings`, `/community-fees`, `/my-payments` don't exist (see §43) |
@@ -65,6 +65,22 @@ and members can maintain full profiles. Roughly **32 of 52 sections are complete
 | 48 | Acceptance: member profile | 🟡 | Sections load and save; photo upload untested |
 | 49 | Acceptance: existing member | 🟡 | Duplicate detection verified; notify-and-accept direction missing (§11) |
 | 50–52 | Final requirements / DoD | 🟡 | See outstanding work |
+
+## Authentication mode (deliberate deviation from §2)
+
+The spec's "verify mobile/email" step is **intentionally disabled** for now, at
+the project owner's request: sign-up and login are plain email-or-mobile +
+password, and a new account works the moment it's created. There is no SMS
+gateway and no SMTP server configured, so an OTP step would only block testing.
+
+This is a single switch, not a rewrite — `NEXT_PUBLIC_AUTH_REQUIRE_VERIFICATION`
+in `.env` (see `src/lib/auth-config.ts`). Setting it to `true` restores the OTP
+screen, makes new accounts start `PENDING`, and makes login refuse them until
+verified. Both settings were tested end-to-end.
+
+Note that **password reset still depends on OTP delivery**, so it can't work
+until SMTP is configured. Until then, an Admin can reset a password from the
+admin user screen.
 
 ## The one structural discrepancy worth a decision
 

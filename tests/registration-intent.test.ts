@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { mockSessionAs } from './helpers/session'
 import { POST as postRegister } from '@/app/api/auth/register/route'
 import { POST as postFamilies } from '@/app/api/families/route'
+import { validateLogin } from '@/lib/auth'
 
 const MOBILE_KARTA = '9990000001'
 const MOBILE_JOINER = '9990000002'
@@ -70,8 +71,20 @@ describe('Registration join-intent (spec §2, §7)', () => {
     expect(user.userRoles.map((ur) => ur.role.code)).toEqual(['MEMBER'])
     // And a Member profile exists for them (spec §9, §32).
     expect(user.member).not.toBeNull()
-    // Account still needs verification before it can be used (spec §2).
-    expect(user.status).toBe('PENDING')
+    // Verification is currently switched off, so the account is usable right
+    // away — no OTP step. (Set NEXT_PUBLIC_AUTH_REQUIRE_VERIFICATION=true to
+    // go back to PENDING-until-verified.)
+    expect(user.status).toBe('ACTIVE')
+  })
+
+  it('lets a brand-new account sign in immediately with no OTP', async () => {
+    const result = await validateLogin(MOBILE_KARTA, baseBody.password)
+    expect(result.ok).toBe(true)
+  })
+
+  it('still rejects a wrong password for a new account', async () => {
+    const result = await validateLogin(MOBILE_KARTA, 'WrongPass123')
+    expect(result).toEqual({ ok: false, code: 'INVALID_CREDENTIALS' })
   })
 
   it('stores the JOIN_EXISTING choice with the same MEMBER-only role', async () => {

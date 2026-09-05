@@ -3,6 +3,7 @@ import { hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { registerSchema } from '@/lib/validators'
 import { generateMemberNumber } from '@/lib/utils'
+import { requireAccountVerification } from '@/lib/auth-config'
 
 export async function POST(req: Request) {
   try {
@@ -42,12 +43,17 @@ export async function POST(req: Request) {
       // flow can route correctly. It deliberately does NOT grant KARTA here —
       // roles are never taken from client input; the KARTA role is granted
       // server-side in POST /api/families once a family actually exists.
+      // With verification off (the current default), the account is usable
+      // straight away: email-or-mobile + password, nothing to confirm. The
+      // verified flags stay false because nothing has actually been verified —
+      // only `status` gates login, so this stays honest without locking anyone
+      // out. Flip NEXT_PUBLIC_AUTH_REQUIRE_VERIFICATION to restore OTP.
       const user = await tx.user.create({
         data: {
           email: data.email || null,
           mobile: data.mobile,
           passwordHash,
-          status: 'PENDING',
+          status: requireAccountVerification ? 'PENDING' : 'ACTIVE',
           mobileVerified: false,
           joinIntent: data.joinIntent,
         },
@@ -79,26 +85,33 @@ export async function POST(req: Request) {
         },
       })
 
-      // Create OTP token (in production: send via SMS)
-      const otp = Math.floor(100000 + Math.random() * 900000).toString()
-      const otpHash = await hash(otp, 10)
-      await tx.verificationToken.create({
-        data: {
-          userId: user.id,
-          type: 'MOBILE_VERIFY',
-          tokenHash: otpHash,
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 min
-        },
-      })
+      if (requireAccountVerification) {
+        // Create OTP token (in production: send via SMS)
+        const otp = Math.floor(100000 + Math.random() * 900000).toString()
+        const otpHash = await hash(otp, 10)
+        await tx.verificationToken.create({
+          data: {
+            userId: user.id,
+            type: 'MOBILE_VERIFY',
+            tokenHash: otpHash,
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 min
+          },
+        })
 
-      console.log(`[DEV] OTP for ${data.mobile}: ${otp}`) // remove in production
+        console.log(`[DEV] OTP for ${data.mobile}: ${otp}`) // remove in production
+      }
 
       return { userId: user.id, memberId: member.id }
     })
 
     return NextResponse.json({
-      message: 'Account created. OTP sent to your mobile.',
+      message: requireAccountVerification
+        ? 'Account created. OTP sent to your mobile.'
+        : 'Account created. You can sign in now.',
       userId: result.userId,
+      // Lets the registration UI decide whether to show the OTP step without
+      // duplicating the flag's interpretation client-side.
+      requiresVerification: requireAccountVerification,
     }, { status: 201 })
   } catch (e: any) {
     console.error('[register]', e)

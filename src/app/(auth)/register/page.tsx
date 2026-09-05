@@ -4,19 +4,28 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { signIn } from 'next-auth/react'
 import { Eye, EyeOff, Loader2, CheckCircle2, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { registerSchema, type RegisterInput } from '@/lib/validators'
+import { requireAccountVerification } from '@/lib/auth-config'
+import { resolveOnboardingPath } from '@/lib/dashboard-routing'
 
-const steps = ['Account', 'Verification', 'Complete']
+type Step = 'account' | 'verify' | 'done'
+
+// The OTP screen only exists when verification is switched on.
+const steps: { key: Step; label: string }[] = requireAccountVerification
+  ? [{ key: 'account', label: 'Account' }, { key: 'verify', label: 'Verification' }, { key: 'done', label: 'Complete' }]
+  : [{ key: 'account', label: 'Account' }, { key: 'done', label: 'Complete' }]
 
 export default function RegisterPage() {
   const router = useRouter()
-  const [step, setStep] = useState(0)
+  const [step, setStep] = useState<Step>('account')
   const [showPwd, setShowPwd] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [otp, setOtp] = useState('')
+  const stepIndex = steps.findIndex((s) => s.key === step)
 
   const { register, handleSubmit, watch, getValues, formState: { errors } } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -44,8 +53,28 @@ export default function RegisterPage() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || 'Registration failed')
-      toast.success('Account created! Please verify your mobile.')
-      setStep(1)
+
+      if (json.requiresVerification) {
+        toast.success('Account created! Please verify your mobile.')
+        setStep('verify')
+        return
+      }
+
+      // No verification step: the account is already active, so sign in and
+      // drop the user straight into the flow they picked at signup.
+      toast.success('Account created!')
+      const signInRes = await signIn('credentials', {
+        identifier: data.email || data.mobile,
+        password: data.password,
+        redirect: false,
+      })
+      if (signInRes?.ok) {
+        router.push(resolveOnboardingPath(data.joinIntent) ?? '/dashboard')
+        router.refresh()
+      } else {
+        // Account exists either way — fall back to the manual sign-in screen.
+        setStep('done')
+      }
     } catch (e: any) {
       toast.error(e.message)
     } finally {
@@ -64,7 +93,7 @@ export default function RegisterPage() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || 'Verification failed')
       toast.success('Mobile verified successfully!')
-      setStep(2)
+      setStep('done')
     } catch (e: any) {
       toast.error(e.message)
     } finally {
@@ -91,22 +120,22 @@ export default function RegisterPage() {
           {/* Step indicator */}
           <div className="flex items-center justify-center gap-2 mb-6">
             {steps.map((s, i) => (
-              <div key={s} className="flex items-center gap-2">
+              <div key={s.key} className="flex items-center gap-2">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                  i < step ? 'bg-green-500 text-white' :
-                  i === step ? 'bg-saffron-600 text-white' :
+                  i < stepIndex ? 'bg-green-500 text-white' :
+                  i === stepIndex ? 'bg-saffron-600 text-white' :
                   'bg-gray-200 text-gray-500'
                 }`}>
-                  {i < step ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
+                  {i < stepIndex ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
                 </div>
-                <span className={`text-xs font-medium ${i === step ? 'text-saffron-700' : 'text-gray-400'}`}>{s}</span>
+                <span className={`text-xs font-medium ${i === stepIndex ? 'text-saffron-700' : 'text-gray-400'}`}>{s.label}</span>
                 {i < steps.length - 1 && <div className="w-8 h-px bg-gray-200 ml-1" />}
               </div>
             ))}
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-            {step === 0 && (
+            {step === 'account' && (
               <>
                 <h1 className="text-2xl font-bold text-gray-900 font-display mb-1">Create your account</h1>
                 <p className="text-gray-500 text-sm mb-6">Join the Ladwani Samaj community platform</p>
@@ -226,7 +255,7 @@ export default function RegisterPage() {
               </>
             )}
 
-            {step === 1 && (
+            {step === 'verify' && (
               <div className="text-center py-4">
                 <div className="w-16 h-16 bg-saffron-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <span className="text-3xl">📱</span>
@@ -257,7 +286,7 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {step === 2 && (
+            {step === 'done' && (
               <div className="text-center py-4">
                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle2 className="w-10 h-10 text-green-500" />
@@ -265,8 +294,8 @@ export default function RegisterPage() {
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Mi Ladwani!</h2>
                 <p className="text-gray-500 mb-6">
                   {joinIntent === 'KARTA'
-                    ? 'Your account is verified. Sign in to register your family — you become its Karta once the family is created.'
-                    : 'Your account is verified. Sign in to find your family and send a join request.'}
+                    ? 'Your account is ready. Sign in to register your family — you become its Karta once the family is created.'
+                    : 'Your account is ready. Sign in to find your family and send a join request.'}
                 </p>
                 <Link
                   href={`/login?callbackUrl=${encodeURIComponent(

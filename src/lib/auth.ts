@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { compare, hash } from 'bcryptjs'
 import { prisma } from './prisma'
+import { requireAccountVerification } from './auth-config'
 
 export type LoginErrorCode =
   | 'INVALID_CREDENTIALS'
@@ -73,7 +74,10 @@ export async function validateLogin(identifier: string, password: string): Promi
   if (user.status === 'SUSPENDED' || user.status === 'BLOCKED') {
     return { ok: false, code: 'ACCOUNT_SUSPENDED' }
   }
-  if (user.status === 'PENDING') {
+  // Only hold back unverified accounts when verification is actually switched
+  // on. With it off there is no way for a PENDING user to verify, so blocking
+  // them would strand anyone who registered before the switch.
+  if (user.status === 'PENDING' && requireAccountVerification) {
     return { ok: false, code: 'ACCOUNT_PENDING' }
   }
 
