@@ -7,6 +7,7 @@ import { ArrowLeft, MapPin, Users, CheckCircle2, CalendarDays } from 'lucide-rea
 import { formatPaise } from '@/lib/payments'
 import { formatDate } from '@/lib/utils'
 import BookingPanel from '@/components/assets/BookingPanel'
+import AssetPhotoManager from '@/components/assets/AssetPhotoManager'
 
 export default async function AssetDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -94,6 +95,8 @@ export default async function AssetDetailPage({ params }: { params: { id: string
               <p className="text-sm text-gray-600 mt-4 pt-4 border-t border-gray-100">{asset.description}</p>
             )}
           </div>
+
+          <AssetPhotoManager assetId={asset.id} canManage={isOwner || isStaff} />
 
           <div className="card">
             <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">

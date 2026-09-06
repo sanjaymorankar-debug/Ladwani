@@ -820,6 +820,7 @@ model Asset {
   owner     Member          @relation(fields: [ownerMemberId], references: [id])
   bookings  Booking[]
   blackouts AssetBlackout[]
+  photos    Photo[]
 
   @@index([status, isActive])
   @@map("assets")
@@ -977,10 +978,11 @@ enum FeeInvoiceStatus {
 
 model Photo {
   id               String   @id @default(cuid())
-  ownerType        String   // member | family | post
+  ownerType        String   // member | family | post | asset
   memberId         String?
   familyId         String?
   postId           String?
+  assetId          String?
   uploadedBy       String
   storageKey       String   // S3 key (not public URL)
   thumbnailKey     String?
@@ -1001,6 +1003,7 @@ model Photo {
   member      Member? @relation(fields: [memberId], references: [id], onDelete: Cascade)
   family      Family? @relation(fields: [familyId], references: [id], onDelete: Cascade)
   post        Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  asset       Asset?  @relation(fields: [assetId], references: [id], onDelete: Cascade)
   profileOf   Member? @relation("ProfilePhoto")
 
   @@map("photos")

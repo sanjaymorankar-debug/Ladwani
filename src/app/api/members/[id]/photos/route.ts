@@ -12,6 +12,12 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
   const photos = await prisma.photo.findMany({
     where: { memberId: params.id, ownerType: 'member', status: 'ACTIVE' },
+    // Explicit selection: storage keys stay server-side, and fileSizeBytes
+    // (a BigInt) is excluded because JSON cannot serialize it.
+    select: {
+      id: true, isProfilePhoto: true, visibility: true, caption: true,
+      width: true, height: true, createdAt: true,
+    },
     orderBy: { createdAt: 'desc' },
   })
 
@@ -85,5 +91,20 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return created
   })
 
-  return NextResponse.json({ message: 'Photo uploaded', photo }, { status: 201 })
+  // Return an explicit shape rather than the raw row: fileSizeBytes is a
+  // BigInt, which JSON.stringify cannot serialize, and the storage keys are
+  // internal and must never reach the client.
+  return NextResponse.json({
+    message: 'Photo uploaded',
+    photo: {
+      id: photo.id,
+      isProfilePhoto: photo.isProfilePhoto,
+      visibility: photo.visibility,
+      caption: photo.caption,
+      width: photo.width,
+      height: photo.height,
+      fileSizeBytes: Number(photo.fileSizeBytes ?? 0),
+      createdAt: photo.createdAt,
+    },
+  }, { status: 201 })
 }

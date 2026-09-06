@@ -50,7 +50,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string; ph
     return result
   })
 
-  return NextResponse.json({ message: 'Updated', photo: updated })
+  // Same reason as the list/upload routes: fileSizeBytes is a BigInt and the
+  // storage keys are internal.
+  return NextResponse.json({
+    message: 'Updated',
+    photo: {
+      id: updated.id, isProfilePhoto: updated.isProfilePhoto,
+      visibility: updated.visibility, caption: updated.caption,
+    },
+  })
 }
 
 export async function DELETE(req: Request, { params }: { params: { id: string; photoId: string } }) {
