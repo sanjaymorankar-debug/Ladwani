@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redactMemberForViewer } from '@/lib/visibility'
+import { getMemberAccess } from '@/lib/member-auth'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -31,9 +32,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!member) return NextResponse.json({ message: 'Not found' }, { status: 404 })
 
   const roles: string[] = (session.user as any)?.roles ?? []
-  const isOwn = member.user?.id === userId
-  const canEdit = isOwn || roles.includes('ADMIN') || roles.includes('OPERATOR')
-  if (!canEdit) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+  // Single source of truth for "who may edit this member" — self, staff, or
+  // the Karta of an account-less family member. See member-auth.ts.
+  const access = await getMemberAccess(session, params.id)
+  if (!access.authorized) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
 
   // Marrying someone links two people's records and the family tree, so it
   // always goes through the dedicated /spouse endpoint (which applies the
@@ -45,34 +47,42 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     )
   }
 
+  // PATCH semantics: only touch what the caller actually sent. Treating an
+  // omitted field as "set to null" silently destroys data whenever a client
+  // submits a partial update — it wiped lastName and dateOfBirth during UAT.
+  // An explicitly-sent empty string still clears the field, as intended.
+  const set = <T>(key: string, transform: (v: any) => T) =>
+    body[key] !== undefined ? { [key]: transform(body[key]) } : {}
+  const text = (v: any) => (v === '' || v === null ? null : v)
+  const int = (v: any) => (v === '' || v === null || v === undefined ? null : parseInt(v, 10))
+
   const updated = await prisma.member.update({
     where: { id: params.id },
     data: {
-      firstName: body.firstName,
-      middleName: body.middleName || null,
-      lastName: body.lastName || null,
-      gender: body.gender,
-      dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
-      bloodGroup: body.bloodGroup || null,
-      heightCm: body.heightCm ? parseInt(body.heightCm) : null,
-      weightKg: body.weightKg ? parseInt(body.weightKg) : null,
-      bodyType: body.bodyType || null,
-      physicalDisability: body.physicalDisability || null,
-      mobilePrimary: body.mobilePrimary || null,
-      email: body.email || null,
-      // Address fields are edited via /api/members/[id]/addresses now, which
-      // keeps these flat copies in sync. Only touch them here if the caller
-      // explicitly sent one — omitting a field must never blank it out.
-      ...(body.currentCity !== undefined ? { currentCity: body.currentCity || null } : {}),
-      ...(body.currentState !== undefined ? { currentState: body.currentState || null } : {}),
-      ...(body.currentCountry !== undefined ? { currentCountry: body.currentCountry || null } : {}),
-      ...(body.nativeVillage !== undefined ? { nativeVillage: body.nativeVillage || null } : {}),
-      ...(body.nativeDistrict !== undefined ? { nativeDistrict: body.nativeDistrict || null } : {}),
-      ...(body.nativeState !== undefined ? { nativeState: body.nativeState || null } : {}),
-      maritalStatus: body.maritalStatus,
-      employmentStatus: body.employmentStatus || null,
-      occupationCategory: body.occupationCategory || null,
-      biography: body.biography || null,
+      ...set('firstName', (v) => v),
+      ...set('gender', (v) => v),
+      ...set('maritalStatus', (v) => v),
+      ...set('middleName', text),
+      ...set('lastName', text),
+      ...set('dateOfBirth', (v) => (v ? new Date(v) : null)),
+      ...set('bloodGroup', text),
+      ...set('heightCm', int),
+      ...set('weightKg', int),
+      ...set('bodyType', text),
+      ...set('physicalDisability', text),
+      ...set('mobilePrimary', text),
+      ...set('email', text),
+      // Addresses are owned by /api/members/[id]/addresses, which keeps these
+      // flat copies in sync; they're only touched here if explicitly sent.
+      ...set('currentCity', text),
+      ...set('currentState', text),
+      ...set('currentCountry', text),
+      ...set('nativeVillage', text),
+      ...set('nativeDistrict', text),
+      ...set('nativeState', text),
+      ...set('employmentStatus', text),
+      ...set('occupationCategory', text),
+      ...set('biography', text),
       updatedBy: userId,
     },
   })

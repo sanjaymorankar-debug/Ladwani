@@ -44,6 +44,25 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ message: 'This request has already been reviewed' }, { status: 409 })
   }
 
+  // The entity a queued request points at can disappear before anyone reviews
+  // it (family merged, member removed). Fail cleanly instead of letting the
+  // side-effect below blow up with a raw database error, and don't mark the
+  // request applied when it wasn't.
+  if (existing.entityId && (action === 'approve' || action === 'reject')) {
+    const target =
+      existing.entityType === 'family'
+        ? await prisma.family.findUnique({ where: { id: existing.entityId }, select: { id: true } })
+        : existing.entityType === 'member'
+          ? await prisma.member.findUnique({ where: { id: existing.entityId }, select: { id: true } })
+          : { id: existing.entityId } // nothing to check for other entity types
+    if (!target) {
+      return NextResponse.json(
+        { message: `The ${existing.entityType ?? 'record'} this request refers to no longer exists. Nothing was changed.` },
+        { status: 409 }
+      )
+    }
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     const approval = await tx.approval.update({
       where: { id: params.id },
