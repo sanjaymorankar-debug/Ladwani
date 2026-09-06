@@ -122,8 +122,14 @@ export async function POST(req: Request) {
           emailDeliveryFailed: true,
         }, { status: 201 })
       }
-      if (!isEmailConfigured()) {
-        console.log(`[DEV] Verification OTP for ${data.email}: ${result.otp}`)
+      // Log the code locally when there's no mail server, or when explicitly
+      // asked for during development. Hard-guarded against production so a
+      // stray env var can never leak live verification codes to the logs.
+      const debugOtp =
+        process.env.NODE_ENV !== 'production' &&
+        (!isEmailConfigured() || process.env.AUTH_DEBUG_OTP === 'true')
+      if (debugOtp) {
+        console.log(`[DEV] Verification code for ${data.email}: ${result.otp}`)
       }
     }
 
