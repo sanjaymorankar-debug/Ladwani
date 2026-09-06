@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   Home, Users, Heart, Bell, Search,
   Settings, LogOut, ChevronLeft, ChevronRight,
-  Building2, Newspaper, UserCircle, ShieldCheck
+  Building2, Newspaper, UserCircle, ShieldCheck, Receipt
 } from 'lucide-react'
 import { signOut, useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
@@ -21,6 +21,8 @@ const nav = [
   { href: '/family', icon: Building2, label: 'My Family' },
   { href: '/members', icon: Users, label: 'Directory' },
   { href: '/matrimony', icon: Heart, label: 'Matrimony' },
+  { href: '/assets', icon: Building2, label: 'Assets & Booking' },
+  { href: '/fees', icon: Receipt, label: 'Fees' },
   { href: '/community', icon: Newspaper, label: 'Community' },
   { href: '/search', icon: Search, label: 'Search' },
   { href: '/profile', icon: UserCircle, label: 'My Profile' },

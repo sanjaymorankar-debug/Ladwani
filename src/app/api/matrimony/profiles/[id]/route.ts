@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { isEligibleForMatrimony, matrimonyIneligibleReason } from '@/lib/matrimony'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -46,6 +47,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const isOwner = profile.member.userId === session.user.id
   if (!isOwner && !roles.includes('ADMIN') && !roles.includes('OPERATOR')) {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+  }
+
+  // Opting IN requires current eligibility; opting out is always allowed.
+  if (body.isVisible === true) {
+    const member = await prisma.member.findUniqueOrThrow({ where: { id: profile.memberId } })
+    if (!isEligibleForMatrimony(member.maritalStatus)) {
+      return NextResponse.json({ message: matrimonyIneligibleReason(member.maritalStatus) }, { status: 403 })
+    }
   }
 
   const updated = await prisma.matrimonialProfile.update({

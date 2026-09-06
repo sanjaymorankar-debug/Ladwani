@@ -132,7 +132,7 @@ describe('TC-MAT — matrimony', () => {
     await prisma.matrimonialInterest.deleteMany({ where: { id: interest.id } })
   })
 
-  it('TC-MAT-010 DEFECT CHECK: does a MARRIED member still appear in matrimony results?', async () => {
+  it('TC-MAT-010 a MARRIED member is excluded from matrimony results', async () => {
     const m = await account('MEMBER-02')
     const viewer = await account('MEMBER-01')
     await ensureProfile(m.memberId, true)
@@ -145,8 +145,7 @@ describe('TC-MAT — matrimony', () => {
     await prisma.member.update({ where: { id: m.memberId }, data: { maritalStatus: 'UNMARRIED' } })
     await ensureProfile(m.memberId, false)
 
-    // Documents current behaviour: listing filters on isVisible only, so a
-    // married member is NOT excluded automatically.
-    expect(ids).toContain(m.memberId)
+    // Matrimony now lists only members who opted in AND are free to marry.
+    expect(ids).not.toContain(m.memberId)
   })
 })

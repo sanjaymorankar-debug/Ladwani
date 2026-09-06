@@ -26,6 +26,12 @@ async function cleanup() {
     await prisma.auditLog.deleteMany({ where: { actorId: u.id } })
     await prisma.verificationToken.deleteMany({ where: { userId: u.id } })
     await prisma.consentRecord.deleteMany({ where: { userId: u.id } })
+    // Registering a family now raises a registration-fee invoice, which holds
+    // a reference to the member.
+    if (u.member) {
+      await prisma.payment.deleteMany({ where: { memberId: u.member.id } })
+      await prisma.feeInvoice.deleteMany({ where: { memberId: u.member.id } })
+    }
     if (familyIds.length) await prisma.family.deleteMany({ where: { id: { in: familyIds } } })
     if (u.member) await prisma.member.delete({ where: { id: u.member.id } })
     await prisma.user.delete({ where: { id: u.id } })

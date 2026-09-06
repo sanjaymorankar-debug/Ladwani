@@ -211,6 +211,29 @@ async function main() {
   })
   console.log('✅ Settings created')
 
+  // ── Fees ───────────────────────────────────────────────────────
+  // One-time registration fee, charged to the Karta who registers a family.
+  // Everyone who joins that family afterwards registers free. Amount is in
+  // paise (200000 = ₹2,000) and is admin-editable.
+  await prisma.feeType.upsert({
+    where: { code: 'FAMILY_REGISTRATION' },
+    update: {},
+    create: {
+      code: 'FAMILY_REGISTRATION',
+      label: 'Family Registration Fee',
+      description: 'One-time fee payable by the Karta when a new family is registered. Other family members join free.',
+      amountPaise: 200000,
+      appliesTo: 'FAMILY_KARTA',
+      isActive: true,
+    },
+  })
+  await prisma.approvalRule.upsert({
+    where: { actionCode: 'asset.create' },
+    update: {},
+    create: { actionCode: 'asset.create', requiresApproval: true, approverRole: 'OPERATOR' },
+  })
+  console.log('✅ Fee types + asset approval rule created')
+
   // ── Test Accounts (dev/test only - obviously fake data) ─────────
   const testPwdHash = await hash('TestPass@123', 12)
 

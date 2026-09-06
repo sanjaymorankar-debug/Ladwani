@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { raiseFamilyRegistrationInvoice } from '@/lib/fees'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -119,11 +120,26 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    return created
+    // One-time registration fee, billed to the Karta who registered the
+    // family. Members who join later are never billed.
+    const invoice = await raiseFamilyRegistrationInvoice(tx, {
+      familyId: created.id,
+      kartaMemberId: memberId,
+    })
+
+    return { created, invoice }
   })
 
   return NextResponse.json(
-    { message: 'Family created — you are now its Karta. Submitted for verification.', familyId: family.id },
+    {
+      message: family.invoice
+        ? 'Family created — you are now its Karta. A registration fee is due.'
+        : 'Family created — you are now its Karta. Submitted for verification.',
+      familyId: family.created.id,
+      registrationFee: family.invoice
+        ? { invoiceId: family.invoice.id, reference: family.invoice.reference, amountPaise: family.invoice.amountPaise }
+        : null,
+    },
     { status: 201 }
   )
 }

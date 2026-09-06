@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { withdrawMatrimonyOnMarriage } from '@/lib/matrimony'
 
 /**
  * Whether an action needs Operator/Admin review before it takes effect.
@@ -100,6 +101,10 @@ export async function applySpouseLink(
       data: { memberId: payload.spouseMemberId, status: 'MARRIED', changedBy: actorId, approvalId: approvalId ?? null },
     })
   }
+
+  // Now married — withdraw them from matrimony rather than relying on anyone
+  // remembering to opt out.
+  await withdrawMatrimonyOnMarriage(tx, [memberId, payload.spouseMemberId ?? ''])
 }
 
 export async function createApprovalRecord(

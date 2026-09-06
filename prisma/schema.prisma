@@ -196,6 +196,7 @@ model Family {
   userRoles       UserRole[]
   photos          Photo[]
   joinRequests    FamilyJoinRequest[]
+  feeInvoices     FeeInvoice[]
   karta           Member?         @relation("FamilyKarta", fields: [kartaMemberId], references: [id])
 
   @@map("families")
@@ -319,6 +320,10 @@ model Member {
   memberAreas           MemberArea[]
   fieldVisibility       MemberFieldVisibility[]
   joinRequests          FamilyJoinRequest[]
+  assets                Asset[]
+  bookings              Booking[]
+  payments              Payment[]
+  feeInvoices           FeeInvoice[]
   profilePhoto          Photo?         @relation("ProfilePhoto", fields: [profilePhotoId], references: [id])
 
   @@map("members")
@@ -688,7 +693,12 @@ model Post {
   content        String?    @db.Text
   visibility     String     @default("COMMUNITY") // LOCAL_AREA, CITY, STATE, COMMUNITY, PRIVATE
   targetAreaId   String?
-  status         PostStatus @default(PUBLISHED)
+  // Community posts are held for moderation by default — nothing reaches the
+  // feed until an Operator or Admin approves it.
+  status         PostStatus @default(PENDING_APPROVAL)
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  reviewNote     String?    @db.Text
   isPinned       Boolean    @default(false)
   isAnnouncement Boolean    @default(false)
   eventDate      DateTime?
@@ -708,7 +718,9 @@ model Post {
 
 enum PostStatus {
   DRAFT
+  PENDING_APPROVAL
   PUBLISHED
+  REJECTED
   HIDDEN
   REMOVED
   FLAGGED
@@ -767,6 +779,196 @@ model Report {
   reporter User @relation(fields: [reporterId], references: [id])
 
   @@map("reports")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// COMMUNITY ASSETS, BOOKINGS, PAYMENTS & FEES
+//
+// Money is stored as INTEGER PAISE everywhere (₹2,000 = 200000). No float
+// ever touches a monetary value.
+// ─────────────────────────────────────────────────────────────────
+
+model Asset {
+  id             String      @id @default(cuid())
+  ownerMemberId  String
+  name           String
+  assetType      String      // HALL, GUESTHOUSE, LAWN, EQUIPMENT, VEHICLE, OTHER
+  description    String?     @db.Text
+  // Location
+  addressLine    String?
+  city           String?
+  district       String?
+  state          String?
+  pincode        String?
+  // Capacity & facilities
+  capacity       Int?
+  facilities     String[]
+  // Rates in paise. Which one applies depends on bookingMode.
+  bookingMode    String      @default("DAILY") // DAILY | HOURLY
+  ratePerDay     Int?
+  ratePerHour    Int?
+  // Community assets are reviewed before members can see or book them.
+  status         AssetStatus @default(DRAFT)
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  reviewNote     String?     @db.Text
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  deletedAt      DateTime?
+
+  owner     Member          @relation(fields: [ownerMemberId], references: [id])
+  bookings  Booking[]
+  blackouts AssetBlackout[]
+
+  @@index([status, isActive])
+  @@map("assets")
+}
+
+enum AssetStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+/// Owner-declared unavailability (maintenance, private use).
+model AssetBlackout {
+  id        String   @id @default(cuid())
+  assetId   String
+  startAt   DateTime
+  endAt     DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, startAt, endAt])
+  @@map("asset_blackouts")
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  reference     String        @unique
+  assetId       String
+  memberId      String
+  bookedByUserId String
+  startAt       DateTime
+  endAt         DateTime
+  status        BookingStatus @default(PENDING_PAYMENT)
+  amountPaise   Int
+  guestCount    Int?
+  notes         String?       @db.Text
+  cancelledAt   DateTime?
+  cancelReason  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  asset    Asset     @relation(fields: [assetId], references: [id])
+  member   Member    @relation(fields: [memberId], references: [id])
+  payments Payment[]
+
+  @@index([assetId, startAt, endAt])
+  @@index([memberId])
+  @@map("bookings")
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  REJECTED
+  EXPIRED
+}
+
+/// One row per payment attempt. The gateway is pluggable; MOCK lets the whole
+/// flow be exercised without live credentials. Status is only ever advanced
+/// from server-side verification — never from what the browser reports.
+model Payment {
+  id               String        @id @default(cuid())
+  reference        String        @unique
+  purpose          String        // BOOKING | FEE
+  bookingId        String?
+  feeInvoiceId     String?
+  memberId         String
+  paidByUserId     String
+  amountPaise      Int
+  currency         String        @default("INR")
+  status           PaymentStatus @default(CREATED)
+  gateway          String        @default("MOCK")
+  gatewayOrderId   String?
+  gatewayPaymentId String?
+  failureReason    String?
+  paidAt           DateTime?
+  refundedPaise    Int           @default(0)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  booking    Booking?    @relation(fields: [bookingId], references: [id])
+  feeInvoice FeeInvoice? @relation(fields: [feeInvoiceId], references: [id])
+  member     Member      @relation(fields: [memberId], references: [id])
+
+  @@index([memberId])
+  @@index([status])
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  CREATED
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+/// Admin-configurable fee definitions, e.g. one-time family registration.
+model FeeType {
+  id          String   @id @default(cuid())
+  code        String   @unique // FAMILY_REGISTRATION
+  label       String
+  description String?
+  amountPaise Int
+  appliesTo   String   @default("FAMILY_KARTA") // who is billed
+  isActive    Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+
+  invoices FeeInvoice[]
+
+  @@map("fee_types")
+}
+
+model FeeInvoice {
+  id          String           @id @default(cuid())
+  reference   String           @unique
+  feeTypeId   String
+  familyId    String?
+  memberId    String
+  amountPaise Int
+  status      FeeInvoiceStatus @default(PENDING)
+  dueDate     DateTime?
+  paidAt      DateTime?
+  waivedBy    String?
+  waiverReason String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  feeType  FeeType   @relation(fields: [feeTypeId], references: [id])
+  family   Family?   @relation(fields: [familyId], references: [id])
+  member   Member    @relation(fields: [memberId], references: [id])
+  payments Payment[]
+
+  @@index([memberId, status])
+  @@map("fee_invoices")
+}
+
+enum FeeInvoiceStatus {
+  PENDING
+  PAID
+  WAIVED
+  CANCELLED
 }
 
 // ─────────────────────────────────────────────────────────────────

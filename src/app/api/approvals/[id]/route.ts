@@ -54,7 +54,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         ? await prisma.family.findUnique({ where: { id: existing.entityId }, select: { id: true } })
         : existing.entityType === 'member'
           ? await prisma.member.findUnique({ where: { id: existing.entityId }, select: { id: true } })
-          : { id: existing.entityId } // nothing to check for other entity types
+          : existing.entityType === 'asset'
+            ? await prisma.asset.findUnique({ where: { id: existing.entityId }, select: { id: true } })
+            : { id: existing.entityId } // nothing to check for other entity types
     if (!target) {
       return NextResponse.json(
         { message: `The ${existing.entityType ?? 'record'} this request refers to no longer exists. Nothing was changed.` },
@@ -91,6 +93,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             : {
                 verificationStatus: 'REJECTED',
               },
+        })
+      }
+
+      if (approval.actionCode === 'asset.create' && approval.entityType === 'asset') {
+        await tx.asset.update({
+          where: { id: approval.entityId },
+          data: {
+            status: action === 'approve' ? 'APPROVED' : 'REJECTED',
+            reviewedBy: session.user?.id as string,
+            reviewedAt: new Date(),
+            reviewNote: note ?? null,
+          },
         })
       }
 
