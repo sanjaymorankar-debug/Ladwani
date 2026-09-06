@@ -15,7 +15,9 @@ export async function POST(req: Request) {
       include: {
         verificationTokens: {
           where: {
-            type: 'MOBILE_VERIFY',
+            // Accept either kind: sign-up now verifies by email, but older
+            // accounts may still hold an unused mobile token.
+            type: { in: ['EMAIL_VERIFY', 'MOBILE_VERIFY'] },
             usedAt: null,
             expiresAt: { gt: new Date() },
           },
@@ -48,8 +50,10 @@ export async function POST(req: Request) {
       prisma.user.update({
         where: { id: user.id },
         data: {
-          mobileVerified: mobile ? true : undefined,
-          emailVerified: email ? true : undefined,
+          // Mark whichever channel the token was actually issued for, not
+          // whichever identifier the caller happened to log in with.
+          emailVerified: token.type === 'EMAIL_VERIFY' ? true : undefined,
+          mobileVerified: token.type === 'MOBILE_VERIFY' ? true : undefined,
           status: 'ACTIVE',
         },
       }),

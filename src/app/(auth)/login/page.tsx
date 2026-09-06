@@ -101,13 +101,16 @@ function LoginForm() {
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <label className="form-label">Email or Mobile Number</label>
+                <label className="form-label">Email Address</label>
                 <input
                   {...register('identifier')}
                   className="form-input"
-                  placeholder="email@example.com or 9876543210"
+                  placeholder="email@example.com"
                   autoComplete="username"
                 />
+                <p className="text-xs text-gray-400 mt-1">
+                  Registered with a mobile number instead? You can still sign in with it.
+                </p>
                 {errors.identifier && <p className="form-error">{errors.identifier.message}</p>}
               </div>
 

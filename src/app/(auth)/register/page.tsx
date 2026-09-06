@@ -32,7 +32,7 @@ export default function RegisterPage() {
     defaultValues: { consentAccepted: true },
   })
 
-  const mobile = watch('mobile')
+  const email = watch('email')
   const joinIntent = watch('joinIntent')
 
   const onSubmit = async (data: RegisterInput) => {
@@ -55,7 +55,7 @@ export default function RegisterPage() {
       if (!res.ok) throw new Error(json.message || 'Registration failed')
 
       if (json.requiresVerification) {
-        toast.success('Account created! Please verify your mobile.')
+        toast.success('Account created! Check your email for the verification code.')
         setStep('verify')
         return
       }
@@ -64,7 +64,7 @@ export default function RegisterPage() {
       // drop the user straight into the flow they picked at signup.
       toast.success('Account created!')
       const signInRes = await signIn('credentials', {
-        identifier: data.email || data.mobile,
+        identifier: data.email,
         password: data.password,
         redirect: false,
       })
@@ -88,11 +88,11 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile: getValues('mobile'), otp }),
+        body: JSON.stringify({ email: getValues('email'), otp }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || 'Verification failed')
-      toast.success('Mobile verified successfully!')
+      toast.success('Email verified successfully!')
       setStep('done')
     } catch (e: any) {
       toast.error(e.message)
@@ -155,15 +155,16 @@ export default function RegisterPage() {
                   </div>
 
                   <div>
-                    <label className="form-label">Mobile Number *</label>
-                    <input {...register('mobile')} className="form-input" placeholder="9876543210" maxLength={10} />
-                    {errors.mobile && <p className="form-error">{errors.mobile.message}</p>}
+                    <label className="form-label">Email Address *</label>
+                    <input {...register('email')} type="email" className="form-input" placeholder="email@example.com" />
+                    <p className="text-xs text-gray-400 mt-1">You&apos;ll use this email to sign in.</p>
+                    {errors.email && <p className="form-error">{errors.email.message}</p>}
                   </div>
 
                   <div>
-                    <label className="form-label">Email Address (optional)</label>
-                    <input {...register('email')} type="email" className="form-input" placeholder="email@example.com" />
-                    {errors.email && <p className="form-error">{errors.email.message}</p>}
+                    <label className="form-label">Mobile Number (optional)</label>
+                    <input {...register('mobile')} className="form-input" placeholder="9876543210" maxLength={10} />
+                    {errors.mobile && <p className="form-error">{errors.mobile.message}</p>}
                   </div>
 
                   <div>
@@ -258,11 +259,11 @@ export default function RegisterPage() {
             {step === 'verify' && (
               <div className="text-center py-4">
                 <div className="w-16 h-16 bg-saffron-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl">📱</span>
+                  <span className="text-3xl">✉️</span>
                 </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">Verify Your Mobile</h2>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Verify Your Email</h2>
                 <p className="text-gray-500 text-sm mb-6">
-                  We sent a 6-digit OTP to <span className="font-medium text-gray-900">+91 {mobile}</span>
+                  We sent a 6-digit code to <span className="font-medium text-gray-900">{email}</span>
                 </p>
                 <div className="mb-4">
                   <label className="form-label text-left">Enter OTP</label>

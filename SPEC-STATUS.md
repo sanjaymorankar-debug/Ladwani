@@ -68,19 +68,24 @@ and members can maintain full profiles. Roughly **32 of 52 sections are complete
 
 ## Authentication mode (deliberate deviation from §2)
 
-The spec's "verify mobile/email" step is **intentionally disabled** for now, at
-the project owner's request: sign-up and login are plain email-or-mobile +
-password, and a new account works the moment it's created. There is no SMS
-gateway and no SMTP server configured, so an OTP step would only block testing.
+**Email is the primary account identifier.** Registration requires an email
+address; mobile is optional and kept as contact info. Login accepts either, so
+accounts created before this change (mobile-only) still work.
 
-This is a single switch, not a rewrite — `NEXT_PUBLIC_AUTH_REQUIRE_VERIFICATION`
-in `.env` (see `src/lib/auth-config.ts`). Setting it to `true` restores the OTP
-screen, makes new accounts start `PENDING`, and makes login refuse them until
+The spec's verification step is **intentionally disabled** for now: a new
+account works the moment it's created, with no code to enter. This is a single
+switch, not a rewrite — `NEXT_PUBLIC_AUTH_REQUIRE_VERIFICATION` in `.env` (see
+`src/lib/auth-config.ts`). Setting it to `true` emails a 6-digit code at
+sign-up, makes new accounts start `PENDING`, and makes login refuse them until
 verified. Both settings were tested end-to-end.
 
-Note that **password reset still depends on OTP delivery**, so it can't work
-until SMTP is configured. Until then, an Admin can reset a password from the
-admin user screen.
+Verification is **by email**, not SMS — there is no SMS gateway, and email is
+now the identifier anyway. Turning it on therefore requires working SMTP:
+see **`SMTP-SETUP.md`** (Hostinger walkthrough) and test with
+`npm run test:smtp -- you@example.com`.
+
+**Password reset also depends on SMTP** and cannot work until it's configured.
+Until then, an Admin can reset a password from the admin user screen.
 
 ## The one structural discrepancy worth a decision
 

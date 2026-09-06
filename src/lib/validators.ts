@@ -3,8 +3,14 @@ import { z } from 'zod'
 export const registerSchema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
   lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Invalid email address').optional().or(z.literal('')),
-  mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number'),
+  // Email is the primary account identifier. Mobile stays supported (existing
+  // accounts sign in with it, and it's useful contact info) but is optional.
+  email: z.string().min(1, 'Email address is required').email('Invalid email address'),
+  mobile: z
+    .string()
+    .regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number')
+    .optional()
+    .or(z.literal('')),
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')

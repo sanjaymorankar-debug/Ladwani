@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { registerSchema } from '@/lib/validators'
 import { generateMemberNumber } from '@/lib/utils'
 import { requireAccountVerification } from '@/lib/auth-config'
+import { sendEmail, otpEmailTemplate, isEmailConfigured } from '@/lib/email'
 
 export async function POST(req: Request) {
   try {
@@ -15,17 +16,19 @@ export async function POST(req: Request) {
     }
     const data = parsed.data
 
-    // Check duplicate mobile
-    const existingMobile = await prisma.user.findUnique({ where: { mobile: data.mobile } })
-    if (existingMobile) {
-      return NextResponse.json({ message: 'An account with this mobile number already exists.' }, { status: 409 })
+    const mobile = data.mobile || null
+
+    // Email is the primary identifier, so it's always checked.
+    const existingEmail = await prisma.user.findUnique({ where: { email: data.email } })
+    if (existingEmail) {
+      return NextResponse.json({ message: 'An account with this email already exists.' }, { status: 409 })
     }
 
-    // Check duplicate email if provided
-    if (data.email) {
-      const existingEmail = await prisma.user.findUnique({ where: { email: data.email } })
-      if (existingEmail) {
-        return NextResponse.json({ message: 'An account with this email already exists.' }, { status: 409 })
+    // Mobile is optional now — only check it when one was supplied.
+    if (mobile) {
+      const existingMobile = await prisma.user.findUnique({ where: { mobile } })
+      if (existingMobile) {
+        return NextResponse.json({ message: 'An account with this mobile number already exists.' }, { status: 409 })
       }
     }
 
@@ -50,8 +53,8 @@ export async function POST(req: Request) {
       // out. Flip NEXT_PUBLIC_AUTH_REQUIRE_VERIFICATION to restore OTP.
       const user = await tx.user.create({
         data: {
-          email: data.email || null,
-          mobile: data.mobile,
+          email: data.email,
+          mobile,
           passwordHash,
           status: requireAccountVerification ? 'PENDING' : 'ACTIVE',
           mobileVerified: false,
@@ -86,27 +89,47 @@ export async function POST(req: Request) {
       })
 
       if (requireAccountVerification) {
-        // Create OTP token (in production: send via SMS)
         const otp = Math.floor(100000 + Math.random() * 900000).toString()
         const otpHash = await hash(otp, 10)
         await tx.verificationToken.create({
           data: {
             userId: user.id,
-            type: 'MOBILE_VERIFY',
+            type: 'EMAIL_VERIFY',
             tokenHash: otpHash,
             expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 min
           },
         })
-
-        console.log(`[DEV] OTP for ${data.mobile}: ${otp}`) // remove in production
+        // Returned so the OTP can be emailed *after* the transaction commits —
+        // sending inside it would hold a DB transaction open across a network
+        // call, and a mail failure would roll back a perfectly good signup.
+        return { userId: user.id, memberId: member.id, otp }
       }
 
-      return { userId: user.id, memberId: member.id }
+      return { userId: user.id, memberId: member.id, otp: null as string | null }
     })
+
+    if (result.otp) {
+      const template = otpEmailTemplate(result.otp, data.firstName)
+      try {
+        await sendEmail({ to: data.email, ...template })
+      } catch {
+        // The account exists and the OTP is stored; surface the delivery
+        // problem instead of pretending the mail went out.
+        return NextResponse.json({
+          message: 'Account created, but the verification email could not be sent. Please contact the administrator.',
+          userId: result.userId,
+          requiresVerification: true,
+          emailDeliveryFailed: true,
+        }, { status: 201 })
+      }
+      if (!isEmailConfigured()) {
+        console.log(`[DEV] Verification OTP for ${data.email}: ${result.otp}`)
+      }
+    }
 
     return NextResponse.json({
       message: requireAccountVerification
-        ? 'Account created. OTP sent to your mobile.'
+        ? 'Account created. We sent a verification code to your email.'
         : 'Account created. You can sign in now.',
       userId: result.userId,
       // Lets the registration UI decide whether to show the OTP step without

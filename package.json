@@ -18,7 +18,8 @@
     "db:reset": "prisma migrate reset",
     "test": "node scripts/with-env.js .env.test npx vitest run",
     "test:migrate": "node scripts/with-env.js .env.test npx prisma migrate deploy",
-    "migrate:mysql-to-postgres": "ts-node --project prisma/seeds/tsconfig.seed.json scripts/migrate-mysql-to-postgres.ts"
+    "migrate:mysql-to-postgres": "ts-node --project prisma/seeds/tsconfig.seed.json scripts/migrate-mysql-to-postgres.ts",
+    "test:smtp": "node scripts/with-env.js .env node scripts/test-smtp.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.624.0",

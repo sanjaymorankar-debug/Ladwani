@@ -8,12 +8,14 @@ import { POST as postRegister } from '@/app/api/auth/register/route'
 import { POST as postFamilies } from '@/app/api/families/route'
 import { validateLogin } from '@/lib/auth'
 
+const EMAIL_KARTA = 'intent.karta@example.test'
+const EMAIL_JOINER = 'intent.joiner@example.test'
 const MOBILE_KARTA = '9990000001'
 const MOBILE_JOINER = '9990000002'
 
 async function cleanup() {
   const users = await prisma.user.findMany({
-    where: { mobile: { in: [MOBILE_KARTA, MOBILE_JOINER] } },
+    where: { email: { in: [EMAIL_KARTA, EMAIL_JOINER, 'nomobile@example.test'] } },
     include: { member: { include: { families: true } } },
   })
   for (const u of users) {
@@ -45,21 +47,37 @@ const baseBody = {
 
 describe('Registration join-intent (spec §2, §7)', () => {
   it('rejects registration with no join choice', async () => {
-    const res = await postRegister(req({ ...baseBody, mobile: MOBILE_KARTA }))
+    const res = await postRegister(req({ ...baseBody, email: EMAIL_KARTA, mobile: MOBILE_KARTA }))
     expect(res.status).toBe(400)
   })
 
+  it('requires an email address (email is now the primary identifier)', async () => {
+    const res = await postRegister(req({ ...baseBody, mobile: MOBILE_KARTA, joinIntent: 'KARTA' }))
+    expect(res.status).toBe(400)
+  })
+
+  it('accepts a signup with no mobile number (mobile is optional)', async () => {
+    const res = await postRegister(req({
+      ...baseBody, email: 'nomobile@example.test', joinIntent: 'JOIN_EXISTING',
+    }))
+    expect(res.status).toBe(201)
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: 'nomobile@example.test' } })
+    expect(user.mobile).toBeNull()
+    // ...and can sign in with just the email.
+    expect((await validateLogin('nomobile@example.test', baseBody.password)).ok).toBe(true)
+  })
+
   it('rejects an unrecognised join choice', async () => {
-    const res = await postRegister(req({ ...baseBody, mobile: MOBILE_KARTA, joinIntent: 'SUPERUSER' }))
+    const res = await postRegister(req({ ...baseBody, email: EMAIL_KARTA, mobile: MOBILE_KARTA, joinIntent: 'SUPERUSER' }))
     expect(res.status).toBe(400)
   })
 
   it('stores the KARTA choice but does NOT grant the KARTA role at signup', async () => {
-    const res = await postRegister(req({ ...baseBody, mobile: MOBILE_KARTA, joinIntent: 'KARTA' }))
+    const res = await postRegister(req({ ...baseBody, email: EMAIL_KARTA, mobile: MOBILE_KARTA, joinIntent: 'KARTA' }))
     expect(res.status).toBe(201)
 
     const user = await prisma.user.findUniqueOrThrow({
-      where: { mobile: MOBILE_KARTA },
+      where: { email: EMAIL_KARTA },
       include: { userRoles: { include: { role: true } }, member: true },
     })
 
@@ -78,21 +96,21 @@ describe('Registration join-intent (spec §2, §7)', () => {
   })
 
   it('lets a brand-new account sign in immediately with no OTP', async () => {
-    const result = await validateLogin(MOBILE_KARTA, baseBody.password)
+    const result = await validateLogin(EMAIL_KARTA, baseBody.password)
     expect(result.ok).toBe(true)
   })
 
   it('still rejects a wrong password for a new account', async () => {
-    const result = await validateLogin(MOBILE_KARTA, 'WrongPass123')
+    const result = await validateLogin(EMAIL_KARTA, 'WrongPass123')
     expect(result).toEqual({ ok: false, code: 'INVALID_CREDENTIALS' })
   })
 
   it('stores the JOIN_EXISTING choice with the same MEMBER-only role', async () => {
-    const res = await postRegister(req({ ...baseBody, mobile: MOBILE_JOINER, joinIntent: 'JOIN_EXISTING' }))
+    const res = await postRegister(req({ ...baseBody, email: EMAIL_JOINER, joinIntent: 'JOIN_EXISTING' }))
     expect(res.status).toBe(201)
 
     const user = await prisma.user.findUniqueOrThrow({
-      where: { mobile: MOBILE_JOINER },
+      where: { email: EMAIL_JOINER },
       include: { userRoles: { include: { role: true } } },
     })
     expect(user.joinIntent).toBe('JOIN_EXISTING')
@@ -101,7 +119,7 @@ describe('Registration join-intent (spec §2, §7)', () => {
 
   it('grants the KARTA role only once a family is actually created', async () => {
     const user = await prisma.user.findUniqueOrThrow({
-      where: { mobile: MOBILE_KARTA },
+      where: { email: EMAIL_KARTA },
       include: { member: true },
     })
 

@@ -1,22 +1,50 @@
 import nodemailer from 'nodemailer'
 
-const isDev = process.env.NODE_ENV !== 'production'
+/**
+ * Email is sent whenever SMTP is configured — including in development, so
+ * you can prove your provider's settings work locally before deploying.
+ * Without SMTP configured we fall back to logging to the console, which keeps
+ * local development usable with no mail server at all.
+ */
+export function isEmailConfigured(): boolean {
+  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD)
+}
 
-// Create transporter (dev uses ethereal/console, prod uses SMTP)
-function createTransporter() {
-  if (isDev) {
-    // In dev, log emails to console instead of sending
-    return null
-  }
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT ?? '587'),
-    secure: false,
+let cachedTransporter: nodemailer.Transporter | null = null
+
+export function getTransporter(): nodemailer.Transporter | null {
+  if (!isEmailConfigured()) return null
+  if (cachedTransporter) return cachedTransporter
+
+  const port = parseInt(process.env.SMTP_PORT ?? '587', 10)
+  // Port 465 is implicit TLS (connect over TLS from the start); 587 is
+  // STARTTLS (connect plain, then upgrade). Getting this backwards is the
+  // single most common cause of SMTP timeouts, so derive it from the port
+  // unless explicitly overridden.
+  const secure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 465
+
+  cachedTransporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port,
+    secure,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASSWORD,
     },
   })
+  return cachedTransporter
+}
+
+/** Checks credentials/connectivity without sending anything. */
+export async function verifyEmailConnection(): Promise<{ ok: boolean; error?: string }> {
+  const transporter = getTransporter()
+  if (!transporter) return { ok: false, error: 'SMTP is not configured (need SMTP_HOST, SMTP_USER, SMTP_PASSWORD)' }
+  try {
+    await transporter.verify()
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? String(e) }
+  }
 }
 
 interface SendEmailOptions {
@@ -27,19 +55,25 @@ interface SendEmailOptions {
 }
 
 export async function sendEmail({ to, subject, html, text }: SendEmailOptions) {
-  const from = process.env.SMTP_FROM ?? 'noreply@miladwani.com'
+  // Default the From address to the authenticated mailbox — most providers
+  // (Hostinger included) reject a From that isn't the account you logged in as.
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@miladwani.com'
 
-  if (isDev || !process.env.SMTP_HOST) {
-    console.log(`[EMAIL] To: ${to} | Subject: ${subject}`)
-    console.log(`[EMAIL] Body: ${text ?? 'HTML email'}`)
-    return { messageId: 'dev-mode', accepted: [to] }
+  const transporter = getTransporter()
+  if (!transporter) {
+    console.log(`[EMAIL:not-configured] To: ${to} | Subject: ${subject}`)
+    console.log(`[EMAIL:not-configured] Body: ${text ?? 'HTML email'}`)
+    return { messageId: 'console-fallback', accepted: [to] }
   }
 
-  const transporter = createTransporter()
-  if (!transporter) return null
-
-  const info = await transporter.sendMail({ from, to, subject, html, text })
-  return info
+  try {
+    return await transporter.sendMail({ from, to, subject, html, text })
+  } catch (e: any) {
+    // Never let a mail failure take down the request that triggered it —
+    // the caller decides what to do about an undelivered message.
+    console.error(`[EMAIL] Failed to send to ${to}:`, e?.message ?? e)
+    throw e
+  }
 }
 
 // ── Email Templates ────────────────────────────────────────────────
