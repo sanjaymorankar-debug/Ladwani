@@ -37,6 +37,9 @@ export default async function AssetDetailPage({ params }: { params: { id: string
   if (!visible) notFound()
 
   const bookable = asset.status === 'APPROVED' && asset.isActive && !isOwner
+  // facilities is stored as a JSON column (see schema comment) — narrow it
+  // back to a string array for display.
+  const facilities = Array.isArray(asset.facilities) ? (asset.facilities as string[]) : []
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -80,11 +83,11 @@ export default async function AssetDetailPage({ params }: { params: { id: string
               </div>
             </div>
 
-            {asset.facilities.length > 0 && (
+            {facilities.length > 0 && (
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <p className="text-xs font-medium text-gray-500 mb-2">FACILITIES</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {asset.facilities.map((f) => (
+                  {facilities.map((f) => (
                     <span key={f} className="badge bg-amber-50 text-amber-700 text-xs">{f}</span>
                   ))}
                 </div>

@@ -74,8 +74,27 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ message: 'The asset is unavailable for those dates.' }, { status: 409 })
   }
 
+  const OVERLAP = Symbol('booking-overlap')
+
   try {
     const result = await prisma.$transaction(async (tx) => {
+      // MySQL has no exclusion-constraint equivalent, so double-booking is
+      // prevented here instead: lock the asset's own row for the rest of
+      // this transaction, so a second, concurrent booking attempt for the
+      // same asset blocks on this SELECT until we commit or roll back —
+      // only then does it see the row we're about to insert.
+      await tx.$executeRaw`SELECT id FROM assets WHERE id = ${asset.id} FOR UPDATE`
+
+      const overlapping = await tx.booking.count({
+        where: {
+          assetId: asset.id,
+          status: { in: ['PENDING_PAYMENT', 'CONFIRMED'] },
+          startAt: { lt: endAt },
+          endAt: { gt: startAt },
+        },
+      })
+      if (overlapping > 0) throw OVERLAP
+
       const booking = await tx.booking.create({
         data: {
           reference: reference('BKG'),
@@ -118,10 +137,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       { status: 201 }
     )
   } catch (e: any) {
-    // The database rejects overlapping active bookings for the same asset
-    // (exclusion constraint `bookings_no_overlap`). Two people booking the
-    // same slot at the same instant both reach here; only one insert wins.
-    if (e?.code === 'P2010' || /bookings_no_overlap|exclusion constraint/i.test(String(e?.message))) {
+    if (e === OVERLAP) {
       return NextResponse.json(
         { message: 'That slot has just been taken. Please choose a different time.' },
         { status: 409 }

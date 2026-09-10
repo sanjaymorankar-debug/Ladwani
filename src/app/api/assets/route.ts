@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     where.status = 'APPROVED'
     where.isActive = true
   }
-  if (city) where.city = { contains: city, mode: 'insensitive' }
+  if (city) where.city = { contains: city }
   if (assetType) where.assetType = assetType
 
   const assets = await prisma.asset.findMany({

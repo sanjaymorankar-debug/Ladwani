@@ -1,3 +1,12 @@
+> **Superseded 10 Sep 2026.** The deployment target changed back to MySQL
+> (this app was ported — see `DEPLOYMENT.md`), and the user confirmed there's
+> no real production data to carry over for the `devmiladwani.agtci.com`
+> deploy. This runbook (written for the opposite direction, MySQL → Postgres)
+> no longer applies to that deploy. It's left here only because it documents
+> real credentials (`ladwani/env1`, `env2`) that once pointed at a live
+> MySQL database with real community data — if that database still exists
+> and still matters, say so before it's ever overwritten or decommissioned.
+
 # MySQL → PostgreSQL Migration Runbook
 
 ## Why this exists

@@ -14,7 +14,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const name = (body.name as string | undefined)?.trim()
   if (!name) return NextResponse.json({ message: 'Skill name is required' }, { status: 400 })
 
-  let skill = await prisma.skill.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } })
+  let skill = await prisma.skill.findFirst({ where: { name: { equals: name } } })
   if (!skill) {
     skill = await prisma.skill.create({ data: { name } })
   }

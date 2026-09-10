@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -568,7 +568,10 @@ model MatrimonialProfile {
   isVisible  Boolean @default(false)
   about      String? @db.Text
   heightCm   Int?
-  languages  String[]
+  // MySQL has no native array column type (unlike Postgres) — stored as a
+  // JSON array of strings instead. Nullable; application code treats a
+  // missing value as an empty list.
+  languages  Json?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   createdBy  String?
@@ -585,11 +588,12 @@ model MatrimonialPreference {
   minAge               Int?
   maxAge               Int?
   preferredGender      Gender?
-  preferredLocations   String[]
+  // JSON arrays — see the comment on MatrimonialProfile.languages above.
+  preferredLocations   Json?
   educationPreference  String?
   occupationPreference String?
   incomeRangeId        String?
-  maritalStatusPref    MaritalStatus[]
+  maritalStatusPref    Json? // array of MaritalStatus values
   otherPreferences     Json?
   updatedAt            DateTime @updatedAt
 
@@ -872,7 +876,8 @@ model Asset {
   pincode        String?
   // Capacity & facilities
   capacity       Int?
-  facilities     String[]
+  // JSON array of strings — see the comment on MatrimonialProfile.languages.
+  facilities     Json?
   // Rates in paise. Which one applies depends on bookingMode.
   bookingMode    String      @default("DAILY") // DAILY | HOURLY
   ratePerDay     Int?
@@ -919,6 +924,11 @@ model AssetBlackout {
   @@map("asset_blackouts")
 }
 
+/// Double-booking prevention: MySQL has no equivalent of a Postgres GiST
+/// exclusion constraint, so overlap is enforced in application code —
+/// `SELECT ... FOR UPDATE` on the parent Asset row inside the booking
+/// transaction (see src/app/api/assets/[id]/bookings/route.ts) serializes
+/// concurrent attempts for the same asset before the overlap check runs.
 model Booking {
   id            String        @id @default(cuid())
   reference     String        @unique

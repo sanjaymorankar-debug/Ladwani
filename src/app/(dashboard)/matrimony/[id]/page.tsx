@@ -33,6 +33,9 @@ export default async function MatrimonyProfileDetailPage({ params }: { params: {
   const job = member.employment[0]
   const family = member.families[0]?.family
   const isOwn = (session.user as any).memberId === member.id
+  // languages is a JSON column (see schema comment) — narrow it back to a
+  // string array for display.
+  const languages = Array.isArray(profile.languages) ? (profile.languages as string[]) : []
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -85,10 +88,10 @@ export default async function MatrimonyProfileDetailPage({ params }: { params: {
               {profile.heightCm} cm
             </div>
           )}
-          {profile.languages && profile.languages.length > 0 && (
+          {languages.length > 0 && (
             <div className="flex items-center gap-2 text-gray-600 sm:col-span-2">
               <LanguagesIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
-              {profile.languages.join(', ')}
+              {languages.join(', ')}
             </div>
           )}
         </div>

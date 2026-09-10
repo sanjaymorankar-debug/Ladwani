@@ -49,8 +49,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           body.email ? { email: body.email } : undefined,
           body.firstName && body.dateOfBirth
             ? {
-                firstName: { equals: body.firstName, mode: 'insensitive' },
-                lastName: body.lastName ? { equals: body.lastName, mode: 'insensitive' } : undefined,
+                firstName: { equals: body.firstName },
+                lastName: body.lastName ? { equals: body.lastName } : undefined,
                 dateOfBirth: new Date(body.dateOfBirth),
               }
             : undefined,
