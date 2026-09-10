@@ -325,6 +325,8 @@ model Member {
   payments              Payment[]
   feeInvoices           FeeInvoice[]
   profilePhoto          Photo?         @relation("ProfilePhoto", fields: [profilePhotoId], references: [id])
+  groupsConvened        CommunityGroup[]       @relation("GroupConvener")
+  communityGroups       CommunityGroupMember[]
 
   @@map("members")
 }
@@ -644,6 +646,7 @@ model Area {
   familyAreas FamilyArea[]
   posts       Post[]
   userRoles   UserRole[]
+  communityGroups CommunityGroup[]
 
   @@map("areas")
 }
@@ -670,6 +673,73 @@ model FamilyArea {
 
   @@id([familyId, areaId])
   @@map("family_areas")
+}
+
+/// A small local body within the community — a mandal or similar — that meets
+/// in a particular area and carries a roster of roughly 20–25 members. Kept
+/// separate from Area: an Area is geography, a group is a body of people with
+/// a convener, a roster and a review cadence.
+model CommunityGroup {
+  id             String      @id @default(cuid())
+  name           String
+  code           String?     @unique
+  groupType      String      @default("MANDAL") // MANDAL, YUVAK_MANDAL, MAHILA_MANDAL, BHAJAN_MANDAL, SENIOR, YOUTH, OTHER
+  description    String?     @db.Text
+  areaId         String?
+  convenerMemberId String?
+  meetingSchedule String?    // free text, e.g. "Second Sunday, 6pm"
+  /// Guidance size for the roster. Enforced only when set.
+  maxMembers     Int?        @default(25)
+  status         GroupStatus @default(PENDING_APPROVAL)
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  reviewNote     String?     @db.Text
+  /// Roster upkeep: when the membership list was last confirmed as current,
+  /// and how often it should be. Drives the "review due" prompt.
+  lastRosterReviewAt   DateTime?
+  lastRosterReviewBy   String?
+  rosterReviewIntervalDays Int   @default(180)
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  createdBy      String?
+  deletedAt      DateTime?
+
+  area     Area?                  @relation(fields: [areaId], references: [id])
+  convener Member?                @relation("GroupConvener", fields: [convenerMemberId], references: [id])
+  members  CommunityGroupMember[]
+
+  @@index([status, isActive])
+  @@map("community_groups")
+}
+
+enum GroupStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  REJECTED
+  INACTIVE
+}
+
+model CommunityGroupMember {
+  id         String    @id @default(cuid())
+  groupId    String
+  memberId   String
+  /// CONVENER, SECRETARY, TREASURER, MEMBER
+  roleInGroup String   @default("MEMBER")
+  joinedAt   DateTime  @default(now())
+  addedBy    String?
+  /// Members are retired from a roster rather than deleted, so the group's
+  /// history stays intact across periodic updates.
+  leftAt     DateTime?
+  leftReason String?
+
+  group  CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  member Member         @relation(fields: [memberId], references: [id])
+
+  @@unique([groupId, memberId])
+  @@index([memberId])
+  @@map("community_group_members")
 }
 
 model PostType {

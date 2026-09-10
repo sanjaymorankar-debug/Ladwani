@@ -37,6 +37,8 @@ async function main() {
     { code: 'admin:settings', label: 'Manage platform settings', module: 'admin' },
     { code: 'admin:audit', label: 'View audit logs', module: 'admin' },
     { code: 'asset:manage_own', label: 'Manage own assets', module: 'asset' },
+    { code: 'group:manage_own', label: 'Register and convene community groups', module: 'group' },
+    { code: 'group:approve', label: 'Approve community groups', module: 'group' },
   ]
   const permissionRecords: Record<string, string> = {}
   for (const p of permissions) {
@@ -45,16 +47,17 @@ async function main() {
   }
 
   const ROLE_PERMISSIONS: Record<string, string[]> = {
-    MEMBER: ['member:edit_own', 'matrimony:manage_own', 'family:view_tree'],
+    MEMBER: ['member:edit_own', 'matrimony:manage_own', 'family:view_tree', 'group:manage_own'],
     KARTA: [
       'member:edit_own', 'matrimony:manage_own', 'family:view_tree',
-      'family:create', 'family:edit_own', 'family:member_add',
+      'family:create', 'family:edit_own', 'family:member_add', 'group:manage_own',
     ],
-    ASSET_OWNER: ['member:edit_own', 'matrimony:manage_own', 'family:view_tree', 'asset:manage_own'],
+    ASSET_OWNER: ['member:edit_own', 'matrimony:manage_own', 'family:view_tree', 'asset:manage_own', 'group:manage_own'],
     OPERATOR: [
       'member:edit_own', 'matrimony:manage_own', 'family:view_tree',
       'member:edit_any', 'member:mark_deceased', 'family:edit_any',
       'family:member_add', 'family:approve', 'approval:review',
+      'group:manage_own', 'group:approve',
     ],
     ADMIN: permissions.map((p) => p.code), // full access
   }
@@ -232,7 +235,12 @@ async function main() {
     update: {},
     create: { actionCode: 'asset.create', requiresApproval: true, approverRole: 'OPERATOR' },
   })
-  console.log('✅ Fee types + asset approval rule created')
+  await prisma.approvalRule.upsert({
+    where: { actionCode: 'group.create' },
+    update: {},
+    create: { actionCode: 'group.create', requiresApproval: true, approverRole: 'OPERATOR' },
+  })
+  console.log('✅ Fee types + asset/group approval rules created')
 
   // ── Test Accounts (dev/test only - obviously fake data) ─────────
   const testPwdHash = await hash('TestPass@123', 12)
