@@ -243,6 +243,18 @@ async function main() {
   console.log('✅ Fee types + asset/group approval rules created')
 
   // ── Test Accounts (dev/test only - obviously fake data) ─────────
+  // These share one published password, so they must never exist on a
+  // production database. Opt in explicitly with SEED_TEST_ACCOUNTS=true —
+  // .env and .env.test set it locally; the production runbook does not, so
+  // a production seed stops here with reference data only.
+  if (process.env.SEED_TEST_ACCOUNTS !== 'true') {
+    console.log('\n🎉 Seed complete — reference data only, no test accounts.\n')
+    console.log('Admin login:')
+    console.log(`  Email:    ${process.env.ADMIN_EMAIL ?? 'admin@miladwani.com'}`)
+    console.log('  Password: as set in ADMIN_PASSWORD — change it immediately after first login.\n')
+    return
+  }
+
   const testPwdHash = await hash('TestPass@123', 12)
 
   const operatorUser = await prisma.user.upsert({

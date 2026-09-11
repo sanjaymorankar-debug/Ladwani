@@ -67,9 +67,37 @@ You now have everything for the connection string:
 mysql://<db-user>:<db-password>@localhost:3306/<db-name>
 ```
 
-Nothing else needs to be created by hand — table creation is handled by
-`npx prisma migrate deploy` in Part 3, from the schema already committed to
-this repo.
+### Then create the tables — two options
+
+You can build the schema **either** through phpMyAdmin **or** over SSH. Both
+produce an identical database; do one, not both.
+
+**Option A — phpMyAdmin (no command line needed).** Import two ready-made SQL
+files from [scripts/mysql/](scripts/mysql/):
+
+1. Open phpMyAdmin from the same hPanel Databases page.
+2. **Select your database in the left sidebar first.** Both files deliberately
+   omit `CREATE DATABASE`/`USE`, so they import into whichever database is
+   selected — that's what makes them work with Hostinger's prefixed names.
+3. Import [`scripts/mysql/01-schema.sql`](scripts/mysql/01-schema.sql) — 53
+   tables, 81 foreign keys, no rows.
+4. Import [`scripts/mysql/02-reference-data.sql`](scripts/mysql/02-reference-data.sql) —
+   roles, permissions, relationship types, approval rules, post types, areas,
+   the ₹2,000 fee, and one admin login.
+
+Then skip step 3's `migrate deploy` and step 4's `db:seed` in Part 3 — the
+import already did both. Full detail: [scripts/mysql/README.md](scripts/mysql/README.md).
+
+**Option B — SSH.** Leave the database empty here and let
+`npx prisma migrate deploy` + `npm run db:seed` create everything in Part 3.
+
+Either order stays safe: the SQL files record the migration as applied in
+`_prisma_migrations`, so a later `migrate deploy` is a no-op rather than an
+error.
+
+> A database built from those two SQL files was verified by running the app's
+> full 143-test suite against it — the schema they produce is not
+> hand-maintained, it's dumped from the same Prisma migration the CLI uses.
 
 > If you ever deploy this somewhere with real root/admin MySQL access instead
 > (a VPS, a managed MySQL provider) rather than Hostinger shared hosting,
@@ -182,7 +210,7 @@ npm run build                # runs `prisma generate` first, see package.json
 prompting. It's the only `migrate` command safe to run against a server —
 never `migrate dev` or `db push` in production.
 
-## 4. Seed reference data (first deploy only)
+## 4. Seed reference data (first deploy only — skip if you used phpMyAdmin)
 
 ```bash
 npm run db:seed
@@ -198,9 +226,13 @@ Email:    admin@miladwani.com
 Password: ChangeThisInProduction123!
 ```
 
-**Change that password immediately after your first login.**
-**Never run `npm run db:seed:uat` on production** — it creates a dozen test
-accounts with a published password.
+**Change that password immediately after your first login** — it's published
+in this repo, so until you change it the site is open to anyone who's read it.
+
+The fake test accounts (`test.member@example.test` and friends, all sharing
+the password `TestPass@123`) are gated behind `SEED_TEST_ACCOUNTS=true` and
+will **not** be created unless you set that — leave it unset on production.
+Also never run `npm run db:seed:uat` there; it creates a dozen more.
 
 ## 5. Start / restart the app
 
