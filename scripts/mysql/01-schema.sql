@@ -1,5 +1,5 @@
 -- ===========================================================================
--- Mi Ladwani — 01-schema.sql  (STRUCTURE ONLY: 53 tables, no rows)
+-- Mi Ladwani — 01-schema.sql  (STRUCTURE ONLY: 54 tables, no rows)
 --
 -- Run this FIRST, then 02-reference-data.sql.
 --
@@ -11,13 +11,13 @@
 --      u123456789_miladwani).
 --   3. Import tab > Choose File > this file > Go.
 --
--- Generated from prisma/migrations/20260910163143_init by mysqldump (MySQL
--- 8.4). It includes the _prisma_migrations table AND (in file 02) its row,
--- so a later `npx prisma migrate deploy` sees the migration as already
--- applied instead of trying to re-create every table.
+-- Generated from prisma/migrations by mysqldump (MySQL 8.4). It includes the
+-- _prisma_migrations table AND (in file 02) its rows, so a later
+-- `npx prisma migrate deploy` sees the migrations as already applied instead
+-- of trying to re-create every table.
 --
 -- Verified: a database built from these two files passes the app's full
--- 143-test suite.
+-- test suite.
 -- ===========================================================================
 
 -- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
@@ -556,8 +556,9 @@ CREATE TABLE `family_join_requests` (
   `respondedAt` datetime(3) DEFAULT NULL,
   `responseNote` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `direction` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'MEMBER_REQUEST',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `family_join_requests_familyId_memberId_status_key` (`familyId`,`memberId`,`status`),
+  UNIQUE KEY `family_join_requests_familyId_memberId_status_direction_key` (`familyId`,`memberId`,`status`,`direction`),
   KEY `family_join_requests_memberId_fkey` (`memberId`),
   CONSTRAINT `family_join_requests_familyId_fkey` FOREIGN KEY (`familyId`) REFERENCES `families` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `family_join_requests_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `members` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
@@ -839,6 +840,33 @@ CREATE TABLE `member_field_visibility` (
   `visibility` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`memberId`,`fieldName`),
   CONSTRAINT `member_field_visibility_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `members` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `member_invitations`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `member_invitations` (
+  `id` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `memberId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `mobile` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tokenHash` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDING',
+  `invitedBy` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expiresAt` datetime(3) NOT NULL,
+  `acceptedAt` datetime(3) DEFAULT NULL,
+  `acceptedBy` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `revokedAt` datetime(3) DEFAULT NULL,
+  `revokedBy` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `member_invitations_tokenHash_key` (`tokenHash`),
+  KEY `member_invitations_memberId_status_idx` (`memberId`,`status`),
+  CONSTRAINT `member_invitations_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `members` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1357,4 +1385,4 @@ CREATE TABLE `verification_tokens` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-11 20:21:11
+-- Dump completed on 2026-09-11 21:02:31

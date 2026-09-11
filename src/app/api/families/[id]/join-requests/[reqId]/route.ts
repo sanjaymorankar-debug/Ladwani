@@ -7,9 +7,6 @@ import { canManageFamily } from '@/lib/family-auth'
 export async function PATCH(req: Request, { params }: { params: { id: string; reqId: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-  if (!(await canManageFamily(session, params.id))) {
-    return NextResponse.json({ message: "Only this family's Karta can respond to join requests" }, { status: 403 })
-  }
 
   const body = await req.json()
   const decision = body.decision as 'APPROVE' | 'REJECT'
@@ -23,6 +20,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string; re
   }
   if (joinRequest.status !== 'PENDING') {
     return NextResponse.json({ message: 'This request has already been resolved' }, { status: 409 })
+  }
+
+  // Who gets to answer depends on who asked. A Karta approving a request to
+  // join their family is not the same act as a person accepting an invitation
+  // into someone else's — letting the Karta do both would let them add an
+  // existing account-holder to their family without consent.
+  if (joinRequest.direction === 'KARTA_INVITE') {
+    const viewerMemberId = (session.user as any).memberId as string | null
+    if (!viewerMemberId || viewerMemberId !== joinRequest.memberId) {
+      return NextResponse.json(
+        { message: 'Only the person who was invited can respond to this invitation' },
+        { status: 403 }
+      )
+    }
+  } else if (!(await canManageFamily(session, params.id))) {
+    return NextResponse.json({ message: "Only this family's Karta can respond to join requests" }, { status: 403 })
   }
 
   await prisma.$transaction(async (tx) => {
@@ -82,14 +95,41 @@ export async function PATCH(req: Request, { params }: { params: { id: string; re
     await tx.auditLog.create({
       data: {
         actorId: session.user.id,
-        action: `family.join_request.${decision.toLowerCase()}`,
+        action: joinRequest.direction === 'KARTA_INVITE'
+          ? `family.invite.${decision === 'APPROVE' ? 'accept' : 'decline'}`
+          : `family.join_request.${decision.toLowerCase()}`,
         entityType: 'family_join_request',
         entityId: joinRequest.id,
+        newValue: { direction: joinRequest.direction },
       },
     })
+
+    // Close the loop for whoever is waiting on the answer.
+    const notifyUserId =
+      joinRequest.direction === 'KARTA_INVITE'
+        ? (await tx.user.findUnique({ where: { id: joinRequest.requestedBy }, select: { id: true } }))?.id
+        : (await tx.member.findUnique({ where: { id: joinRequest.memberId }, select: { userId: true } }))?.userId
+
+    if (notifyUserId) {
+      await tx.notification.create({
+        data: {
+          recipientId: notifyUserId,
+          senderId: session.user!.id as string,
+          type: 'APPROVAL_STATUS',
+          title: decision === 'APPROVE' ? 'Family request accepted' : 'Family request declined',
+          body: joinRequest.direction === 'KARTA_INVITE'
+            ? `Your invitation was ${decision === 'APPROVE' ? 'accepted' : 'declined'}.`
+            : `Your request to join the family was ${decision === 'APPROVE' ? 'approved' : 'declined'}.`,
+          data: { familyId: params.id, joinRequestId: joinRequest.id },
+        },
+      })
+    }
   })
 
+  const approved = decision === 'APPROVE'
   return NextResponse.json({
-    message: decision === 'APPROVE' ? 'Member added to family' : 'Request rejected',
+    message: joinRequest.direction === 'KARTA_INVITE'
+      ? approved ? 'You have joined the family' : 'Invitation declined'
+      : approved ? 'Member added to family' : 'Request rejected',
   })
 }

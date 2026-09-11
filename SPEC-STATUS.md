@@ -99,12 +99,18 @@ are still to be built. Worth confirming before anyone treats §43 as satisfied.
 
 ## Outstanding work, roughly by value
 
-1. **Invitation / account claiming (§12, §34)** — a Karta can add an elderly
-   parent today, but there's no way to later invite that person to claim the
-   profile. This is the largest missing user-facing flow.
-2. **"Request to add an existing member" (§11, §49)** — currently duplicates are
-   detected and shown, but the Karta can't send a request that the existing
-   member accepts.
+1. ~~**Invitation / account claiming (§12, §34)**~~ — **DONE (11 Sep 2026).**
+   A Karta (or staff) invites the real person behind an account-less profile
+   by email; they open `/claim/<token>`, set a password, and the account is
+   created and linked in one transaction. Tokens are single-use, expire in 14
+   days, and only their SHA-256 is stored. On claiming, control transfers:
+   the Karta can no longer edit that profile (verified — they get a 403).
+2. ~~**"Request to add an existing member" (§11, §49)**~~ — **DONE
+   (11 Sep 2026).** `FamilyJoinRequest` now carries a `direction`.
+   `KARTA_INVITE` lets a Karta ask an already-registered person to join, and
+   **only that person can accept** — a Karta cannot add an existing
+   account-holder unilaterally. The original `MEMBER_REQUEST` direction
+   (person asks, Karta approves) is unchanged.
 3. **Photo pipeline verification (§22, §23)** — the code is complete; it needs S3
    or MinIO credentials and one real upload to be trusted.
 4. **Karta dashboard: Add Photo + Invite Member buttons (§13)**.

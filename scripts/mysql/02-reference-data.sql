@@ -3,11 +3,10 @@
 --
 -- Run this SECOND, after 01-schema.sql, into the same database.
 --
--- Contains ONLY reference/config data the app needs to function:
---   5 roles, 17 permissions, 44 role-permission grants, 20 relationship
---   types, 12 approval rules, 10 post types, 5 areas, 6 income ranges,
---   3 settings, the family registration fee type, the _prisma_migrations
---   row, and ONE admin login:
+-- Contains ONLY reference/config data the app needs to function: roles, the
+-- permission matrix, relationship types, approval rules, post types, areas,
+-- income ranges, settings, the family registration fee type, the
+-- _prisma_migrations rows, and ONE admin login:
 --
 --       admin@miladwani.com / ChangeThisInProduction123!
 --       ^ CHANGE THIS PASSWORD IMMEDIATELY AFTER YOUR FIRST LOGIN.
@@ -38,7 +37,7 @@
 
 LOCK TABLES `_prisma_migrations` WRITE;
 /*!40000 ALTER TABLE `_prisma_migrations` DISABLE KEYS */;
-INSERT INTO `_prisma_migrations` (`id`, `checksum`, `finished_at`, `migration_name`, `logs`, `rolled_back_at`, `started_at`, `applied_steps_count`) VALUES ('6b37ccad-6cf5-4e2f-84a8-0570f7d5a41f','584c8fab176b065f3aedbdf8d0012d17cbc1ab48026c15c30caeaf85f667372d','2026-09-11 14:50:13.729','20260910163143_init',NULL,NULL,'2026-09-11 14:50:05.611',1);
+INSERT INTO `_prisma_migrations` (`id`, `checksum`, `finished_at`, `migration_name`, `logs`, `rolled_back_at`, `started_at`, `applied_steps_count`) VALUES ('105fdd6e-a06b-4c50-b29c-c65959c918bb','c82675ee4126d590035b047acd84502263f41828cbe5b8711bc3436e1e302f9b','2026-09-11 15:32:05.379','20260911150000_member_invitations_and_join_direction',NULL,NULL,'2026-09-11 15:32:05.267',1),('a6e63255-87ae-4703-9655-3de43ffabbdc','584c8fab176b065f3aedbdf8d0012d17cbc1ab48026c15c30caeaf85f667372d','2026-09-11 15:32:05.158','20260910163143_init',NULL,NULL,'2026-09-11 15:32:01.408',1);
 /*!40000 ALTER TABLE `_prisma_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -57,7 +56,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `approval_rules` WRITE;
 /*!40000 ALTER TABLE `approval_rules` DISABLE KEYS */;
-INSERT INTO `approval_rules` (`id`, `actionCode`, `requiresApproval`, `approverRole`, `autoApproveRole`, `isActive`, `updatedAt`) VALUES ('cmtx2pm9l001jr4734jkfkecr','family.create',1,'OPERATOR',NULL,1,'2026-09-11 14:50:36.153'),('cmtx2pm9q001kr473dlf2qe9c','family.member.add',1,'OPERATOR',NULL,1,'2026-09-11 14:50:36.159'),('cmtx2pm9t001lr473jptn0i7l','member.marital_status.change',1,'OPERATOR',NULL,1,'2026-09-11 14:50:36.162'),('cmtx2pm9w001mr473sga9kda1','member.mark_deceased',1,'OPERATOR',NULL,1,'2026-09-11 14:50:36.164'),('cmtx2pm9y001nr473x9a6276p','member.relationship.change',1,'OPERATOR',NULL,1,'2026-09-11 14:50:36.167'),('cmtx2pma1001or473qzp33vvv','family.karta.change',1,'ADMIN',NULL,1,'2026-09-11 14:50:36.169'),('cmtx2pma3001pr473m033lgt6','family.merge',1,'ADMIN',NULL,1,'2026-09-11 14:50:36.171'),('cmtx2pma7001qr473qwhbl0np','member.edit_own',0,NULL,'MEMBER',1,'2026-09-11 14:50:36.176'),('cmtx2pmaa001rr473fb2ydbto','member.education.edit_own',0,NULL,'MEMBER',1,'2026-09-11 14:50:36.179'),('cmtx2pmad001sr473wosa8qsw','member.employment.edit_own',0,NULL,'MEMBER',1,'2026-09-11 14:50:36.181'),('cmtx2pmby001xr473b1dl4lpk','asset.create',1,'OPERATOR',NULL,1,'2026-09-11 14:50:36.238'),('cmtx2pmc2001yr473td5uyw4x','group.create',1,'OPERATOR',NULL,1,'2026-09-11 14:50:36.242');
+INSERT INTO `approval_rules` (`id`, `actionCode`, `requiresApproval`, `approverRole`, `autoApproveRole`, `isActive`, `updatedAt`) VALUES ('cmtx47b0y001j10n9vqwadozz','family.create',1,'OPERATOR',NULL,1,'2026-09-11 15:32:21.010'),('cmtx47b14001k10n9i5frcsdl','family.member.add',1,'OPERATOR',NULL,1,'2026-09-11 15:32:21.017'),('cmtx47b18001l10n9hv4p9m3y','member.marital_status.change',1,'OPERATOR',NULL,1,'2026-09-11 15:32:21.021'),('cmtx47b1e001m10n9tpswylku','member.mark_deceased',1,'OPERATOR',NULL,1,'2026-09-11 15:32:21.026'),('cmtx47b1h001n10n9krmk8krf','member.relationship.change',1,'OPERATOR',NULL,1,'2026-09-11 15:32:21.029'),('cmtx47b1l001o10n9x0y7nkhl','family.karta.change',1,'ADMIN',NULL,1,'2026-09-11 15:32:21.033'),('cmtx47b1o001p10n9xyr2kp00','family.merge',1,'ADMIN',NULL,1,'2026-09-11 15:32:21.037'),('cmtx47b1t001q10n9jetyvm2j','member.edit_own',0,NULL,'MEMBER',1,'2026-09-11 15:32:21.041'),('cmtx47b1y001r10n983963bi6','member.education.edit_own',0,NULL,'MEMBER',1,'2026-09-11 15:32:21.046'),('cmtx47b22001s10n9j39iuxah','member.employment.edit_own',0,NULL,'MEMBER',1,'2026-09-11 15:32:21.050'),('cmtx47b3x001x10n94pq5rclt','asset.create',1,'OPERATOR',NULL,1,'2026-09-11 15:32:21.117'),('cmtx47b40001y10n9ndmk3zjw','group.create',1,'OPERATOR',NULL,1,'2026-09-11 15:32:21.120');
 /*!40000 ALTER TABLE `approval_rules` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -239,7 +238,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `fee_types` WRITE;
 /*!40000 ALTER TABLE `fee_types` DISABLE KEYS */;
-INSERT INTO `fee_types` (`id`, `code`, `label`, `description`, `amountPaise`, `appliesTo`, `isActive`, `updatedAt`) VALUES ('cmtx2pmbu001wr4738oqnr59v','FAMILY_REGISTRATION','Family Registration Fee','One-time fee payable by the Karta when a new family is registered. Other family members join free.',200000,'FAMILY_KARTA',1,'2026-09-11 14:50:36.235');
+INSERT INTO `fee_types` (`id`, `code`, `label`, `description`, `amountPaise`, `appliesTo`, `isActive`, `updatedAt`) VALUES ('cmtx47b3t001w10n93t5j0ivk','FAMILY_REGISTRATION','Family Registration Fee','One-time fee payable by the Karta when a new family is registered. Other family members join free.',200000,'FAMILY_KARTA',1,'2026-09-11 15:32:21.113');
 /*!40000 ALTER TABLE `fee_types` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -335,6 +334,15 @@ LOCK TABLES `member_field_visibility` WRITE;
 UNLOCK TABLES;
 
 --
+-- Dumping data for table `member_invitations`
+--
+
+LOCK TABLES `member_invitations` WRITE;
+/*!40000 ALTER TABLE `member_invitations` DISABLE KEYS */;
+/*!40000 ALTER TABLE `member_invitations` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Dumping data for table `member_relationships`
 --
 
@@ -358,7 +366,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `members` WRITE;
 /*!40000 ALTER TABLE `members` DISABLE KEYS */;
-INSERT INTO `members` (`id`, `memberNumber`, `userId`, `firstName`, `middleName`, `lastName`, `gender`, `dateOfBirth`, `dateOfBirthApprox`, `bloodGroup`, `heightCm`, `weightKg`, `bodyType`, `physicalDisability`, `mobilePrimary`, `mobileAlternate`, `email`, `profilePhotoId`, `biography`, `currentCity`, `currentState`, `currentCountry`, `nativeVillage`, `nativeDistrict`, `nativeState`, `nationality`, `maritalStatus`, `employmentStatus`, `occupationCategory`, `status`, `deceasedAt`, `deceasedPlace`, `deceasedNotes`, `verificationStatus`, `createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `deletedAt`) VALUES ('cmtx2plyi000or473lx40yh5p','MEM-ADMIN-001','cmtx2pglb000mr473ad507hz3','Admin',NULL,'Ladwani','MALE',NULL,0,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'Indian','UNMARRIED',NULL,NULL,'ACTIVE',NULL,NULL,NULL,'UNVERIFIED','2026-09-11 14:50:35.753','2026-09-11 14:50:35.753',NULL,NULL,NULL);
+INSERT INTO `members` (`id`, `memberNumber`, `userId`, `firstName`, `middleName`, `lastName`, `gender`, `dateOfBirth`, `dateOfBirthApprox`, `bloodGroup`, `heightCm`, `weightKg`, `bodyType`, `physicalDisability`, `mobilePrimary`, `mobileAlternate`, `email`, `profilePhotoId`, `biography`, `currentCity`, `currentState`, `currentCountry`, `nativeVillage`, `nativeDistrict`, `nativeState`, `nationality`, `maritalStatus`, `employmentStatus`, `occupationCategory`, `status`, `deceasedAt`, `deceasedPlace`, `deceasedNotes`, `verificationStatus`, `createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `deletedAt`) VALUES ('cmtx47awg000o10n9jheg61hy','MEM-ADMIN-001','cmtx47avs000m10n9kfi4gro9','Admin',NULL,'Ladwani','MALE',NULL,0,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'Indian','UNMARRIED',NULL,NULL,'ACTIVE',NULL,NULL,NULL,'UNVERIFIED','2026-09-11 15:32:20.848','2026-09-11 15:32:20.848',NULL,NULL,NULL);
 /*!40000 ALTER TABLE `members` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -386,7 +394,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `permissions` WRITE;
 /*!40000 ALTER TABLE `permissions` DISABLE KEYS */;
-INSERT INTO `permissions` (`id`, `code`, `label`, `module`) VALUES ('cmtx2pfy80005r473keyf3jnk','family:create','Register a new family','family'),('cmtx2pfyj0006r4736l8dvtec','family:edit_own','Edit own family','family'),('cmtx2pfys0007r473cfejjdso','family:edit_any','Edit any family','family'),('cmtx2pfyz0008r4734nsl38qc','family:member_add','Add members to own family','family'),('cmtx2pfz70009r473o0grz4up','family:view_tree','View own family tree','family'),('cmtx2pfze000ar473mgn0cj0c','family:approve','Verify/approve families','family'),('cmtx2pfzl000br473ibzlduzi','member:edit_own','Edit own member profile','member'),('cmtx2pfzs000cr4734mref0wa','member:edit_any','Edit any member profile','member'),('cmtx2pg00000dr473jpvx8nbd','member:mark_deceased','Mark a member deceased','member'),('cmtx2pg08000er473nyj639ma','matrimony:manage_own','Manage own matrimonial profile','matrimony'),('cmtx2pg0e000fr473x3gumsn9','approval:review','Review approval requests','approval'),('cmtx2pg0m000gr4734ccid74a','admin:users','Manage users and roles','admin'),('cmtx2pg0t000hr473qpbah3a6','admin:settings','Manage platform settings','admin'),('cmtx2pg10000ir47374flcl0v','admin:audit','View audit logs','admin'),('cmtx2pg18000jr473jp0jw4ps','asset:manage_own','Manage own assets','asset'),('cmtx2pg1f000kr473tw0jm737','group:manage_own','Register and convene community groups','group'),('cmtx2pg1n000lr4737hed1cem','group:approve','Approve community groups','group');
+INSERT INTO `permissions` (`id`, `code`, `label`, `module`) VALUES ('cmtx47afd000510n9lrdlvx0r','family:create','Register a new family','family'),('cmtx47afr000610n9s94an4zi','family:edit_own','Edit own family','family'),('cmtx47afu000710n9ki0kv41n','family:edit_any','Edit any family','family'),('cmtx47afx000810n9iu9ov4ye','family:member_add','Add members to own family','family'),('cmtx47ag0000910n95w2n8m8a','family:view_tree','View own family tree','family'),('cmtx47ag3000a10n9ib4onw2o','family:approve','Verify/approve families','family'),('cmtx47ag5000b10n9nbdtnhkx','member:edit_own','Edit own member profile','member'),('cmtx47ag7000c10n9k6hjk9zs','member:edit_any','Edit any member profile','member'),('cmtx47ag9000d10n9jaibzmv6','member:mark_deceased','Mark a member deceased','member'),('cmtx47agc000e10n95lml61cb','matrimony:manage_own','Manage own matrimonial profile','matrimony'),('cmtx47age000f10n90cro8x1e','approval:review','Review approval requests','approval'),('cmtx47agh000g10n9bzf4iqxx','admin:users','Manage users and roles','admin'),('cmtx47agk000h10n9iy7hh34k','admin:settings','Manage platform settings','admin'),('cmtx47agn000i10n9t74vdjjj','admin:audit','View audit logs','admin'),('cmtx47agq000j10n9qvdhdjx5','asset:manage_own','Manage own assets','asset'),('cmtx47ags000k10n9hzgp16ho','group:manage_own','Register and convene community groups','group'),('cmtx47agv000l10n9sv3yburj','group:approve','Approve community groups','group');
 /*!40000 ALTER TABLE `permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -405,7 +413,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `post_types` WRITE;
 /*!40000 ALTER TABLE `post_types` DISABLE KEYS */;
-INSERT INTO `post_types` (`id`, `code`, `label`, `icon`, `requiresApproval`, `isActive`) VALUES ('cmtx2plzp000pr473ussb8rkv','GENERAL','General','📌',0,1),('cmtx2pm0h000qr47331d9jv4o','ANNOUNCEMENT','Announcement','📢',0,1),('cmtx2pm0z000rr473p46k7bqv','EVENT','Event','🎉',0,1),('cmtx2pm1l000sr473h9uryuvp','ACHIEVEMENT','Achievement','🏆',0,1),('cmtx2pm26000tr473itiaik6x','BIRTHDAY','Birthday','🎂',0,1),('cmtx2pm2l000ur473mhijognc','MARRIAGE','Marriage','💒',0,1),('cmtx2pm37000vr473z34wjawz','CONDOLENCE','Condolence','🙏',0,1),('cmtx2pm4r000wr473t9e42agh','JOB','Job Opportunity','💼',0,1),('cmtx2pm51000xr473n0gj8is2','BUSINESS','Business','🏢',0,1),('cmtx2pm5d000yr4735tlohmwq','LOST_FOUND','Lost & Found','🔍',0,1);
+INSERT INTO `post_types` (`id`, `code`, `label`, `icon`, `requiresApproval`, `isActive`) VALUES ('cmtx47awv000p10n9819d4sq6','GENERAL','General','📌',0,1),('cmtx47ax2000q10n9uhfcprvz','ANNOUNCEMENT','Announcement','📢',0,1),('cmtx47ax7000r10n9dy4gp0iw','EVENT','Event','🎉',0,1),('cmtx47axc000s10n9gwndf463','ACHIEVEMENT','Achievement','🏆',0,1),('cmtx47axg000t10n97snpiugi','BIRTHDAY','Birthday','🎂',0,1),('cmtx47axk000u10n9wtqfiq7x','MARRIAGE','Marriage','💒',0,1),('cmtx47axp000v10n9y7bz8y7f','CONDOLENCE','Condolence','🙏',0,1),('cmtx47axy000w10n9iqbk24as','JOB','Job Opportunity','💼',0,1),('cmtx47ay3000x10n9tgb7gfbr','BUSINESS','Business','🏢',0,1),('cmtx47ay7000y10n9fmfnfgm8','LOST_FOUND','Lost & Found','🔍',0,1);
 /*!40000 ALTER TABLE `post_types` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -442,7 +450,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `relationship_types` WRITE;
 /*!40000 ALTER TABLE `relationship_types` DISABLE KEYS */;
-INSERT INTO `relationship_types` (`id`, `code`, `label`, `inverseCode`, `genderApplicable`, `isSpouse`, `isActive`, `sortOrder`) VALUES ('cmtx2pm5u000zr473em99741p','father','Father','son','MALE',0,1,0),('cmtx2pm630010r473uqm0y2re','mother','Mother','son','FEMALE',0,1,0),('cmtx2pm680011r473a1oj1bkp','son','Son','father','MALE',0,1,0),('cmtx2pm6e0012r4737x9f6jqg','daughter','Daughter','father','FEMALE',0,1,0),('cmtx2pm6k0013r473v8pr32uo','husband','Husband','wife','MALE',1,1,0),('cmtx2pm7x0014r4731mxky3th','wife','Wife','husband','FEMALE',1,1,0),('cmtx2pm820015r473ml197y4s','brother','Brother','brother','MALE',0,1,0),('cmtx2pm860016r473wyecgk0r','sister','Sister','brother','FEMALE',0,1,0),('cmtx2pm8c0017r473ieo75x1i','grandfather_p','Grandfather (Paternal)','grandson','MALE',0,1,0),('cmtx2pm8g0018r473lt0sszyk','grandmother_p','Grandmother (Paternal)','grandson','FEMALE',0,1,0),('cmtx2pm8k0019r473eqpl1lxf','grandson','Grandson','grandfather_p','MALE',0,1,0),('cmtx2pm8p001ar473dzgmwkj4','granddaughter','Granddaughter','grandfather_p','FEMALE',0,1,0),('cmtx2pm8v001br473ddexhwu5','uncle','Uncle','nephew','MALE',0,1,0),('cmtx2pm8z001cr473c884srcl','aunt','Aunt','nephew','FEMALE',0,1,0),('cmtx2pm92001dr473y6eihnel','nephew','Nephew','uncle','MALE',0,1,0),('cmtx2pm95001er47397nybr6b','niece','Niece','uncle','FEMALE',0,1,0),('cmtx2pm9a001fr4731bdrzbe7','son_in_law','Son-in-law','father_in_law','MALE',0,1,0),('cmtx2pm9d001gr473tkgywhkk','daughter_in_law','Daughter-in-law','father_in_law','FEMALE',0,1,0),('cmtx2pm9f001hr4734dxidn10','father_in_law','Father-in-law','son_in_law','MALE',0,1,0),('cmtx2pm9i001ir473j0kklxn9','mother_in_law','Mother-in-law','son_in_law','FEMALE',0,1,0);
+INSERT INTO `relationship_types` (`id`, `code`, `label`, `inverseCode`, `genderApplicable`, `isSpouse`, `isActive`, `sortOrder`) VALUES ('cmtx47ayb000z10n9pyvnlx7o','father','Father','son','MALE',0,1,0),('cmtx47ayj001010n966wac400','mother','Mother','son','FEMALE',0,1,0),('cmtx47ayo001110n9m01lxi3t','son','Son','father','MALE',0,1,0),('cmtx47ayr001210n9oqge8af1','daughter','Daughter','father','FEMALE',0,1,0),('cmtx47ayv001310n9vmvf62mt','husband','Husband','wife','MALE',1,1,0),('cmtx47az0001410n93zashbr8','wife','Wife','husband','FEMALE',1,1,0),('cmtx47az5001510n9yxb5d26w','brother','Brother','brother','MALE',0,1,0),('cmtx47aza001610n91cctmzs8','sister','Sister','brother','FEMALE',0,1,0),('cmtx47aze001710n9wa7ht4lb','grandfather_p','Grandfather (Paternal)','grandson','MALE',0,1,0),('cmtx47azl001810n9tmd2lxlq','grandmother_p','Grandmother (Paternal)','grandson','FEMALE',0,1,0),('cmtx47azq001910n9vzewuzku','grandson','Grandson','grandfather_p','MALE',0,1,0),('cmtx47azu001a10n9sskn3iwy','granddaughter','Granddaughter','grandfather_p','FEMALE',0,1,0),('cmtx47azy001b10n9wiwtq1hu','uncle','Uncle','nephew','MALE',0,1,0),('cmtx47b03001c10n9hi94az6m','aunt','Aunt','nephew','FEMALE',0,1,0),('cmtx47b07001d10n97cpqqsal','nephew','Nephew','uncle','MALE',0,1,0),('cmtx47b0b001e10n9jkqwkccz','niece','Niece','uncle','FEMALE',0,1,0),('cmtx47b0f001f10n9y7jf6upi','son_in_law','Son-in-law','father_in_law','MALE',0,1,0),('cmtx47b0k001g10n9owzqxk6i','daughter_in_law','Daughter-in-law','father_in_law','FEMALE',0,1,0),('cmtx47b0n001h10n9c7nrmdd9','father_in_law','Father-in-law','son_in_law','MALE',0,1,0),('cmtx47b0s001i10n9pwneh4xn','mother_in_law','Mother-in-law','son_in_law','FEMALE',0,1,0);
 /*!40000 ALTER TABLE `relationship_types` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -461,7 +469,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `role_permissions` WRITE;
 /*!40000 ALTER TABLE `role_permissions` DISABLE KEYS */;
-INSERT INTO `role_permissions` (`roleId`, `permissionId`) VALUES ('cmtx2pfwo0001r4738yy0g0yd','cmtx2pfy80005r473keyf3jnk'),('cmtx2pfwo0003r473ztflq803','cmtx2pfy80005r473keyf3jnk'),('cmtx2pfwo0001r4738yy0g0yd','cmtx2pfyj0006r4736l8dvtec'),('cmtx2pfwo0003r473ztflq803','cmtx2pfyj0006r4736l8dvtec'),('cmtx2pfwo0003r473ztflq803','cmtx2pfys0007r473cfejjdso'),('cmtx2pfwp0004r473a3kk1rjr','cmtx2pfys0007r473cfejjdso'),('cmtx2pfwo0001r4738yy0g0yd','cmtx2pfyz0008r4734nsl38qc'),('cmtx2pfwo0003r473ztflq803','cmtx2pfyz0008r4734nsl38qc'),('cmtx2pfwp0004r473a3kk1rjr','cmtx2pfyz0008r4734nsl38qc'),('cmtx2pfwo0000r473jzwqsq54','cmtx2pfz70009r473o0grz4up'),('cmtx2pfwo0001r4738yy0g0yd','cmtx2pfz70009r473o0grz4up'),('cmtx2pfwo0002r473nskb6jru','cmtx2pfz70009r473o0grz4up'),('cmtx2pfwo0003r473ztflq803','cmtx2pfz70009r473o0grz4up'),('cmtx2pfwp0004r473a3kk1rjr','cmtx2pfz70009r473o0grz4up'),('cmtx2pfwo0003r473ztflq803','cmtx2pfze000ar473mgn0cj0c'),('cmtx2pfwp0004r473a3kk1rjr','cmtx2pfze000ar473mgn0cj0c'),('cmtx2pfwo0000r473jzwqsq54','cmtx2pfzl000br473ibzlduzi'),('cmtx2pfwo0001r4738yy0g0yd','cmtx2pfzl000br473ibzlduzi'),('cmtx2pfwo0002r473nskb6jru','cmtx2pfzl000br473ibzlduzi'),('cmtx2pfwo0003r473ztflq803','cmtx2pfzl000br473ibzlduzi'),('cmtx2pfwp0004r473a3kk1rjr','cmtx2pfzl000br473ibzlduzi'),('cmtx2pfwo0003r473ztflq803','cmtx2pfzs000cr4734mref0wa'),('cmtx2pfwp0004r473a3kk1rjr','cmtx2pfzs000cr4734mref0wa'),('cmtx2pfwo0003r473ztflq803','cmtx2pg00000dr473jpvx8nbd'),('cmtx2pfwp0004r473a3kk1rjr','cmtx2pg00000dr473jpvx8nbd'),('cmtx2pfwo0000r473jzwqsq54','cmtx2pg08000er473nyj639ma'),('cmtx2pfwo0001r4738yy0g0yd','cmtx2pg08000er473nyj639ma'),('cmtx2pfwo0002r473nskb6jru','cmtx2pg08000er473nyj639ma'),('cmtx2pfwo0003r473ztflq803','cmtx2pg08000er473nyj639ma'),('cmtx2pfwp0004r473a3kk1rjr','cmtx2pg08000er473nyj639ma'),('cmtx2pfwo0003r473ztflq803','cmtx2pg0e000fr473x3gumsn9'),('cmtx2pfwp0004r473a3kk1rjr','cmtx2pg0e000fr473x3gumsn9'),('cmtx2pfwo0003r473ztflq803','cmtx2pg0m000gr4734ccid74a'),('cmtx2pfwo0003r473ztflq803','cmtx2pg0t000hr473qpbah3a6'),('cmtx2pfwo0003r473ztflq803','cmtx2pg10000ir47374flcl0v'),('cmtx2pfwo0002r473nskb6jru','cmtx2pg18000jr473jp0jw4ps'),('cmtx2pfwo0003r473ztflq803','cmtx2pg18000jr473jp0jw4ps'),('cmtx2pfwo0000r473jzwqsq54','cmtx2pg1f000kr473tw0jm737'),('cmtx2pfwo0001r4738yy0g0yd','cmtx2pg1f000kr473tw0jm737'),('cmtx2pfwo0002r473nskb6jru','cmtx2pg1f000kr473tw0jm737'),('cmtx2pfwo0003r473ztflq803','cmtx2pg1f000kr473tw0jm737'),('cmtx2pfwp0004r473a3kk1rjr','cmtx2pg1f000kr473tw0jm737'),('cmtx2pfwo0003r473ztflq803','cmtx2pg1n000lr4737hed1cem'),('cmtx2pfwp0004r473a3kk1rjr','cmtx2pg1n000lr4737hed1cem');
+INSERT INTO `role_permissions` (`roleId`, `permissionId`) VALUES ('cmtx47ae1000210n9d8yrriz0','cmtx47afd000510n9lrdlvx0r'),('cmtx47aee000310n9eskw3r63','cmtx47afd000510n9lrdlvx0r'),('cmtx47ae1000210n9d8yrriz0','cmtx47afr000610n9s94an4zi'),('cmtx47aee000310n9eskw3r63','cmtx47afr000610n9s94an4zi'),('cmtx47ae1000110n9g7f6idpo','cmtx47afu000710n9ki0kv41n'),('cmtx47ae1000210n9d8yrriz0','cmtx47afu000710n9ki0kv41n'),('cmtx47ae1000110n9g7f6idpo','cmtx47afx000810n9iu9ov4ye'),('cmtx47ae1000210n9d8yrriz0','cmtx47afx000810n9iu9ov4ye'),('cmtx47aee000310n9eskw3r63','cmtx47afx000810n9iu9ov4ye'),('cmtx47adz000010n9k7pvy4ge','cmtx47ag0000910n95w2n8m8a'),('cmtx47ae1000110n9g7f6idpo','cmtx47ag0000910n95w2n8m8a'),('cmtx47ae1000210n9d8yrriz0','cmtx47ag0000910n95w2n8m8a'),('cmtx47aee000310n9eskw3r63','cmtx47ag0000910n95w2n8m8a'),('cmtx47aey000410n9j493g77e','cmtx47ag0000910n95w2n8m8a'),('cmtx47ae1000110n9g7f6idpo','cmtx47ag3000a10n9ib4onw2o'),('cmtx47ae1000210n9d8yrriz0','cmtx47ag3000a10n9ib4onw2o'),('cmtx47adz000010n9k7pvy4ge','cmtx47ag5000b10n9nbdtnhkx'),('cmtx47ae1000110n9g7f6idpo','cmtx47ag5000b10n9nbdtnhkx'),('cmtx47ae1000210n9d8yrriz0','cmtx47ag5000b10n9nbdtnhkx'),('cmtx47aee000310n9eskw3r63','cmtx47ag5000b10n9nbdtnhkx'),('cmtx47aey000410n9j493g77e','cmtx47ag5000b10n9nbdtnhkx'),('cmtx47ae1000110n9g7f6idpo','cmtx47ag7000c10n9k6hjk9zs'),('cmtx47ae1000210n9d8yrriz0','cmtx47ag7000c10n9k6hjk9zs'),('cmtx47ae1000110n9g7f6idpo','cmtx47ag9000d10n9jaibzmv6'),('cmtx47ae1000210n9d8yrriz0','cmtx47ag9000d10n9jaibzmv6'),('cmtx47adz000010n9k7pvy4ge','cmtx47agc000e10n95lml61cb'),('cmtx47ae1000110n9g7f6idpo','cmtx47agc000e10n95lml61cb'),('cmtx47ae1000210n9d8yrriz0','cmtx47agc000e10n95lml61cb'),('cmtx47aee000310n9eskw3r63','cmtx47agc000e10n95lml61cb'),('cmtx47aey000410n9j493g77e','cmtx47agc000e10n95lml61cb'),('cmtx47ae1000110n9g7f6idpo','cmtx47age000f10n90cro8x1e'),('cmtx47ae1000210n9d8yrriz0','cmtx47age000f10n90cro8x1e'),('cmtx47ae1000210n9d8yrriz0','cmtx47agh000g10n9bzf4iqxx'),('cmtx47ae1000210n9d8yrriz0','cmtx47agk000h10n9iy7hh34k'),('cmtx47ae1000210n9d8yrriz0','cmtx47agn000i10n9t74vdjjj'),('cmtx47ae1000210n9d8yrriz0','cmtx47agq000j10n9qvdhdjx5'),('cmtx47aey000410n9j493g77e','cmtx47agq000j10n9qvdhdjx5'),('cmtx47adz000010n9k7pvy4ge','cmtx47ags000k10n9hzgp16ho'),('cmtx47ae1000110n9g7f6idpo','cmtx47ags000k10n9hzgp16ho'),('cmtx47ae1000210n9d8yrriz0','cmtx47ags000k10n9hzgp16ho'),('cmtx47aee000310n9eskw3r63','cmtx47ags000k10n9hzgp16ho'),('cmtx47aey000410n9j493g77e','cmtx47ags000k10n9hzgp16ho'),('cmtx47ae1000110n9g7f6idpo','cmtx47agv000l10n9sv3yburj'),('cmtx47ae1000210n9d8yrriz0','cmtx47agv000l10n9sv3yburj');
 /*!40000 ALTER TABLE `role_permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -471,7 +479,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `roles` WRITE;
 /*!40000 ALTER TABLE `roles` DISABLE KEYS */;
-INSERT INTO `roles` (`id`, `code`, `label`, `description`, `isSystem`, `createdAt`) VALUES ('cmtx2pfwo0000r473jzwqsq54','MEMBER','Member',NULL,1,'2026-09-11 14:50:27.910'),('cmtx2pfwo0001r4738yy0g0yd','KARTA','Family Head (Karta)',NULL,1,'2026-09-11 14:50:27.910'),('cmtx2pfwo0002r473nskb6jru','ASSET_OWNER','Asset Owner',NULL,1,'2026-09-11 14:50:27.910'),('cmtx2pfwo0003r473ztflq803','ADMIN','Administrator',NULL,1,'2026-09-11 14:50:27.910'),('cmtx2pfwp0004r473a3kk1rjr','OPERATOR','Operator',NULL,1,'2026-09-11 14:50:27.910');
+INSERT INTO `roles` (`id`, `code`, `label`, `description`, `isSystem`, `createdAt`) VALUES ('cmtx47adz000010n9k7pvy4ge','MEMBER','Member',NULL,1,'2026-09-11 15:32:20.181'),('cmtx47ae1000110n9g7f6idpo','OPERATOR','Operator',NULL,1,'2026-09-11 15:32:20.181'),('cmtx47ae1000210n9d8yrriz0','ADMIN','Administrator',NULL,1,'2026-09-11 15:32:20.181'),('cmtx47aee000310n9eskw3r63','KARTA','Family Head (Karta)',NULL,1,'2026-09-11 15:32:20.181'),('cmtx47aey000410n9j493g77e','ASSET_OWNER','Asset Owner',NULL,1,'2026-09-11 15:32:20.181');
 /*!40000 ALTER TABLE `roles` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -481,7 +489,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `settings` WRITE;
 /*!40000 ALTER TABLE `settings` DISABLE KEYS */;
-INSERT INTO `settings` (`id`, `key`, `value`, `description`, `updatedBy`, `updatedAt`) VALUES ('cmtx2pmbk001tr473huwz52ek','community.name','\"\\\"Ladwani Samaj\\\"\"','Community display name',NULL,'2026-09-11 14:50:36.224'),('cmtx2pmbp001ur4730xo5qez6','community.tagline','\"\\\"Our Community, Our Heritage, Our Future\\\"\"','Community tagline',NULL,'2026-09-11 14:50:36.230'),('cmtx2pmbs001vr473hygrh9kf','matrimony.contact_exchange','\"\\\"ACCEPT_FIRST\\\"\"','When to reveal contact: ACCEPT_FIRST or FAMILY_APPROVAL',NULL,'2026-09-11 14:50:36.232');
+INSERT INTO `settings` (`id`, `key`, `value`, `description`, `updatedBy`, `updatedAt`) VALUES ('cmtx47b3f001t10n9y0tjlrov','community.name','\"\\\"Ladwani Samaj\\\"\"','Community display name',NULL,'2026-09-11 15:32:21.100'),('cmtx47b3l001u10n92j6q03ra','community.tagline','\"\\\"Our Community, Our Heritage, Our Future\\\"\"','Community tagline',NULL,'2026-09-11 15:32:21.105'),('cmtx47b3p001v10n9gbhyjy3c','matrimony.contact_exchange','\"\\\"ACCEPT_FIRST\\\"\"','When to reveal contact: ACCEPT_FIRST or FAMILY_APPROVAL',NULL,'2026-09-11 15:32:21.110');
 /*!40000 ALTER TABLE `settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -500,7 +508,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `user_roles` WRITE;
 /*!40000 ALTER TABLE `user_roles` DISABLE KEYS */;
-INSERT INTO `user_roles` (`id`, `userId`, `roleId`, `familyId`, `areaId`, `grantedBy`, `grantedAt`, `expiresAt`) VALUES ('admin-role-cmtx2pglb000mr473ad507hz3','cmtx2pglb000mr473ad507hz3','cmtx2pfwo0003r473ztflq803',NULL,NULL,NULL,'2026-09-11 14:50:35.701',NULL);
+INSERT INTO `user_roles` (`id`, `userId`, `roleId`, `familyId`, `areaId`, `grantedBy`, `grantedAt`, `expiresAt`) VALUES ('admin-role-cmtx47avs000m10n9kfi4gro9','cmtx47avs000m10n9kfi4gro9','cmtx47ae1000210n9d8yrriz0',NULL,NULL,NULL,'2026-09-11 15:32:20.837',NULL);
 /*!40000 ALTER TABLE `user_roles` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -510,7 +518,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` (`id`, `email`, `mobile`, `passwordHash`, `emailVerified`, `mobileVerified`, `status`, `joinIntent`, `lastLoginAt`, `lastLoginIp`, `failedAttempts`, `lockedUntil`, `createdAt`, `updatedAt`, `deletedAt`) VALUES ('cmtx2pglb000mr473ad507hz3','admin@miladwani.com','9000000000','$2a$12$H0PY6RAqqBgSj/p1QtFPOOlJtQetyoLm7J9lT1aFDQGGSfmEVAe6a',1,1,'ACTIVE',NULL,NULL,NULL,0,NULL,'2026-09-11 14:50:28.799','2026-09-11 14:50:28.799',NULL);
+INSERT INTO `users` (`id`, `email`, `mobile`, `passwordHash`, `emailVerified`, `mobileVerified`, `status`, `joinIntent`, `lastLoginAt`, `lastLoginIp`, `failedAttempts`, `lockedUntil`, `createdAt`, `updatedAt`, `deletedAt`) VALUES ('cmtx47avs000m10n9kfi4gro9','admin@miladwani.com','9000000000','$2a$12$omENyQrsyQ49fgkEy.cE/OiDDJsejhu2wroU67suQsfRwpOwQBUZG',1,1,'ACTIVE',NULL,NULL,NULL,0,NULL,'2026-09-11 15:32:20.824','2026-09-11 15:32:20.824',NULL);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -532,4 +540,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-11 20:21:12
+-- Dump completed on 2026-09-11 21:02:32

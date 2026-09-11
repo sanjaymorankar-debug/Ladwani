@@ -222,6 +222,12 @@ model FamilyJoinRequest {
   memberId              String
   relatedToMemberId     String?
   relationshipTypeCode  String?
+  /// Who asked whom — the two directions have opposite approvers:
+  ///   MEMBER_REQUEST — a person asks to join a family; its Karta decides.
+  ///   KARTA_INVITE   — a Karta asks an already-registered person to join
+  ///                    their family; that person decides (§11, §49). A Karta
+  ///                    can never add an existing account-holder unilaterally.
+  direction             String    @default("MEMBER_REQUEST")
   requestedBy           String
   status                String    @default("PENDING") // PENDING, APPROVED, REJECTED
   respondedBy           String?
@@ -232,8 +238,36 @@ model FamilyJoinRequest {
   family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
   member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
-  @@unique([familyId, memberId, status])
+  @@unique([familyId, memberId, status, direction])
   @@map("family_join_requests")
+}
+
+/// Invites a real person to claim a Member profile somebody else created for
+/// them — a Karta adding an elderly parent or a child, who later gets their
+/// own login (§12, §34). Until the invitation is accepted the profile has no
+/// `Member.userId` and the Karta maintains it; accepting creates the User,
+/// links it, and hands control of the profile to that person.
+model MemberInvitation {
+  id         String    @id @default(cuid())
+  memberId   String
+  email      String?
+  mobile     String?
+  /// SHA-256 of the emailed token. The raw token is sent once and never
+  /// stored, so read access to this table can't be used to claim a profile.
+  tokenHash  String    @unique
+  status     String    @default("PENDING") // PENDING, ACCEPTED, REVOKED
+  invitedBy  String
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  acceptedBy String?
+  revokedAt  DateTime?
+  revokedBy  String?
+  createdAt  DateTime  @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, status])
+  @@map("member_invitations")
 }
 
 model FamilyMember {
@@ -327,6 +361,7 @@ model Member {
   profilePhoto          Photo?         @relation("ProfilePhoto", fields: [profilePhotoId], references: [id])
   groupsConvened        CommunityGroup[]       @relation("GroupConvener")
   communityGroups       CommunityGroupMember[]
+  invitations           MemberInvitation[]
 
   @@map("members")
 }

@@ -9,6 +9,8 @@ import {
   Building2, Star, Users
 } from 'lucide-react'
 import { calculateAge, genderLabel, maritalLabel, formatDate, GENDER_LABELS, MARITAL_STATUS_LABELS, getInitials } from '@/lib/utils'
+import { getMemberAccess } from '@/lib/member-auth'
+import InviteToClaimPanel from '@/components/members/InviteToClaimPanel'
 
 export default async function MemberProfilePage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -44,6 +46,12 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
   const family = member.families[0]?.family
   const age = calculateAge(member.dateOfBirth)
 
+  // Whoever maintains an account-less profile may invite the real person to
+  // take it over (§12, §34). Re-derived server-side; the panel's own API
+  // re-checks it too, so this only decides whether to render.
+  const memberAccess = await getMemberAccess(session, params.id)
+  const canInviteToClaim = !member.userId && memberAccess.authorized && !isOwnProfile
+
   const genderGrad = member.gender === 'MALE' ? 'from-blue-400 to-blue-600'
     : member.gender === 'FEMALE' ? 'from-pink-400 to-pink-600'
     : 'from-purple-400 to-purple-600'
@@ -55,6 +63,14 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
         <Link href="/members" className="btn-ghost p-2 -ml-2"><ArrowLeft className="w-4 h-4" /></Link>
         <span className="text-gray-400 text-sm">Member Directory</span>
       </div>
+
+      {canInviteToClaim && (
+        <InviteToClaimPanel
+          memberId={member.id}
+          memberName={member.firstName}
+          defaultEmail={member.email}
+        />
+      )}
 
       {/* Profile card */}
       <div className="card">

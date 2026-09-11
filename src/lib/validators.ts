@@ -1,5 +1,26 @@
 import { z } from 'zod'
 
+/// One definition of "an acceptable password", so registration, profile
+/// claiming and password reset can't drift apart on strength rules.
+export const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
+  .regex(/[0-9]/, 'Must contain at least one number')
+
+export const claimInvitationSchema = z.object({
+  password: passwordSchema,
+  confirmPassword: z.string(),
+  mobile: z
+    .string()
+    .regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number')
+    .optional()
+    .or(z.literal('')),
+}).refine((d) => d.password === d.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+})
+
 export const registerSchema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
   lastName: z.string().min(1, 'Last name is required'),
@@ -11,11 +32,7 @@ export const registerSchema = z.object({
     .regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number')
     .optional()
     .or(z.literal('')),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
-    .regex(/[0-9]/, 'Must contain at least one number'),
+  password: passwordSchema,
   confirmPassword: z.string(),
   joinIntent: z.enum(['KARTA', 'JOIN_EXISTING'], {
     errorMap: () => ({ message: 'Please choose how you want to join the community' }),

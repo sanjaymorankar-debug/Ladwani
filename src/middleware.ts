@@ -25,7 +25,12 @@ export default withAuth(
           pathname.startsWith('/forgot-password') ||
           pathname.startsWith('/privacy') ||
           pathname.startsWith('/terms') ||
-          pathname.startsWith('/api/auth')
+          pathname.startsWith('/api/auth') ||
+          // Claiming an invited profile happens before the person has any
+          // account at all — the single-use token in the URL is the
+          // credential, checked server-side by the route itself.
+          pathname.startsWith('/claim/') ||
+          pathname.startsWith('/api/invitations/')
         ) return true
         return !!token
       },

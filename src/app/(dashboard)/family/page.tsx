@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { Users, TreePine, MapPin, Plus, Edit, ChevronRight, CheckCircle2 } from 'lucide-react'
 import { calculateAge, genderLabel, maritalLabel, MARITAL_STATUS_LABELS, GENDER_LABELS } from '@/lib/utils'
+import PendingFamilyInvitations from '@/components/family/PendingFamilyInvitations'
 
 export default async function FamilyPage() {
   const session = await getServerSession(authOptions)
@@ -42,7 +43,11 @@ export default async function FamilyPage() {
 
   if (!family) {
     return (
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto space-y-5">
+        {/* A Karta may have already invited this person into their family —
+            answering that is quicker than registering a new one. */}
+        <PendingFamilyInvitations />
+
         <div className="card text-center py-16">
           <div className="w-20 h-20 bg-saffron-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Users className="w-10 h-10 text-saffron-600" />
