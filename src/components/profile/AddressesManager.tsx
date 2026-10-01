@@ -41,8 +41,11 @@ export default function AddressesManager({ memberId }: { memberId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ addressType, ...data }),
       })
-      if (!res.ok) throw new Error((await res.json()).message)
-      toast.success(`${addressType === 'CURRENT' ? 'Current' : 'Native'} address saved`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.message)
+      // 202 = the change was queued for review rather than applied.
+      if (res.status === 202) toast(json.message, { icon: '🕓' })
+      else toast.success(`${addressType === 'CURRENT' ? 'Current' : 'Native'} address saved`)
     } catch (e: any) {
       toast.error(e.message)
     } finally {

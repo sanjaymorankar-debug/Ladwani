@@ -9,6 +9,7 @@ import { ArrowLeft, Loader2, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
 import EducationManager from '@/components/profile/EducationManager'
 import EmploymentManager from '@/components/profile/EmploymentManager'
+import BusinessManager from '@/components/profile/BusinessManager'
 import SkillsManager from '@/components/profile/SkillsManager'
 import AddressesManager from '@/components/profile/AddressesManager'
 import SpouseLink from '@/components/profile/SpouseLink'
@@ -31,6 +32,8 @@ const schema = z.object({
   employmentStatus: z.string().optional(),
   occupationCategory: z.string().optional(),
   biography: z.string().optional(),
+  nationality: z.string().optional(),
+  languages: z.string().optional(), // comma-separated in the form, sent as a list
 })
 
 type FormData = z.infer<typeof schema>
@@ -42,6 +45,14 @@ export default function EditMemberPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isFetching, setIsFetching] = useState(true)
   const [currentMaritalStatus, setCurrentMaritalStatus] = useState<string | null>(null)
+  // Which optional physical fields the community collects (section 16). Shown
+  // by default until the config arrives so the form never flashes empty.
+  const [physical, setPhysical] = useState<Record<string, boolean>>({
+    heightCm: true, weightKg: true, bodyType: true, bloodGroup: true, physicalDisability: true,
+  })
+  useEffect(() => {
+    fetch('/api/settings/physical-fields').then((r) => (r.ok ? r.json() : null)).then((d) => d && setPhysical(d.config)).catch(() => {})
+  }, [])
 
   const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -69,6 +80,8 @@ export default function EditMemberPage() {
           employmentStatus: data.employmentStatus ?? '',
           occupationCategory: data.occupationCategory ?? '',
           biography: data.biography ?? '',
+          nationality: data.nationality ?? 'Indian',
+          languages: Array.isArray(data.languages) ? data.languages.join(', ') : '',
         })
         setIsFetching(false)
       })
@@ -82,7 +95,10 @@ export default function EditMemberPage() {
       const res = await fetch(`/api/members/${memberId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          languages: (data.languages ?? '').split(',').map((l) => l.trim()).filter(Boolean),
+        }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || 'Update failed')
@@ -156,6 +172,7 @@ export default function EditMemberPage() {
               <input {...register('dateOfBirth')} type="date" className="form-input"
                 max={new Date().toISOString().split('T')[0]} />
             </div>
+            {physical.bloodGroup && (
             <div>
               <label className="form-label">Blood Group</label>
               <select {...register('bloodGroup')} className="form-input">
@@ -165,10 +182,21 @@ export default function EditMemberPage() {
                 ))}
               </select>
             </div>
+            )}
           </div>
           {currentMaritalStatus !== 'MARRIED' && (
             <SpouseLink memberId={memberId} onDone={fetchMember} />
           )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="form-label">Nationality</label>
+              <input {...register('nationality')} className="form-input" placeholder="Indian" />
+            </div>
+            <div>
+              <label className="form-label">Languages spoken</label>
+              <input {...register('languages')} className="form-input" placeholder="Marathi, Hindi, English" />
+            </div>
+          </div>
           <div>
             <label className="form-label">Biography / About</label>
             <textarea {...register('biography')} className="form-input min-h-[100px]"
@@ -181,22 +209,30 @@ export default function EditMemberPage() {
             Physical Details <span className="text-xs text-gray-400 font-normal">(optional)</span>
           </h3>
           <div className="grid grid-cols-2 gap-3">
+            {physical.heightCm && (
             <div>
               <label className="form-label">Height (cm)</label>
               <input {...register('heightCm')} type="number" className="form-input" placeholder="170" />
             </div>
+            )}
+            {physical.weightKg && (
             <div>
               <label className="form-label">Weight (kg)</label>
               <input {...register('weightKg')} type="number" className="form-input" placeholder="65" />
             </div>
+            )}
+            {physical.bodyType && (
             <div>
               <label className="form-label">Body Type</label>
               <input {...register('bodyType')} className="form-input" placeholder="e.g. Athletic, Average" />
             </div>
+            )}
+            {physical.physicalDisability && (
             <div>
               <label className="form-label">Physical Disability</label>
               <input {...register('physicalDisability')} className="form-input" placeholder="Leave blank if none" />
             </div>
+            )}
           </div>
         </div>
 
@@ -249,6 +285,7 @@ export default function EditMemberPage() {
         <AddressesManager memberId={memberId} />
         <EducationManager memberId={memberId} />
         <EmploymentManager memberId={memberId} />
+        <BusinessManager memberId={memberId} />
         <SkillsManager memberId={memberId} />
       </div>
     </div>

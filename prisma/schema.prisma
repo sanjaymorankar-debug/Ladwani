@@ -318,6 +318,7 @@ model Member {
   nativeDistrict        String?
   nativeState           String?
   nationality           String         @default("Indian")
+  languages             Json?          // JSON array of strings (MySQL has no native arrays)
   maritalStatus         MaritalStatus  @default(UNMARRIED)
   employmentStatus      String?
   occupationCategory    String?

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { applySpouseLink } from '@/lib/approvals'
+import { applySpouseLink, applyMarkDeceased, applyKartaChange, applyAddressChange } from '@/lib/approvals'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -42,6 +42,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!existing) return NextResponse.json({ message: 'Not found' }, { status: 404 })
   if (existing.status !== 'SUBMITTED' && existing.status !== 'UNDER_REVIEW') {
     return NextResponse.json({ message: 'This request has already been reviewed' }, { status: 409 })
+  }
+
+  // Changing a family's Karta is Admin-only (approver role in the rule seed).
+  if (existing.actionCode === 'family.karta.change' && !roles.includes('ADMIN') && (action === 'approve' || action === 'reject')) {
+    return NextResponse.json({ message: 'Only an Admin can review a change of Karta' }, { status: 403 })
   }
 
   // The entity a queued request points at can disappear before anyone reviews
@@ -125,6 +130,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       if (approval.actionCode === 'member.marital_status.change' && approval.entityType === 'member' && action === 'approve') {
         const payload = (approval.newValue ?? {}) as { spouseMemberId?: string | null; externalSpouseName?: string | null }
         await applySpouseLink(tx, approval.entityId, payload, session.user?.id as string, approval.id)
+      }
+
+      if (approval.actionCode === 'member.mark_deceased' && approval.entityType === 'member' && action === 'approve') {
+        await applyMarkDeceased(tx, approval.entityId, approval.newValue as any, session.user?.id as string)
+      }
+
+      if (approval.actionCode === 'family.karta.change' && approval.entityType === 'family' && action === 'approve') {
+        await applyKartaChange(tx, approval.newValue as any, session.user?.id as string)
+      }
+
+      if (approval.actionCode === 'member.address.change' && approval.entityType === 'member' && action === 'approve') {
+        await applyAddressChange(tx, approval.entityId, approval.newValue as any)
       }
     }
 

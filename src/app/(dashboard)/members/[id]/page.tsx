@@ -11,6 +11,7 @@ import {
 import { calculateAge, genderLabel, maritalLabel, formatDate, GENDER_LABELS, MARITAL_STATUS_LABELS, getInitials } from '@/lib/utils'
 import { getMemberAccess } from '@/lib/member-auth'
 import InviteToClaimPanel from '@/components/members/InviteToClaimPanel'
+import MarkDeceasedPanel from '@/components/members/MarkDeceasedPanel'
 
 export default async function MemberProfilePage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -70,6 +71,17 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
           memberName={member.firstName}
           defaultEmail={member.email}
         />
+      )}
+
+      {member.status === 'DECEASED' && (
+        <div className="card bg-gray-50 text-sm text-gray-700">
+          In loving memory{member.deceasedAt ? ` — passed away ${formatDate(member.deceasedAt)}` : ''}
+          {member.deceasedPlace ? ` at ${member.deceasedPlace}` : ''}.
+        </div>
+      )}
+
+      {memberAccess.authorized && !isOwnProfile && member.status !== 'DECEASED' && (
+        <MarkDeceasedPanel memberId={member.id} memberName={member.firstName} />
       )}
 
       {/* Profile card */}

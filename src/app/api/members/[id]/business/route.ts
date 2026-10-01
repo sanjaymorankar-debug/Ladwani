@@ -13,6 +13,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const body = await req.json()
   if (!body.businessName) return NextResponse.json({ message: 'Business name is required' }, { status: 400 })
 
+  if (body.establishedYear) {
+    const y = parseInt(body.establishedYear, 10)
+    if (!Number.isInteger(y) || y < 1800 || y > new Date().getFullYear()) {
+      return NextResponse.json({ message: 'Enter a valid established year' }, { status: 400 })
+    }
+  }
+
   const record = await prisma.business.create({
     data: {
       memberId: params.id,

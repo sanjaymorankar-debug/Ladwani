@@ -97,3 +97,32 @@ export type LoginInput = z.infer<typeof loginSchema>
 export type FamilyInput = z.infer<typeof familySchema>
 export type MemberInput = z.infer<typeof memberSchema>
 export type MatrimonialProfileInput = z.infer<typeof matrimonialProfileSchema>
+
+
+/** Indian PIN codes are 6 digits and never start with 0. */
+export const PINCODE_REGEX = /^[1-9]\d{5}$/
+
+/**
+ * Range checks for the physical fields (§30). Values arrive from forms as
+ * strings or numbers; blank means "not provided" and is always valid.
+ * Returns a user-facing error message, or null when fine.
+ */
+export function validatePhysical(input: { heightCm?: unknown; weightKg?: unknown }): string | null {
+  const blank = (v: unknown) => v === undefined || v === null || v === ''
+  if (!blank(input.heightCm)) {
+    const h = Number(input.heightCm)
+    if (!Number.isInteger(h) || h < 30 || h > 250) return 'Height must be a whole number between 30 and 250 cm'
+  }
+  if (!blank(input.weightKg)) {
+    const w = Number(input.weightKg)
+    if (!Number.isInteger(w) || w < 2 || w > 350) return 'Weight must be a whole number between 2 and 350 kg'
+  }
+  return null
+}
+
+/** Blank is fine; anything else must be a valid Indian PIN when the country is India. */
+export function validatePincode(pincode: unknown, country?: unknown): string | null {
+  if (pincode === undefined || pincode === null || pincode === '') return null
+  if (country && String(country).trim().toLowerCase() !== 'india') return null
+  return PINCODE_REGEX.test(String(pincode)) ? null : 'Enter a valid 6-digit PIN code'
+}

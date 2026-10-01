@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redactMemberForViewer } from '@/lib/visibility'
 import { getMemberAccess } from '@/lib/member-auth'
+import { validatePhysical } from '@/lib/validators'
+import { PHYSICAL_FIELDS, getPhysicalFieldConfig } from '@/lib/physical-fields'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -47,6 +49,27 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     )
   }
 
+  const physicalError = validatePhysical(body)
+  if (physicalError) return NextResponse.json({ message: physicalError }, { status: 400 })
+
+  // Fields the community has switched off (section 16) are refused outright,
+  // so a stale client or a hand-built request cannot store them anyway.
+  const physicalConfig = await getPhysicalFieldConfig()
+  for (const f of PHYSICAL_FIELDS) {
+    const v = body[f.key]
+    if (!physicalConfig[f.key] && v !== undefined && v !== null && v !== '') {
+      return NextResponse.json({ message: `${f.label} is not collected by this community` }, { status: 400 })
+    }
+  }
+
+  let languages: string[] | undefined
+  if (body.languages !== undefined) {
+    if (!Array.isArray(body.languages) || body.languages.some((l: unknown) => typeof l !== 'string')) {
+      return NextResponse.json({ message: 'Languages must be a list of names' }, { status: 400 })
+    }
+    languages = Array.from(new Set(body.languages.map((l: string) => l.trim()).filter(Boolean))).slice(0, 15) as string[]
+  }
+
   // PATCH semantics: only touch what the caller actually sent. Treating an
   // omitted field as "set to null" silently destroys data whenever a client
   // submits a partial update — it wiped lastName and dateOfBirth during UAT.
@@ -83,6 +106,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       ...set('employmentStatus', text),
       ...set('occupationCategory', text),
       ...set('biography', text),
+      ...(body.nationality !== undefined && String(body.nationality).trim()
+        ? { nationality: String(body.nationality).trim() }
+        : {}),
+      ...(languages !== undefined ? { languages } : {}),
       updatedBy: userId,
     },
   })

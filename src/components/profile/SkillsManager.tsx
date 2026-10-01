@@ -12,6 +12,7 @@ export default function SkillsManager({ memberId }: { memberId: string }) {
   const [skills, setSkills] = useState<MemberSkill[]>([])
   const [name, setName] = useState('')
   const [adding, setAdding] = useState(false)
+  const [suggestions, setSuggestions] = useState<string[]>([])
 
   const load = () =>
     fetch(`/api/members/${memberId}`)
@@ -19,6 +20,18 @@ export default function SkillsManager({ memberId }: { memberId: string }) {
       .then((d) => setSkills(d.skills ?? []))
 
   useEffect(() => { load() }, [memberId])
+
+  // Searchable picker over the admin-managed master list (section 20).
+  // Typing something not on the list still works - it is added as a new skill.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetch(`/api/skills?q=${encodeURIComponent(name.trim())}`)
+        .then((r) => (r.ok ? r.json() : { skills: [] }))
+        .then((d) => setSuggestions((d.skills ?? []).map((s: { name: string }) => s.name)))
+        .catch(() => {})
+    }, 200)
+    return () => clearTimeout(t)
+  }, [name])
 
   const add = async () => {
     if (!name.trim()) return
@@ -58,9 +71,12 @@ export default function SkillsManager({ memberId }: { memberId: string }) {
         ))}
       </div>
       <div className="flex gap-2">
-        <input value={name} onChange={(e) => setName(e.target.value)}
+        <input value={name} onChange={(e) => setName(e.target.value)} list="skill-suggestions" 
           onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())}
           className="form-input text-sm flex-1" placeholder="e.g. Cooking, Public Speaking, Tailoring" />
+        <datalist id="skill-suggestions">
+          {suggestions.map((n) => <option key={n} value={n} />)}
+        </datalist>
         <button type="button" onClick={add} disabled={adding} className="btn-secondary px-3 disabled:opacity-60">
           <Plus className="w-4 h-4" />
         </button>

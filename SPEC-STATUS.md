@@ -121,3 +121,26 @@ are still to be built. Worth confirming before anyone treats §43 as satisfied.
 7. **Validation gaps (§30)** — height/weight ranges, Indian PIN format.
 8. **Profile tabs (§41) and mobile verification (§42)** — cosmetic/UX.
 9. **Run the MySQL→Postgres migration (§44)** — see `MIGRATION.md`.
+
+---
+
+## Update 22 Sep 2026 — pending items worked
+
+Built this pass (typechecks clean; **not yet run against a database**, see below):
+
+| § | What was added |
+|---|---|
+| 13 | Karta dashboard: family **Add/Change photo** (`/api/families/[id]/photos`, replaces the previous file) and an **Invite members** list of account-less members linking to the existing invite flow |
+| 15 | **Nationality** and **languages** in the profile editor. Languages is a new `members.languages` JSON column — migration `20260922120000_member_languages` |
+| 16 | **Admin-configurable physical fields** (Admin → Settings → Physical Detail Fields). Disabled fields are hidden in the form *and* refused by the API |
+| 19 | **Business UI** (`BusinessManager`) on the profile editor, plus a PATCH endpoint (edit / mark closed) |
+| 20 | **Skills master list**: admin screen (add / rename / categorise / deactivate; delete blocked when in use) and a searchable picker on the profile. Free-text skills still work |
+| 28 | Approval gates wired for **deceased status** (`member.mark_deceased`), **Karta change** (`family.karta.change`, Admin-only review) and **address changes** (`member.address.change`; first entry is direct, edits to an existing address are queued). Staff changes apply directly |
+| 30 | Height 30–250 cm, weight 2–350 kg, Indian 6-digit PIN validated server-side |
+
+Needs doing before this is trusted:
+- Apply the new migration (`prisma migrate deploy`) and re-seed approval rules (`member.address.change` was added to the seed; a missing rule defaults to *requires approval*, so it works even before re-seeding).
+- Run the suite. New tests are in `tests/uat/pending-items.test.ts`; they have not been executed — the local test MySQL rejected the configured credentials.
+- Existing tests that edit an already-saved address as a non-staff user will now get a 202 (queued) instead of an immediate save.
+
+Still open: §41 profile tabs, §42 mobile verification, real payment gateway, photo pipeline test against real storage, SMTP-dependent flows, and `/admin/areas`, `/admin/matrimony`, `/admin/approval-rules`, `/admin/roles`, `/admin/notifications` — linked from Admin Settings but the pages do not exist.

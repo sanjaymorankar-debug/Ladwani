@@ -4,9 +4,11 @@ import { prisma } from '@/lib/prisma'
 import { canManageFamily } from '@/lib/family-auth'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, MapPin, TreePine, Users, CheckCircle2, Home, Calendar, Plus } from 'lucide-react'
+import { ArrowLeft, Mail, MapPin, TreePine, Users, CheckCircle2, Home, Calendar, Plus } from 'lucide-react'
 import { formatDate, calculateAge, GENDER_LABELS, MARITAL_STATUS_LABELS } from '@/lib/utils'
 import JoinRequestsInbox from '@/components/family/JoinRequestsInbox'
+import ChangeKartaPanel from '@/components/family/ChangeKartaPanel'
+import FamilyPhoto from '@/components/family/FamilyPhoto'
 
 export default async function FamilyDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -36,6 +38,17 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
 
   if (!family) notFound()
 
+  // Living members with no login of their own — candidates for an invitation (§12).
+  const unclaimed = family.members.filter(({ member }: any) => !member.userId && !member.deceasedAt)
+
+  // Possible successors: active adults with their own login, other than the current Karta.
+  const kartaCandidates = family.members
+    .filter(({ member, isKarta: k }: any) => {
+      if (k || !member.userId || member.status !== 'ACTIVE') return false
+      return !member.dateOfBirth || (calculateAge(member.dateOfBirth) ?? 18) >= 18
+    })
+    .map(({ member }: any) => ({ id: member.id, name: `${member.firstName} ${member.lastName ?? ''}`.trim() }))
+
   const currentAddress = family.addresses.find((a: any) => a.addressType === 'CURRENT')
   const nativeAddress = family.addresses.find((a: any) => a.addressType === 'NATIVE')
 
@@ -49,9 +62,7 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
       {/* Family card */}
       <div className="card">
         <div className="flex items-start gap-5">
-          <div className="w-20 h-20 bg-gradient-to-br from-saffron-400 to-saffron-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-sm flex-shrink-0">
-            {family.name[0]}
-          </div>
+          <FamilyPhoto familyId={family.id} photoId={family.familyPhotoId} initial={family.name[0]} canEdit={isKarta} />
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
@@ -128,6 +139,27 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
       </div>
 
       {isKarta && <JoinRequestsInbox familyId={family.id} />}
+
+      {isKarta && <ChangeKartaPanel familyId={family.id} candidates={kartaCandidates} />}
+
+      {isKarta && unclaimed.length > 0 && (
+        <div className="card">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Mail className="w-4 h-4 text-saffron-600" /> Invite members to create their own account
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            These profiles are managed by you. Send an invitation so the person can take over their own profile.
+          </p>
+          <ul className="mt-3 divide-y divide-gray-100">
+            {unclaimed.map(({ member }: any) => (
+              <li key={member.id} className="flex items-center justify-between py-2 text-sm">
+                <span className="text-gray-800">{member.firstName} {member.lastName ?? ''}</span>
+                <Link href={`/members/${member.id}`} className="btn-secondary text-xs">Invite</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Members */}
       <div>

@@ -164,6 +164,7 @@ async function main() {
     { actionCode: 'member.marital_status.change', requiresApproval: true, approverRole: 'OPERATOR' },
     { actionCode: 'member.mark_deceased', requiresApproval: true, approverRole: 'OPERATOR' },
     { actionCode: 'member.relationship.change', requiresApproval: true, approverRole: 'OPERATOR' },
+    { actionCode: 'member.address.change', requiresApproval: true, approverRole: 'OPERATOR' },
     { actionCode: 'family.karta.change', requiresApproval: true, approverRole: 'ADMIN' },
     { actionCode: 'family.merge', requiresApproval: true, approverRole: 'ADMIN' },
     { actionCode: 'member.edit_own', requiresApproval: false, autoApproveRole: 'MEMBER' },

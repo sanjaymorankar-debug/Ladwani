@@ -19,6 +19,14 @@ export default async function AdminSettingsPage() {
       icon: TreePine, desc: 'Manage family relationship types and their inverses',
     },
     {
+      title: 'Skills', href: '/admin/config/skills',
+      icon: Users2, desc: 'Manage the master list of skills members pick from',
+    },
+    {
+      title: 'Physical Detail Fields', href: '/admin/config/physical-fields',
+      icon: Settings, desc: 'Choose which optional physical fields members are asked for',
+    },
+    {
       title: 'Community Areas', href: '/admin/areas',
       icon: Globe, desc: 'Set up geographic community groups and areas',
     },

@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getMemberAccess } from '@/lib/member-auth'
+import { validatePincode } from '@/lib/validators'
+import { requiresApproval, createApprovalRecord, applyAddressChange } from '@/lib/approvals'
 
 const ALLOWED_TYPES = ['CURRENT', 'NATIVE']
 
@@ -31,7 +33,8 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     return NextResponse.json({ message: 'addressType must be CURRENT or NATIVE' }, { status: 400 })
   }
 
-  const existing = await prisma.address.findFirst({ where: { memberId: params.id, addressType } })
+  const pinError = validatePincode(body.pincode, body.country || 'India')
+  if (pinError) return NextResponse.json({ message: pinError }, { status: 400 })
 
   const data = {
     line1: body.line1 || null,
@@ -41,26 +44,30 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     state: body.state || null,
     country: body.country || 'India',
     pincode: body.pincode || null,
-    isPrimary: addressType === 'CURRENT',
+  }
+  const payload = { addressType: addressType as 'CURRENT' | 'NATIVE', ...data }
+  const existing = await prisma.address.findFirst({ where: { memberId: params.id, addressType } })
+
+  // First-time entry is always direct. Changing an address that is already on
+  // record is gated (§28) unless staff make the change themselves; a pending
+  // request blocks a second one so reviewers never see a stale queue.
+  if (existing && !access.isStaff && (await requiresApproval('member.address.change'))) {
+    const pending = await prisma.approval.findFirst({
+      where: { actionCode: 'member.address.change', entityId: params.id, status: { in: ['SUBMITTED', 'UNDER_REVIEW'] } },
+    })
+    if (pending) {
+      return NextResponse.json({ message: 'An address change for this member is already awaiting review' }, { status: 409 })
+    }
+    await prisma.$transaction((tx) =>
+      createApprovalRecord(tx, {
+        actionCode: 'member.address.change', entityType: 'member', entityId: params.id,
+        fieldName: addressType, oldValue: { line1: existing.line1, city: existing.city, state: existing.state, pincode: existing.pincode },
+        newValue: payload, submittedBy: session!.user!.id as string,
+      })
+    )
+    return NextResponse.json({ message: 'Address change submitted for review.', pendingApproval: true }, { status: 202 })
   }
 
-  const [address] = await prisma.$transaction([
-    existing
-      ? prisma.address.update({ where: { id: existing.id }, data })
-      : prisma.address.create({ data: { ...data, addressableType: 'member', memberId: params.id, addressType } }),
-    // Keep the flat Member fields in sync — several existing pages (family
-    // cards, member directory) render those directly rather than joining
-    // Address, and shouldn't go blank just because editing moved here.
-    addressType === 'CURRENT'
-      ? prisma.member.update({
-          where: { id: params.id },
-          data: { currentCity: data.city, currentState: data.state, currentCountry: data.country },
-        })
-      : prisma.member.update({
-          where: { id: params.id },
-          data: { nativeVillage: data.city, nativeDistrict: data.district, nativeState: data.state },
-        }),
-  ])
-
+  const address = await prisma.$transaction((tx) => applyAddressChange(tx, params.id, payload))
   return NextResponse.json({ message: 'Address saved', address })
 }

@@ -134,3 +134,129 @@ export async function createApprovalRecord(
     },
   })
 }
+
+// ─────────────────────────────────────────────────────────────────
+// §28 gates: deceased status, Karta change, address change.
+// Each apply* function is shared by the direct path (no approval needed) and
+// by the approvals PATCH route when a queued request is approved, so the two
+// always produce identical results.
+// ─────────────────────────────────────────────────────────────────
+
+export interface DeceasedPayload {
+  deceasedAt: string
+  deceasedPlace?: string | null
+  deceasedNotes?: string | null
+}
+
+export async function applyMarkDeceased(tx: Prisma.TransactionClient, memberId: string, payload: DeceasedPayload, actorId: string) {
+  const member = await tx.member.update({
+    where: { id: memberId },
+    data: {
+      status: 'DECEASED',
+      deceasedAt: new Date(payload.deceasedAt),
+      deceasedPlace: payload.deceasedPlace || null,
+      deceasedNotes: payload.deceasedNotes || null,
+    },
+  })
+
+  // The tree keeps them (history matters); but a deceased person must not
+  // stay listed for matrimony, and a login for them must stop working.
+  await tx.matrimonialProfile.updateMany({ where: { memberId, isVisible: true }, data: { isVisible: false } })
+  if (member.userId) {
+    await tx.user.update({ where: { id: member.userId }, data: { status: 'DEACTIVATED' } })
+  }
+
+  // A surviving, currently-married spouse becomes WIDOWED.
+  const marriages = await tx.marriageRecord.findMany({
+    where: { status: 'MARRIED', OR: [{ memberId1: memberId }, { memberId2: memberId }] },
+  })
+  for (const m of marriages) {
+    await tx.marriageRecord.update({ where: { id: m.id }, data: { status: 'WIDOWED' } })
+    const spouseId = m.memberId1 === memberId ? m.memberId2 : m.memberId1
+    if (spouseId) {
+      await tx.member.update({ where: { id: spouseId }, data: { maritalStatus: 'WIDOWED' } })
+      await tx.maritalStatusHistory.create({ data: { memberId: spouseId, status: 'WIDOWED', changedBy: actorId } })
+    }
+  }
+}
+
+export interface KartaChangePayload {
+  familyId: string
+  newKartaMemberId: string
+}
+
+export async function applyKartaChange(tx: Prisma.TransactionClient, payload: KartaChangePayload, actorId: string) {
+  const family = await tx.family.findUnique({ where: { id: payload.familyId } })
+  if (!family) throw new Error('Family not found')
+
+  const target = await tx.familyMember.findUnique({
+    where: { familyId_memberId: { familyId: payload.familyId, memberId: payload.newKartaMemberId } },
+    include: { member: true },
+  })
+  if (!target || target.leftAt) throw new Error('The new Karta must be an active member of this family')
+  if (!target.member.userId) throw new Error('The new Karta must have their own login account')
+
+  const kartaRole = await tx.role.findUnique({ where: { code: 'KARTA' } })
+
+  // Previous Karta(s): drop the flag and their family-scoped Karta role.
+  const previous = await tx.familyMember.findMany({
+    where: { familyId: payload.familyId, isKarta: true, memberId: { not: payload.newKartaMemberId } },
+    include: { member: { select: { userId: true } } },
+  })
+  for (const p of previous) {
+    await tx.familyMember.update({ where: { id: p.id }, data: { isKarta: false } })
+    if (kartaRole && p.member.userId) {
+      await tx.userRole.deleteMany({ where: { userId: p.member.userId, roleId: kartaRole.id, familyId: payload.familyId } })
+    }
+  }
+
+  await tx.familyMember.update({ where: { id: target.id }, data: { isKarta: true } })
+  await tx.family.update({ where: { id: payload.familyId }, data: { kartaMemberId: payload.newKartaMemberId, updatedBy: actorId } })
+  if (kartaRole) {
+    const exists = await tx.userRole.findFirst({
+      where: { userId: target.member.userId!, roleId: kartaRole.id, familyId: payload.familyId },
+    })
+    if (!exists) {
+      await tx.userRole.create({
+        data: { userId: target.member.userId!, roleId: kartaRole.id, familyId: payload.familyId, grantedBy: actorId },
+      })
+    }
+  }
+}
+
+export interface AddressChangePayload {
+  addressType: 'CURRENT' | 'NATIVE'
+  line1?: string | null
+  line2?: string | null
+  city?: string | null
+  district?: string | null
+  state?: string | null
+  country?: string | null
+  pincode?: string | null
+}
+
+/** Upserts the member's CURRENT or NATIVE address and syncs the flat Member fields. */
+export async function applyAddressChange(tx: Prisma.TransactionClient, memberId: string, p: AddressChangePayload) {
+  const data = {
+    line1: p.line1 || null,
+    line2: p.line2 || null,
+    city: p.city || null,
+    district: p.district || null,
+    state: p.state || null,
+    country: p.country || 'India',
+    pincode: p.pincode || null,
+    isPrimary: p.addressType === 'CURRENT',
+  }
+  const existing = await tx.address.findFirst({ where: { memberId, addressType: p.addressType } })
+  const address = existing
+    ? await tx.address.update({ where: { id: existing.id }, data })
+    : await tx.address.create({ data: { ...data, addressableType: 'member', memberId, addressType: p.addressType } })
+
+  await tx.member.update({
+    where: { id: memberId },
+    data: p.addressType === 'CURRENT'
+      ? { currentCity: data.city, currentState: data.state, currentCountry: data.country }
+      : { nativeVillage: data.city, nativeDistrict: data.district, nativeState: data.state },
+  })
+  return address
+}
