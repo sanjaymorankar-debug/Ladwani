@@ -1,25 +1,25 @@
-> ## ⚠️ Which Ladwani app is this?
+> ## ⚠️ Two unrelated apps live in this repository — check your branch
 >
-> This repo is the **single Next.js app** (53 Prisma models, one process). It is
-> what `devmiladwani.agtci.com` runs, per `DEPLOYMENT.md`.
+> This repository was renamed from `miladwani` to **`Ladwani`**, and it holds **two
+> different applications on unrelated histories**. `git merge-base main rebuild`
+> finds no common ancestor, so these are not a fork and a mainline — they are two
+> codebases sharing one repo.
 >
-> It is **not** what serves `ladwani.bkesari.com`. `bkesari-platform/DEPLOY.md`
-> part 5 says that is the **full rebuild** — a NestJS API plus a Next.js web app,
-> two separate processes and so two Hostinger sites — in
-> `/Users/agtci/Documents/Project_Documents/Projects/community-platform`
-> (github.com/sanjaymorankar-debug/miladwani, branch `rebuild`). The platform's
-> `database/ladwani/*.sql` scripts were regenerated from **that** schema: 69
-> tables, against this app's 53 models.
+> | Branch | App | Schema | Deploys to |
+> |---|---|---|---|
+> | **`main`** (you are reading its README) | one Next.js app, single process | 53 Prisma models | `devmiladwani.agtci.com` |
+> | **`rebuild`** | NestJS API **+** Next.js web — two processes, so two Hostinger sites | **73** Prisma models | `(dev/test)ladwani.bkesari.com` |
 >
-> | | this repo | the rebuild |
-> |---|---|---|
-> | Shape | one Next.js app | NestJS API + Next.js web |
-> | Schema | 53 Prisma models | 69 tables |
-> | Covers | Family Registry, Directory, Matrimony | + Community Social, Bookings/Assets, Payments/Fees/Ledger, Admin/Reporting (M0–M5) |
-> | Deploys to | `devmiladwani.agtci.com` | `(dev/test)ladwani.bkesari.com` |
+> `rebuild` covers Family Registry, Matrimony, Community Social, Bookings/Assets,
+> Payments/Fees/Ledger and Admin/Reporting (M0–M6). This branch covers Family
+> Registry, Directory and Matrimony only. On the Mac the rebuild is checked out at
+> `/Users/agtci/Documents/Project_Documents/Projects/community-platform`.
 >
-> So: **don't deploy this one to the bkesari tiers**, and don't assume the
-> platform's Ladwani SQL matches this app's schema — it does not.
+> **So:** everything below describes the `main` app and `devmiladwani.agtci.com`.
+> For the bkesari tiers, use `rebuild` and `bkesari-platform/DEPLOY.md` part 5.
+> The platform's `database/ladwani/*.sql` scripts are generated from **`rebuild`**'s
+> schema (73 tables), not this branch's — do not import them into a database for
+> this app.
 
 # Mi Ladwani — Community Platform
 
@@ -46,8 +46,8 @@ Official digital platform for Ladwani Samaj: Family Registry, Member Directory &
 ### 2. Clone & Install
 
 ```bash
-git clone https://github.com/sanjaymorankar-debug/miladwani.git
-cd miladwani
+git clone https://github.com/sanjaymorankar-debug/Ladwani.git
+cd Ladwani
 npm install
 ```
 
@@ -136,7 +136,7 @@ NEXT_PUBLIC_APP_URL=https://devmiladwani.agtci.com
 git init
 git add .
 git commit -m "feat: initial Mi Ladwani platform"
-git remote add origin https://github.com/sanjaymorankar-debug/miladwani.git
+git remote add origin https://github.com/sanjaymorankar-debug/Ladwani.git
 git push -u origin main
 ```
 
