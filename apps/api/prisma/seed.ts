@@ -63,6 +63,42 @@ const ASSET_CATEGORIES = [
   { code: 'GROUND', label: 'Open Ground', sortOrder: 4 },
 ]
 
+// M6 — a starter catalog; Admin can add more via /admin/config
+const EDUCATION_LEVELS = [
+  { code: 'BELOW_10TH', label: 'Below 10th', sortOrder: 1 },
+  { code: 'SSC', label: 'SSC / 10th', sortOrder: 2 },
+  { code: 'HSC', label: 'HSC / 12th', sortOrder: 3 },
+  { code: 'DIPLOMA', label: 'Diploma', sortOrder: 4 },
+  { code: 'GRADUATE', label: "Bachelor's Degree", sortOrder: 5 },
+  { code: 'POST_GRADUATE', label: "Master's Degree", sortOrder: 6 },
+  { code: 'DOCTORATE', label: 'Doctorate', sortOrder: 7 },
+  { code: 'OTHER', label: 'Other', sortOrder: 8 },
+]
+
+// M6 — a starter catalog; Admin can add more via /admin/config
+const OCCUPATIONS = [
+  { code: 'STUDENT', label: 'Student', sortOrder: 1 },
+  { code: 'SALARIED', label: 'Salaried Professional', sortOrder: 2 },
+  { code: 'BUSINESS', label: 'Business Owner', sortOrder: 3 },
+  { code: 'GOVERNMENT', label: 'Government Service', sortOrder: 4 },
+  { code: 'FARMER', label: 'Agriculture', sortOrder: 5 },
+  { code: 'HOMEMAKER', label: 'Homemaker', sortOrder: 6 },
+  { code: 'RETIRED', label: 'Retired', sortOrder: 7 },
+  { code: 'NOT_WORKING', label: 'Not Working', sortOrder: 8 },
+  { code: 'OTHER', label: 'Other', sortOrder: 9 },
+]
+
+// M6 — a starter catalog; Admin can add more via /admin/config
+const SKILLS = [
+  { code: 'COOKING', label: 'Cooking' },
+  { code: 'MUSIC', label: 'Music' },
+  { code: 'TEACHING', label: 'Teaching' },
+  { code: 'ACCOUNTING', label: 'Accounting' },
+  { code: 'IT_SOFTWARE', label: 'IT / Software' },
+  { code: 'HANDICRAFT', label: 'Handicraft' },
+  { code: 'PUBLIC_SPEAKING', label: 'Public Speaking' },
+]
+
 async function main() {
   console.log('Seeding communities...')
   await prisma.community.upsert({
@@ -124,6 +160,21 @@ async function main() {
   console.log('Seeding asset categories...')
   for (const cat of ASSET_CATEGORIES) {
     await prisma.assetCategory.upsert({ where: { code: cat.code }, update: {}, create: cat })
+  }
+
+  console.log('Seeding education levels...')
+  for (const lvl of EDUCATION_LEVELS) {
+    await prisma.educationLevel.upsert({ where: { code: lvl.code }, update: {}, create: lvl })
+  }
+
+  console.log('Seeding occupations...')
+  for (const occ of OCCUPATIONS) {
+    await prisma.occupation.upsert({ where: { code: occ.code }, update: {}, create: occ })
+  }
+
+  console.log('Seeding skills...')
+  for (const skill of SKILLS) {
+    await prisma.skill.upsert({ where: { code: skill.code }, update: {}, create: skill })
   }
 
   console.log('Seed complete.')

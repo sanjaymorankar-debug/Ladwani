@@ -30,6 +30,11 @@ export class BookingsService {
     const asset = await this.prisma.asset.findUnique({ where: { id: dto.assetId } })
     if (!asset || asset.deletedAt || asset.status !== 'ACTIVE') throw new NotFoundException('Asset not found or not bookable.')
 
+    const blocked = await this.prisma.assetBlockedDate.findFirst({
+      where: { assetId: dto.assetId, dateFrom: { lte: dto.date }, dateTo: { gte: dto.date } },
+    })
+    if (blocked) throw new ConflictException('The owner has blocked this date for booking.')
+
     const slot = dto.slot ?? 'FULL_DAY'
     const quote = await this.assets.quote(dto.assetId, dto.date, dto.serviceCodes ?? [])
     const bookingType = asset.bookingApprovalRequired ? 'REQUEST' : 'INSTANT'

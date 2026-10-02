@@ -197,28 +197,38 @@ model Family {
 }
 
 model Member {
-  id             String    @id @default(cuid())
-  userId         String?   @unique @map("user_id")
-  firstName      String    @map("first_name")
-  middleName     String?   @map("middle_name")
-  lastName       String?   @map("last_name")
-  gender         String    @default("NOT_STATED")
-  dateOfBirth    DateTime? @map("date_of_birth")
-  maritalStatus  String    @default("UNMARRIED") @map("marital_status")
-  status         String    @default("ACTIVE")
-  deceasedAt     DateTime? @map("deceased_at")
-  deceasedPlace  String?   @map("deceased_place")
-  currentCity    String?   @map("current_city")
-  currentState   String?   @map("current_state")
-  nativeVillage  String?   @map("native_village")
-  profilePhotoId String?   @unique @map("profile_photo_id")
-  createdBy      String?   @map("created_by")
-  updatedBy      String?   @map("updated_by")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  deletedAt      DateTime? @map("deleted_at")
+  id                 String    @id @default(cuid())
+  userId             String?   @unique @map("user_id")
+  firstName          String    @map("first_name")
+  middleName         String?   @map("middle_name")
+  lastName           String?   @map("last_name")
+  gender             String    @default("NOT_STATED")
+  dateOfBirth        DateTime? @map("date_of_birth")
+  maritalStatus      String    @default("UNMARRIED") @map("marital_status")
+  status             String    @default("ACTIVE")
+  deceasedAt         DateTime? @map("deceased_at")
+  deceasedPlace      String?   @map("deceased_place")
+  currentCity        String?   @map("current_city")
+  currentState       String?   @map("current_state")
+  nativeVillage      String?   @map("native_village")
+  nativeDistrict     String?   @map("native_district")
+  nativeState        String?   @map("native_state")
+  educationLevelId   String?   @map("education_level_id")
+  occupationId       String?   @map("occupation_id")
+  employerOrBusiness String?   @map("employer_or_business")
+  incomeRange        String?   @map("income_range")
+  bio                String?   @db.Text
+  profilePhotoId     String?   @unique @map("profile_photo_id")
+  createdBy          String?   @map("created_by")
+  updatedBy          String?   @map("updated_by")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
 
   user                User?                  @relation(fields: [userId], references: [id])
+  educationLevel      EducationLevel?        @relation(fields: [educationLevelId], references: [id])
+  occupation          Occupation?            @relation(fields: [occupationId], references: [id])
+  skills              MemberSkill[]
   families            FamilyMember[]
   familiesAsKarta     Family[]               @relation("FamilyKarta")
   joinRequests        FamilyJoinRequest[]
@@ -249,7 +259,59 @@ model Member {
   @@index([deletedAt, gender])
   @@index([deletedAt, maritalStatus])
   @@index([deletedAt, status])
+  @@index([deletedAt, currentCity])
+  @@index([deletedAt, educationLevelId])
+  @@index([deletedAt, occupationId])
   @@map("members")
+}
+
+model EducationLevel {
+  id        String  @id @default(cuid())
+  code      String  @unique
+  label     String
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  members           Member[]
+  matrimonyProfiles MatrimonyProfile[]
+
+  @@map("education_levels")
+}
+
+model Occupation {
+  id        String  @id @default(cuid())
+  code      String  @unique
+  label     String
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  members           Member[]
+  matrimonyProfiles MatrimonyProfile[]
+
+  @@map("occupations")
+}
+
+model Skill {
+  id       String  @id @default(cuid())
+  code     String  @unique
+  label    String
+  isActive Boolean @default(true) @map("is_active")
+
+  memberSkills MemberSkill[]
+
+  @@map("skills")
+}
+
+model MemberSkill {
+  memberId String @map("member_id")
+  skillId  String @map("skill_id")
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  skill  Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([memberId, skillId])
+  @@index([skillId])
+  @@map("member_skills")
 }
 
 model FamilyMember {
@@ -511,11 +573,16 @@ model MatrimonyProfile {
   heightCm             Int?     @map("height_cm")
   languages            Json?
   allowContactRequests Boolean  @default(true) @map("allow_contact_requests")
+  educationLevelId     String?  @map("education_level_id")
+  occupationId         String?  @map("occupation_id")
+  familyBackground     String?  @db.Text
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
-  member     Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  preference MatrimonyPreference?
+  member         Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  educationLevel EducationLevel?      @relation(fields: [educationLevelId], references: [id])
+  occupation     Occupation?          @relation(fields: [occupationId], references: [id])
+  preference     MatrimonyPreference?
 
   @@index([isVisible])
   @@map("matrimonial_profiles")

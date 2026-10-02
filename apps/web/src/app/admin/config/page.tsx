@@ -32,6 +32,13 @@ interface AreaRow {
   isActive: boolean
 }
 
+interface LookupRow {
+  id: string
+  code: string
+  label: string
+  isActive: boolean
+}
+
 export default function AdminConfigPage() {
   const [postTypes, setPostTypes] = useState<PostType[]>([])
   const [categories, setCategories] = useState<AssetCategory[]>([])
@@ -50,10 +57,25 @@ export default function AdminConfigPage() {
   const [areaType, setAreaType] = useState<(typeof AREA_TYPES)[number]>('AREA')
   const [areaParentId, setAreaParentId] = useState('')
 
+  const [educationLevels, setEducationLevels] = useState<LookupRow[]>([])
+  const [elCode, setElCode] = useState('')
+  const [elLabel, setElLabel] = useState('')
+
+  const [occupations, setOccupations] = useState<LookupRow[]>([])
+  const [occCode, setOccCode] = useState('')
+  const [occLabel, setOccLabel] = useState('')
+
+  const [skills, setSkills] = useState<LookupRow[]>([])
+  const [skillCode, setSkillCode] = useState('')
+  const [skillLabel, setSkillLabel] = useState('')
+
   function load() {
     api.get<PostType[]>('/config/post-types').then(setPostTypes).catch((err) => setError(errorMessage(err)))
     api.get<AssetCategory[]>('/config/asset-categories').then(setCategories).catch((err) => setError(errorMessage(err)))
     api.get<AreaRow[]>('/config/areas').then(setAreas).catch((err) => setError(errorMessage(err)))
+    api.get<LookupRow[]>('/config/education-levels').then(setEducationLevels).catch((err) => setError(errorMessage(err)))
+    api.get<LookupRow[]>('/config/occupations').then(setOccupations).catch((err) => setError(errorMessage(err)))
+    api.get<LookupRow[]>('/config/skills').then(setSkills).catch((err) => setError(errorMessage(err)))
   }
 
   useEffect(load, [])
@@ -125,6 +147,78 @@ export default function AdminConfigPage() {
     setError(null)
     try {
       await api.patch(`/config/areas/${area.id}`, { isActive: !area.isActive })
+      load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  async function createEducationLevel(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    try {
+      await api.post('/config/education-levels', { code: elCode, label: elLabel })
+      setNotice(`Education level "${elLabel}" created.`)
+      setElCode('')
+      setElLabel('')
+      load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  async function toggleEducationLevel(row: LookupRow) {
+    setError(null)
+    try {
+      await api.patch(`/config/education-levels/${row.id}`, { isActive: !row.isActive })
+      load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  async function createOccupation(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    try {
+      await api.post('/config/occupations', { code: occCode, label: occLabel })
+      setNotice(`Occupation "${occLabel}" created.`)
+      setOccCode('')
+      setOccLabel('')
+      load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  async function toggleOccupation(row: LookupRow) {
+    setError(null)
+    try {
+      await api.patch(`/config/occupations/${row.id}`, { isActive: !row.isActive })
+      load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  async function createSkill(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    try {
+      await api.post('/config/skills', { code: skillCode, label: skillLabel })
+      setNotice(`Skill "${skillLabel}" created.`)
+      setSkillCode('')
+      setSkillLabel('')
+      load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  async function toggleSkill(row: LookupRow) {
+    setError(null)
+    try {
+      await api.patch(`/config/skills/${row.id}`, { isActive: !row.isActive })
       load()
     } catch (err) {
       setError(errorMessage(err))
@@ -230,6 +324,84 @@ export default function AdminConfigPage() {
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </select>
+              </div>
+              <button className="btn btn-accent" type="submit">Add</button>
+            </form>
+          </div>
+
+          <div className="card stack">
+            <h3>Education levels</h3>
+            {educationLevels.map((row) => (
+              <div key={row.id} className="row" style={{ justifyContent: 'space-between' }}>
+                <span>{row.label} <span className="muted mono">({row.code})</span></span>
+                <div className="row" style={{ alignItems: 'center' }}>
+                  <StatusPill status={row.isActive ? 'ACTIVE' : 'INACTIVE'} />
+                  <button className="btn btn-outline" onClick={() => toggleEducationLevel(row)}>
+                    {row.isActive ? 'Deactivate' : 'Activate'}
+                  </button>
+                </div>
+              </div>
+            ))}
+            <form onSubmit={createEducationLevel} className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div className="field" style={{ flex: 1 }}>
+                <label htmlFor="el-code">Code</label>
+                <input id="el-code" value={elCode} onChange={(e) => setElCode(e.target.value)} placeholder="DOCTORATE" required />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label htmlFor="el-label">Label</label>
+                <input id="el-label" value={elLabel} onChange={(e) => setElLabel(e.target.value)} placeholder="Doctorate" required />
+              </div>
+              <button className="btn btn-accent" type="submit">Add</button>
+            </form>
+          </div>
+
+          <div className="card stack">
+            <h3>Occupations</h3>
+            {occupations.map((row) => (
+              <div key={row.id} className="row" style={{ justifyContent: 'space-between' }}>
+                <span>{row.label} <span className="muted mono">({row.code})</span></span>
+                <div className="row" style={{ alignItems: 'center' }}>
+                  <StatusPill status={row.isActive ? 'ACTIVE' : 'INACTIVE'} />
+                  <button className="btn btn-outline" onClick={() => toggleOccupation(row)}>
+                    {row.isActive ? 'Deactivate' : 'Activate'}
+                  </button>
+                </div>
+              </div>
+            ))}
+            <form onSubmit={createOccupation} className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div className="field" style={{ flex: 1 }}>
+                <label htmlFor="occ-code">Code</label>
+                <input id="occ-code" value={occCode} onChange={(e) => setOccCode(e.target.value)} placeholder="ENGINEER" required />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label htmlFor="occ-label">Label</label>
+                <input id="occ-label" value={occLabel} onChange={(e) => setOccLabel(e.target.value)} placeholder="Engineer" required />
+              </div>
+              <button className="btn btn-accent" type="submit">Add</button>
+            </form>
+          </div>
+
+          <div className="card stack">
+            <h3>Skills</h3>
+            {skills.map((row) => (
+              <div key={row.id} className="row" style={{ justifyContent: 'space-between' }}>
+                <span>{row.label} <span className="muted mono">({row.code})</span></span>
+                <div className="row" style={{ alignItems: 'center' }}>
+                  <StatusPill status={row.isActive ? 'ACTIVE' : 'INACTIVE'} />
+                  <button className="btn btn-outline" onClick={() => toggleSkill(row)}>
+                    {row.isActive ? 'Deactivate' : 'Activate'}
+                  </button>
+                </div>
+              </div>
+            ))}
+            <form onSubmit={createSkill} className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div className="field" style={{ flex: 1 }}>
+                <label htmlFor="skill-code">Code</label>
+                <input id="skill-code" value={skillCode} onChange={(e) => setSkillCode(e.target.value)} placeholder="GARDENING" required />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label htmlFor="skill-label">Label</label>
+                <input id="skill-label" value={skillLabel} onChange={(e) => setSkillLabel(e.target.value)} placeholder="Gardening" required />
               </div>
               <button className="btn btn-accent" type="submit">Add</button>
             </form>

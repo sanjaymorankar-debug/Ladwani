@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { api } from '../../../lib/api-client'
-import { errorMessage } from '../../../lib/auth-context'
+import { errorMessage, useAuth } from '../../../lib/auth-context'
 import { RequireAuth, TopBar, Shell, ErrorBanner, StatusPill } from '../../../components/ui'
 
 interface AssetDetail {
@@ -18,6 +18,15 @@ interface AssetDetail {
   averageRating: number | null
   reviewCount: number
   reviews: { id: string; overallScore: number; comment: string | null; createdAt: string }[]
+  ownerUserId: string
+  status: string
+}
+
+interface BlockedDateRow {
+  id: string
+  dateFrom: string
+  dateTo: string
+  reason: string | null
 }
 
 interface AvailabilityDay {
@@ -37,6 +46,7 @@ interface Quote {
 export default function AssetDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { user } = useAuth()
   const [asset, setAsset] = useState<AssetDetail | null>(null)
   const [availability, setAvailability] = useState<AvailabilityDay[]>([])
   const [date, setDate] = useState('')
@@ -47,10 +57,47 @@ export default function AssetDetailPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  const [blockedDates, setBlockedDates] = useState<BlockedDateRow[]>([])
+  const [blockFrom, setBlockFrom] = useState('')
+  const [blockTo, setBlockTo] = useState('')
+  const [blockReason, setBlockReason] = useState('')
+
+  function loadBlockedDates() {
+    api.get<BlockedDateRow[]>(`/assets/${id}/blocked-dates`).then(setBlockedDates).catch(() => undefined)
+  }
+
   useEffect(() => {
     api.get<AssetDetail>(`/assets/${id}`).then(setAsset).catch((err) => setError(errorMessage(err)))
     api.get<AvailabilityDay[]>(`/assets/${id}/availability`).then(setAvailability).catch(() => undefined)
+    loadBlockedDates()
   }, [id])
+
+  const isOwner = !!asset && !!user && asset.ownerUserId === user.id
+
+  async function addBlockedDates(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    try {
+      await api.post(`/assets/${id}/blocked-dates`, { dateFrom: blockFrom, dateTo: blockTo, reason: blockReason || undefined })
+      setNotice('Dates blocked.')
+      setBlockFrom('')
+      setBlockTo('')
+      setBlockReason('')
+      loadBlockedDates()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  async function removeBlockedDates(blockedDateId: string) {
+    setError(null)
+    try {
+      await api.delete(`/assets/${id}/blocked-dates/${blockedDateId}`)
+      loadBlockedDates()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
 
   async function getQuote() {
     if (!date) return
@@ -105,7 +152,10 @@ export default function AssetDetailPage() {
 
         {asset && (
           <>
-            <h1>{asset.name}</h1>
+            <div className="row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+              <h1 style={{ margin: 0 }}>{asset.name}</h1>
+              {asset.status === 'ACTIVE' && <span className="pill pill-success">✓ Verified Community Asset</span>}
+            </div>
             <p className="muted">
               {asset.category.label} {asset.city && `· ${asset.city}`} {asset.capacity && `· up to ${asset.capacity} guests`}
               {asset.averageRating != null && ` · ★ ${asset.averageRating.toFixed(1)} (${asset.reviewCount})`}
@@ -194,6 +244,45 @@ export default function AssetDetailPage() {
                 {submitting ? 'Booking…' : 'Book Now'}
               </button>
             </div>
+
+            {isOwner && (
+              <div className="card stack" style={{ marginBottom: 20 }}>
+                <h3>Manage blocked dates</h3>
+                <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+                  Dates you block here are refused at booking time and shown as unavailable in search, in addition to whatever is already reserved.
+                </p>
+                {blockedDates.length > 0 && (
+                  <div className="stack">
+                    {blockedDates.map((b) => (
+                      <div key={b.id} className="row" style={{ justifyContent: 'space-between' }}>
+                        <span>
+                          {new Date(b.dateFrom).toLocaleDateString()} – {new Date(b.dateTo).toLocaleDateString()}
+                          {b.reason && <span className="muted"> · {b.reason}</span>}
+                        </span>
+                        <button className="btn btn-outline" onClick={() => removeBlockedDates(b.id)}>
+                          Unblock
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <form onSubmit={addBlockedDates} className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <div className="field">
+                    <label htmlFor="blockFrom">From</label>
+                    <input id="blockFrom" type="date" value={blockFrom} onChange={(e) => setBlockFrom(e.target.value)} required />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="blockTo">To</label>
+                    <input id="blockTo" type="date" value={blockTo} onChange={(e) => setBlockTo(e.target.value)} required />
+                  </div>
+                  <div className="field" style={{ flex: 1 }}>
+                    <label htmlFor="blockReason">Reason (optional)</label>
+                    <input id="blockReason" value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Personal use, maintenance…" />
+                  </div>
+                  <button className="btn btn-accent" type="submit">Block dates</button>
+                </form>
+              </div>
+            )}
 
             <h3>Reviews {asset.reviewCount > 0 && `(${asset.reviewCount})`}</h3>
             <div className="stack">

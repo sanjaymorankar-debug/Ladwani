@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/c
 import { MembersService } from './members.service'
 import { ChangeMaritalStatusDto } from './dto/change-marital-status.dto'
 import { MarkDeceasedDto } from './dto/mark-deceased.dto'
+import { UpdateOwnProfileDto } from './dto/update-own-profile.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { PermissionsGuard } from '../common/guards/permissions.guard'
 import { Permissions } from '../common/decorators/permissions.decorator'
@@ -19,9 +20,63 @@ export class MembersController {
   ) {}
 
   @Get('search')
-  async search(@Query('q') q: string, @CurrentUser() user: JwtPayload) {
+  async search(
+    @Query('q') q: string,
+    @Query('familyQuery') familyQuery: string,
+    @Query('memberId') memberId: string,
+    @Query('areaId') areaId: string,
+    @Query('city') city: string,
+    @Query('state') state: string,
+    @Query('nativeVillage') nativeVillage: string,
+    @Query('educationLevelId') educationLevelId: string,
+    @Query('occupationId') occupationId: string,
+    @Query('skillId') skillId: string,
+    @Query('maritalStatus') maritalStatus: string,
+    @Query('gender') gender: string,
+    @Query('minAge') minAge: string,
+    @Query('maxAge') maxAge: string,
+    @Query('matrimonyAvailable') matrimonyAvailable: string,
+    @Query('page') page: string,
+    @Query('pageSize') pageSize: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
     const viewer = await this.viewerContext.build(user.sub)
-    return { data: await this.members.search(q, viewer) }
+    const result = await this.members.search(
+      {
+        q,
+        familyQuery,
+        memberId,
+        areaId,
+        city,
+        state,
+        nativeVillage,
+        educationLevelId,
+        occupationId,
+        skillId,
+        maritalStatus,
+        gender,
+        minAge: minAge ? Number(minAge) : undefined,
+        maxAge: maxAge ? Number(maxAge) : undefined,
+        matrimonyAvailable: matrimonyAvailable === 'true',
+        page: page ? Number(page) : undefined,
+        pageSize: pageSize ? Number(pageSize) : undefined,
+      },
+      viewer,
+    )
+    return { data: result.data, total: result.total }
+  }
+
+  @Get('me')
+  async getOwnProfile(@CurrentUser() user: JwtPayload) {
+    return { data: await this.members.getOwnProfile(user.sub) }
+  }
+
+  @Patch('me')
+  @UseGuards(PermissionsGuard)
+  @Permissions('profile:edit:own')
+  @Audited('member.profile.update_own')
+  async updateOwnProfile(@CurrentUser() user: JwtPayload, @Body() dto: UpdateOwnProfileDto) {
+    return { data: await this.members.updateOwnProfile(user.sub, dto) }
   }
 
   @Get(':id')

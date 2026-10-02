@@ -101,3 +101,6 @@ export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number]
 
 export const UPLOADED_FILE_STATUSES = ['PENDING', 'ACTIVE', 'REJECTED'] as const
 export type UploadedFileStatus = (typeof UPLOADED_FILE_STATUSES)[number]
+
+export const INCOME_RANGES = ['BELOW_2L', 'L2_5L', 'L5_10L', 'L10_25L', 'ABOVE_25L', 'NOT_DISCLOSED'] as const
+export type IncomeRange = (typeof INCOME_RANGES)[number]

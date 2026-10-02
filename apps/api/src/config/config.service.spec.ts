@@ -10,6 +10,9 @@ describe('ConfigService', () => {
     assetCategory: { findMany: jest.Mock; create: jest.Mock; findUnique: jest.Mock; update: jest.Mock }
     area: { findMany: jest.Mock; create: jest.Mock; findUnique: jest.Mock; update: jest.Mock }
     community: { findFirst: jest.Mock }
+    educationLevel: { findMany: jest.Mock; create: jest.Mock; findUnique: jest.Mock; update: jest.Mock }
+    occupation: { findMany: jest.Mock; create: jest.Mock; findUnique: jest.Mock; update: jest.Mock }
+    skill: { findMany: jest.Mock; create: jest.Mock; findUnique: jest.Mock; update: jest.Mock }
   }
 
   beforeEach(async () => {
@@ -18,6 +21,9 @@ describe('ConfigService', () => {
       assetCategory: { findMany: jest.fn(), create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       area: { findMany: jest.fn(), create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       community: { findFirst: jest.fn() },
+      educationLevel: { findMany: jest.fn(), create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+      occupation: { findMany: jest.fn(), create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+      skill: { findMany: jest.fn(), create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     }
     const moduleRef = await Test.createTestingModule({
       providers: [ConfigService, { provide: PrismaService, useValue: prisma }],
@@ -76,6 +82,45 @@ describe('ConfigService', () => {
     it('refuses to update an area that does not exist', async () => {
       prisma.area.findUnique.mockResolvedValue(null)
       await expect(service.updateArea('missing', { name: 'x' })).rejects.toBeInstanceOf(NotFoundException)
+    })
+  })
+
+  describe('education levels', () => {
+    it('creates a new education level', async () => {
+      prisma.educationLevel.create.mockResolvedValue({ id: 'el-1', code: 'PHD', label: 'Doctorate' })
+      await service.createEducationLevel({ code: 'PHD', label: 'Doctorate' })
+      expect(prisma.educationLevel.create).toHaveBeenCalled()
+    })
+
+    it('refuses to update an education level that does not exist', async () => {
+      prisma.educationLevel.findUnique.mockResolvedValue(null)
+      await expect(service.updateEducationLevel('missing', { label: 'x' })).rejects.toBeInstanceOf(NotFoundException)
+    })
+  })
+
+  describe('occupations', () => {
+    it('creates a new occupation', async () => {
+      prisma.occupation.create.mockResolvedValue({ id: 'occ-1', code: 'ENGINEER', label: 'Engineer' })
+      await service.createOccupation({ code: 'ENGINEER', label: 'Engineer' })
+      expect(prisma.occupation.create).toHaveBeenCalled()
+    })
+
+    it('refuses to update an occupation that does not exist', async () => {
+      prisma.occupation.findUnique.mockResolvedValue(null)
+      await expect(service.updateOccupation('missing', { label: 'x' })).rejects.toBeInstanceOf(NotFoundException)
+    })
+  })
+
+  describe('skills', () => {
+    it('creates a new skill', async () => {
+      prisma.skill.create.mockResolvedValue({ id: 'sk-1', code: 'COOKING', label: 'Cooking' })
+      await service.createSkill({ code: 'COOKING', label: 'Cooking' })
+      expect(prisma.skill.create).toHaveBeenCalled()
+    })
+
+    it('refuses to update a skill that does not exist', async () => {
+      prisma.skill.findUnique.mockResolvedValue(null)
+      await expect(service.updateSkill('missing', { label: 'x' })).rejects.toBeInstanceOf(NotFoundException)
     })
   })
 })

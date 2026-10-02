@@ -28,4 +28,16 @@ export class UpsertMatrimonyProfileDto {
   @IsOptional()
   @IsBoolean()
   consentGranted?: boolean
+
+  @IsOptional()
+  @IsString()
+  educationLevelId?: string
+
+  @IsOptional()
+  @IsString()
+  occupationId?: string
+
+  @IsOptional()
+  @IsString()
+  familyBackground?: string
 }

@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import type { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationsService } from '../notifications/notifications.service'
+import { UploadsService } from '../uploads/uploads.service'
 import { canViewMatrimonyProfile } from './matrimony-visibility'
 import { UpsertMatrimonyProfileDto } from './dto/upsert-profile.dto'
 import { UpsertMatrimonyPreferencesDto } from './dto/upsert-preferences.dto'
@@ -11,13 +13,25 @@ export interface MatrimonySearchFilters {
   maxAge?: number
   gender?: string
   city?: string
+  nativeVillage?: string
+  educationLevelId?: string
+  occupationId?: string
+  incomeRange?: string
+  maritalStatus?: string
+  skillId?: string
+  subgroup?: string
+  page?: number
+  pageSize?: number
 }
+
+const MAX_PAGE_SIZE = 50
 
 @Injectable()
 export class MatrimonyService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private uploads: UploadsService,
   ) {}
 
   async upsertProfile(userId: string, dto: UpsertMatrimonyProfileDto) {
@@ -43,6 +57,9 @@ export class MatrimonyService {
       languages: dto.languages as never,
       allowContactRequests: dto.allowContactRequests ?? true,
       isVisible: dto.isVisible ?? false,
+      educationLevelId: dto.educationLevelId,
+      occupationId: dto.occupationId,
+      familyBackground: dto.familyBackground,
     }
 
     return this.prisma.matrimonyProfile.upsert({
@@ -69,36 +86,57 @@ export class MatrimonyService {
   }
 
   async search(viewerUserId: string, filters: MatrimonySearchFilters) {
-    const candidates = await this.prisma.matrimonyProfile.findMany({
-      where: {
-        isVisible: true,
-        member: {
-          deletedAt: null,
-          gender: filters.gender || undefined,
-          currentCity: filters.city ? { contains: filters.city } : undefined,
-          dateOfBirth: this.ageRangeToDobFilter(filters.minAge, filters.maxAge),
-        },
+    const pageSize = Math.min(filters.pageSize ?? 20, MAX_PAGE_SIZE)
+    const page = Math.max(filters.page ?? 1, 1)
+
+    const where: Prisma.MatrimonyProfileWhereInput = {
+      isVisible: true,
+      educationLevelId: filters.educationLevelId || undefined,
+      occupationId: filters.occupationId || undefined,
+      member: {
+        deletedAt: null,
+        gender: filters.gender || undefined,
+        maritalStatus: filters.maritalStatus || undefined,
+        incomeRange: filters.incomeRange || undefined,
+        currentCity: filters.city ? { contains: filters.city } : undefined,
+        nativeVillage: filters.nativeVillage ? { contains: filters.nativeVillage } : undefined,
+        dateOfBirth: this.ageRangeToDobFilter(filters.minAge, filters.maxAge),
+        skills: filters.skillId ? { some: { skillId: filters.skillId } } : undefined,
+        families: filters.subgroup ? { some: { leftAt: null, family: { gotra: { contains: filters.subgroup } } } } : undefined,
       },
-      include: { member: true },
-      take: 30,
-    })
+    }
+
+    const [candidates, total] = await Promise.all([
+      this.prisma.matrimonyProfile.findMany({
+        where,
+        include: { member: true, educationLevel: true, occupation: true },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.matrimonyProfile.count({ where }),
+    ])
 
     const viewer = { isAuthenticated: true, userId: viewerUserId }
-    return candidates
-      .filter((p) => canViewMatrimonyProfile(viewer, { userId: p.member.userId, isVisible: p.isVisible }))
-      .map((p) => ({
+    const visible = candidates.filter((p) => canViewMatrimonyProfile(viewer, { userId: p.member.userId, isVisible: p.isVisible }))
+    const data = await Promise.all(
+      visible.map(async (p) => ({
         memberId: p.memberId,
         firstName: p.member.firstName,
         gender: p.member.gender,
         age: this.ageFromDob(p.member.dateOfBirth),
         currentCity: p.member.currentCity,
-      }))
+        education: p.educationLevel?.label ?? null,
+        occupation: p.occupation?.label ?? null,
+        photoUrl: await this.uploads.getSignedUrlForAuthorizedViewer(p.member.profilePhotoId),
+      })),
+    )
+    return { data, total }
   }
 
   async getDetail(viewerUserId: string, targetMemberId: string) {
     const profile = await this.prisma.matrimonyProfile.findUnique({
       where: { memberId: targetMemberId },
-      include: { member: true, preference: true },
+      include: { member: true, preference: true, educationLevel: true, occupation: true },
     })
     if (!profile) throw new NotFoundException('Matrimonial profile not found.')
 
@@ -120,6 +158,8 @@ export class MatrimonyService {
       }
     }
 
+    const photoUrl = await this.uploads.getSignedUrlForAuthorizedViewer(profile.member.profilePhotoId)
+
     return {
       memberId: profile.memberId,
       firstName: profile.member.firstName,
@@ -127,10 +167,15 @@ export class MatrimonyService {
       gender: profile.member.gender,
       age: this.ageFromDob(profile.member.dateOfBirth),
       currentCity: profile.member.currentCity,
+      nativeVillage: profile.member.nativeVillage,
+      photoUrl,
       about: profile.about,
       heightCm: profile.heightCm,
       languages: profile.languages,
       allowContactRequests: profile.allowContactRequests,
+      education: profile.educationLevel?.label ?? null,
+      occupation: profile.occupation?.label ?? null,
+      familyBackground: profile.familyBackground,
       preference: profile.preference,
       contactRevealed: !!contact,
       contact,

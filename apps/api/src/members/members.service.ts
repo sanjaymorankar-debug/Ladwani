@@ -10,8 +10,43 @@ import { FamilyAuthorizationService } from '../common/family-authorization/famil
 import { AddNewMemberDto } from './dto/add-new-member.dto'
 import { ChangeMaritalStatusDto } from './dto/change-marital-status.dto'
 import { MarkDeceasedDto } from './dto/mark-deceased.dto'
+import { UpdateOwnProfileDto } from './dto/update-own-profile.dto'
 
 type Tx = Prisma.TransactionClient
+
+type MemberWithProfileRelations = Member & {
+  educationLevel?: { label: string } | null
+  occupation?: { label: string } | null
+  skills?: { skill: { id: string; label: string } }[]
+}
+
+const PROFILE_RELATIONS_INCLUDE = {
+  educationLevel: true,
+  occupation: true,
+  skills: { include: { skill: true } },
+} as const
+
+export interface MemberSearchFilters {
+  q?: string
+  familyQuery?: string
+  memberId?: string
+  areaId?: string
+  city?: string
+  state?: string
+  nativeVillage?: string
+  educationLevelId?: string
+  occupationId?: string
+  skillId?: string
+  maritalStatus?: string
+  gender?: string
+  minAge?: number
+  maxAge?: number
+  matrimonyAvailable?: boolean
+  page?: number
+  pageSize?: number
+}
+
+const MAX_PAGE_SIZE = 50
 
 interface FamilyMemberAddPayload {
   mode: 'NEW' | 'EXISTING'
@@ -156,20 +191,119 @@ export class MembersService {
     return { approval }
   }
 
-  async search(query: string, viewer: VisibilityViewer) {
-    if (!query || query.trim().length < 2) return []
-    const members = await this.prisma.member.findMany({
-      where: { deletedAt: null, OR: [{ firstName: { contains: query } }, { lastName: { contains: query } }] },
-      include: { families: true },
-      take: 20,
-    })
-    return members.map((m) => this.toPublicMember(m, viewer, m.families.filter((fm) => !fm.leftAt).map((fm) => fm.familyId)))
+  /**
+   * Multi-field directory search (docs/02-feature-map.md §4) — every filter is optional and
+   * AND-combined; `q` is the only free-text filter (name), everything else is an exact or
+   * range match against a real column/relation so results stay indexable at scale.
+   */
+  async search(filters: MemberSearchFilters, viewer: VisibilityViewer) {
+    const hasAnyFilter = Object.values(filters).some((v) => v !== undefined && v !== '')
+    if (!hasAnyFilter) return { data: [], total: 0 }
+
+    const pageSize = Math.min(filters.pageSize ?? 20, MAX_PAGE_SIZE)
+    const page = Math.max(filters.page ?? 1, 1)
+
+    const where: Prisma.MemberWhereInput = {
+      deletedAt: null,
+      id: filters.memberId || undefined,
+      gender: filters.gender || undefined,
+      maritalStatus: filters.maritalStatus || undefined,
+      currentCity: filters.city ? { contains: filters.city } : undefined,
+      currentState: filters.state ? { contains: filters.state } : undefined,
+      nativeVillage: filters.nativeVillage ? { contains: filters.nativeVillage } : undefined,
+      educationLevelId: filters.educationLevelId || undefined,
+      occupationId: filters.occupationId || undefined,
+      dateOfBirth: this.ageRangeToDobFilter(filters.minAge, filters.maxAge),
+      OR: filters.q ? [{ firstName: { contains: filters.q } }, { lastName: { contains: filters.q } }] : undefined,
+      families: filters.familyQuery
+        ? { some: { leftAt: null, family: { OR: [{ name: { contains: filters.familyQuery } }, { registrationNumber: { contains: filters.familyQuery } }] } } }
+        : undefined,
+      memberAreas: filters.areaId ? { some: { areaId: filters.areaId } } : undefined,
+      skills: filters.skillId ? { some: { skillId: filters.skillId } } : undefined,
+      matrimonyProfile: filters.matrimonyAvailable ? { isVisible: true } : undefined,
+    }
+
+    const [members, total] = await Promise.all([
+      this.prisma.member.findMany({
+        where,
+        include: { families: true, ...PROFILE_RELATIONS_INCLUDE },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: { firstName: 'asc' },
+      }),
+      this.prisma.member.count({ where }),
+    ])
+
+    return { data: members.map((m) => this.toPublicMember(m, viewer, m.families.filter((fm) => !fm.leftAt).map((fm) => fm.familyId))), total }
+  }
+
+  private ageRangeToDobFilter(minAge?: number, maxAge?: number) {
+    if (minAge == null && maxAge == null) return undefined
+    const now = Date.now()
+    const msPerYear = 365.25 * 24 * 60 * 60 * 1000
+    const gte = maxAge != null ? new Date(now - maxAge * msPerYear) : undefined
+    const lte = minAge != null ? new Date(now - minAge * msPerYear) : undefined
+    return { gte, lte }
   }
 
   async getById(memberId: string, viewer: VisibilityViewer) {
-    const member = await this.prisma.member.findUnique({ where: { id: memberId }, include: { families: true } })
+    const member = await this.prisma.member.findUnique({ where: { id: memberId }, include: { families: true, ...PROFILE_RELATIONS_INCLUDE } })
     if (!member || member.deletedAt) throw new NotFoundException('Member not found')
     return this.toPublicMember(member, viewer, member.families.filter((fm) => !fm.leftAt).map((fm) => fm.familyId))
+  }
+
+  /**
+   * Unfiltered — the privacy engine exists to protect a record from OTHER viewers, and this is
+   * always the owner looking at their own data (resolved from their userId, never a client-
+   * supplied id), so there is nothing to filter. This is also the shape the edit form needs:
+   * raw educationLevelId/occupationId/skill ids, not the resolved labels toPublicMember returns.
+   */
+  async getOwnProfile(userId: string) {
+    const member = await this.prisma.member.findUnique({ where: { userId }, include: PROFILE_RELATIONS_INCLUDE })
+    if (!member) throw new NotFoundException('Complete registration before editing your profile.')
+    return this.toOwnProfileView(member)
+  }
+
+  /**
+   * Self-service only — resolves the caller's own member record from their userId, so there is
+   * no :id param to target someone else's profile through this route at all. An Admin editing
+   * someone else's profile (`profile:edit:any`) is a separate, not-yet-built capability.
+   */
+  async updateOwnProfile(userId: string, dto: UpdateOwnProfileDto) {
+    const member = await this.prisma.member.findUnique({ where: { userId } })
+    if (!member) throw new NotFoundException('Complete registration before editing your profile.')
+
+    const { skillIds, ...fields } = dto
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.member.update({ where: { id: member.id }, data: fields })
+
+      if (skillIds) {
+        await tx.memberSkill.deleteMany({ where: { memberId: member.id } })
+        if (skillIds.length > 0) {
+          await tx.memberSkill.createMany({ data: skillIds.map((skillId) => ({ memberId: member.id, skillId })), skipDuplicates: true })
+        }
+      }
+
+      const full = await tx.member.findUniqueOrThrow({ where: { id: member.id }, include: PROFILE_RELATIONS_INCLUDE })
+      return this.toOwnProfileView(full)
+    })
+  }
+
+  private toOwnProfileView(member: MemberWithProfileRelations) {
+    return {
+      currentCity: member.currentCity,
+      currentState: member.currentState,
+      nativeVillage: member.nativeVillage,
+      nativeDistrict: member.nativeDistrict,
+      nativeState: member.nativeState,
+      educationLevelId: member.educationLevelId,
+      occupationId: member.occupationId,
+      employerOrBusiness: member.employerOrBusiness,
+      incomeRange: member.incomeRange,
+      bio: member.bio,
+      skills: member.skills?.map((ms) => ({ id: ms.skill.id, label: ms.skill.label })) ?? [],
+    }
   }
 
   // ── Approval appliers, invoked by ApprovalDispatchService once an Operator decides ──
@@ -290,10 +424,22 @@ export class MembersService {
     throw new ForbiddenException(message)
   }
 
-  private toPublicMember(member: Member, viewer: VisibilityViewer, familyIds: string[]) {
+  private toPublicMember(member: MemberWithProfileRelations, viewer: VisibilityViewer, familyIds: string[]) {
     const owner: VisibilityOwner = { userId: member.userId, familyIds }
     const sensitive = filterFields(
-      { dateOfBirth: member.dateOfBirth, maritalStatus: member.maritalStatus, currentCity: member.currentCity, currentState: member.currentState },
+      {
+        dateOfBirth: member.dateOfBirth,
+        maritalStatus: member.maritalStatus,
+        currentCity: member.currentCity,
+        currentState: member.currentState,
+        nativeVillage: member.nativeVillage,
+        incomeRange: member.incomeRange,
+        education: member.educationLevel?.label ?? null,
+        occupation: member.occupation?.label ?? null,
+        bio: member.bio,
+        employerOrBusiness: member.employerOrBusiness,
+        skills: member.skills?.map((ms) => ({ id: ms.skill.id, label: ms.skill.label })) ?? [],
+      },
       DEFAULT_FIELD_VISIBILITY,
       viewer,
       owner,

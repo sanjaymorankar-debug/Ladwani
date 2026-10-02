@@ -7,8 +7,29 @@ import { AddPhotoDto } from './dto/add-photo.dto'
 import { AddFacilityDto } from './dto/add-facility.dto'
 import { AddPricingDto } from './dto/add-pricing.dto'
 import { AddServiceDto } from './dto/add-service.dto'
+import { BlockDatesDto } from './dto/block-dates.dto'
 
 type Tx = Prisma.TransactionClient
+
+export interface AssetSearchFilters {
+  categoryCode?: string
+  city?: string
+  areaId?: string
+  minCapacity?: number
+  minPrice?: number
+  maxPrice?: number
+  facilityCodes?: string[]
+  minRating?: number
+  date?: Date
+  slot?: string
+  status?: string
+  page?: number
+  pageSize?: number
+}
+
+const MAX_PAGE_SIZE = 50
+/** Only consulted when a rating filter is active — see the comment in search() for why. */
+const RATING_FILTER_CANDIDATE_CAP = 200
 
 export interface PriceQuote {
   basePrice: number
@@ -128,18 +149,55 @@ export class AssetsService {
     })
   }
 
-  async search(filters: { categoryCode?: string; city?: string; minCapacity?: number }) {
-    return this.prisma.asset.findMany({
-      where: {
-        deletedAt: null,
-        status: 'ACTIVE',
-        category: filters.categoryCode ? { code: filters.categoryCode } : undefined,
-        city: filters.city ? { contains: filters.city } : undefined,
-        capacity: filters.minCapacity ? { gte: filters.minCapacity } : undefined,
-      },
-      include: { category: true, photos: { orderBy: { sortOrder: 'asc' }, take: 1 }, pricing: { where: { priceType: 'BASE' } } },
-      take: 30,
-    })
+  /**
+   * Search by category/city/area/capacity/price/facilities/date-availability/rating/status
+   * (docs/02-feature-map.md §8-9). Rating has no denormalized column to filter on at the DB
+   * layer, so when minRating is set this fetches a capped candidate set, computes real
+   * aggregates for just those ids in one groupBy, filters/sorts in memory, then paginates —
+   * trading perfect pagination-under-rating-filter for not needing a write-path change
+   * every time a review is created.
+   */
+  async search(filters: AssetSearchFilters) {
+    const pageSize = Math.min(filters.pageSize ?? 20, MAX_PAGE_SIZE)
+    const page = Math.max(filters.page ?? 1, 1)
+
+    const where: Prisma.AssetWhereInput = {
+      deletedAt: null,
+      status: filters.status || 'ACTIVE',
+      category: filters.categoryCode ? { code: filters.categoryCode } : undefined,
+      city: filters.city ? { contains: filters.city } : undefined,
+      areaId: filters.areaId || undefined,
+      capacity: filters.minCapacity ? { gte: filters.minCapacity } : undefined,
+      pricing: filters.minPrice != null || filters.maxPrice != null
+        ? { some: { priceType: 'BASE', amount: { gte: filters.minPrice ?? undefined, lte: filters.maxPrice ?? undefined } } }
+        : undefined,
+      AND: filters.facilityCodes?.map((code) => ({ facilities: { some: { facilityCode: code } } })),
+      availability: filters.date
+        ? { none: { date: filters.date, slot: filters.slot ?? 'FULL_DAY', status: { in: ['RESERVED', 'PENDING'] } } }
+        : undefined,
+      blockedDates: filters.date ? { none: { dateFrom: { lte: filters.date }, dateTo: { gte: filters.date } } } : undefined,
+    }
+
+    const include = { category: true, photos: { orderBy: { sortOrder: 'asc' as const }, take: 1 }, pricing: { where: { priceType: 'BASE' } } }
+
+    if (filters.minRating == null) {
+      const [data, total] = await Promise.all([
+        this.prisma.asset.findMany({ where, include, skip: (page - 1) * pageSize, take: pageSize }),
+        this.prisma.asset.count({ where }),
+      ])
+      return { data, total }
+    }
+
+    const candidates = await this.prisma.asset.findMany({ where, include, take: RATING_FILTER_CANDIDATE_CAP })
+    const ratings = await this.prisma.review.groupBy({ by: ['assetId'], where: { assetId: { in: candidates.map((a) => a.id) } }, _avg: { overallScore: true } })
+    const ratingByAssetId = new Map(ratings.map((r) => [r.assetId, r._avg.overallScore ?? 0]))
+
+    const withRating = candidates
+      .map((asset) => ({ ...asset, averageRating: ratingByAssetId.get(asset.id) ?? 0 }))
+      .filter((asset) => asset.averageRating >= filters.minRating!)
+      .sort((a, b) => b.averageRating - a.averageRating)
+
+    return { data: withRating.slice((page - 1) * pageSize, page * pageSize), total: withRating.length }
   }
 
   async getDetail(assetId: string) {
@@ -152,26 +210,31 @@ export class AssetsService {
         pricing: true,
         services: { include: { pricing: true } },
         reviews: { orderBy: { createdAt: 'desc' }, take: 10, include: { reviewer: { select: { id: true } } } },
+        assetOwner: { select: { userId: true } },
       },
     })
     if (!asset || asset.deletedAt) throw new NotFoundException('Asset not found.')
 
     const ratingAgg = await this.prisma.review.aggregate({ where: { assetId }, _avg: { overallScore: true }, _count: true })
+    const { assetOwner, ...rest } = asset
 
-    return { ...asset, averageRating: ratingAgg._avg.overallScore, reviewCount: ratingAgg._count }
+    return { ...rest, ownerUserId: assetOwner.userId, averageRating: ratingAgg._avg.overallScore, reviewCount: ratingAgg._count }
   }
 
   /** Missing rows are treated as AVAILABLE — rows only get materialized once something acts on that date/slot (a booking, a block). */
   async getAvailability(assetId: string, dateFrom: Date, dateTo: Date) {
-    const rows = await this.prisma.assetAvailability.findMany({
-      where: { assetId, date: { gte: dateFrom, lte: dateTo } },
-    })
+    const [rows, blocks] = await Promise.all([
+      this.prisma.assetAvailability.findMany({ where: { assetId, date: { gte: dateFrom, lte: dateTo } } }),
+      this.prisma.assetBlockedDate.findMany({ where: { assetId, dateFrom: { lte: dateTo }, dateTo: { gte: dateFrom } } }),
+    ])
     const byDate = new Map(rows.map((r) => [`${r.date.toISOString().slice(0, 10)}:${r.slot}`, r.status]))
+    const isBlocked = (d: Date) => blocks.some((b) => d >= b.dateFrom && d <= b.dateTo)
 
     const days: { date: string; slot: string; status: string }[] = []
     for (let d = new Date(dateFrom); d <= dateTo; d.setDate(d.getDate() + 1)) {
       const key = d.toISOString().slice(0, 10)
-      days.push({ date: key, slot: 'FULL_DAY', status: byDate.get(`${key}:FULL_DAY`) ?? 'AVAILABLE' })
+      const status = isBlocked(d) ? 'BLOCKED' : (byDate.get(`${key}:FULL_DAY`) ?? 'AVAILABLE')
+      days.push({ date: key, slot: 'FULL_DAY', status })
     }
     return days
   }
@@ -201,6 +264,26 @@ export class AssetsService {
     const total = Math.round((subtotal - discount + tax) * 100) / 100
 
     return { basePrice, priceTypeUsed: resolved.priceType, serviceLines, subtotal, discount, tax, total }
+  }
+
+  async blockDates(ownerUserId: string, assetId: string, dto: BlockDatesDto) {
+    await this.assertOwnsAsset(ownerUserId, assetId)
+    if (dto.dateTo < dto.dateFrom) throw new BadRequestException('dateTo must be on or after dateFrom.')
+    return this.prisma.assetBlockedDate.create({
+      data: { assetId, dateFrom: dto.dateFrom, dateTo: dto.dateTo, reason: dto.reason },
+    })
+  }
+
+  async listBlockedDates(assetId: string) {
+    return this.prisma.assetBlockedDate.findMany({ where: { assetId }, orderBy: { dateFrom: 'asc' } })
+  }
+
+  async unblockDates(ownerUserId: string, assetId: string, blockedDateId: string) {
+    await this.assertOwnsAsset(ownerUserId, assetId)
+    const row = await this.prisma.assetBlockedDate.findUnique({ where: { id: blockedDateId } })
+    if (!row || row.assetId !== assetId) throw new NotFoundException('Blocked date range not found.')
+    await this.prisma.assetBlockedDate.delete({ where: { id: blockedDateId } })
+    return { removed: true }
   }
 
   async assertOwnsAsset(userId: string, assetId: string): Promise<void> {

@@ -97,6 +97,21 @@ export class UploadsService {
     return { url }
   }
 
+  /**
+   * For a feature that already ran its own visibility check (e.g. matrimony's
+   * canViewMatrimonyProfile) and just needs the URL for a file it knows the id
+   * of — never exposed directly as a controller route, only called from another
+   * service after that service has decided the viewer is allowed to see this
+   * specific file. Returns null rather than throwing so callers can degrade
+   * gracefully (e.g. omit the photo) instead of failing the whole response.
+   */
+  async getSignedUrlForAuthorizedViewer(fileId: string | null | undefined): Promise<string | null> {
+    if (!fileId) return null
+    const record = await this.prisma.uploadedFile.findUnique({ where: { id: fileId } })
+    if (!record || record.status !== 'ACTIVE') return null
+    return this.storage.getDownloadUrl(record.storageKey, 300)
+  }
+
   private async reject(id: string, reason: string): Promise<{ status: string; reason: string }> {
     await this.prisma.uploadedFile.update({ where: { id }, data: { status: 'REJECTED', rejectionReason: reason } })
     return { status: 'REJECTED', reason }

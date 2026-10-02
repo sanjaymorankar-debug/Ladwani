@@ -6,6 +6,12 @@ import { CreateAssetCategoryDto } from './dto/create-asset-category.dto'
 import { UpdateAssetCategoryDto } from './dto/update-asset-category.dto'
 import { CreateAreaDto } from './dto/create-area.dto'
 import { UpdateAreaDto } from './dto/update-area.dto'
+import { CreateEducationLevelDto } from './dto/create-education-level.dto'
+import { UpdateEducationLevelDto } from './dto/update-education-level.dto'
+import { CreateOccupationDto } from './dto/create-occupation.dto'
+import { UpdateOccupationDto } from './dto/update-occupation.dto'
+import { CreateSkillDto } from './dto/create-skill.dto'
+import { UpdateSkillDto } from './dto/update-skill.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { PermissionsGuard } from '../common/guards/permissions.guard'
 import { Permissions } from '../common/decorators/permissions.decorator'
@@ -77,5 +83,68 @@ export class ConfigController {
   @Audited('config.area.update')
   async updateArea(@Param('id') id: string, @Body() dto: UpdateAreaDto) {
     return { data: await this.config.updateArea(id, dto) }
+  }
+
+  @Get('education-levels')
+  async listEducationLevels() {
+    return { data: await this.config.listEducationLevels() }
+  }
+
+  @Post('education-levels')
+  @UseGuards(PermissionsGuard)
+  @Permissions('config:manage')
+  @Audited('config.education_level.create')
+  async createEducationLevel(@Body() dto: CreateEducationLevelDto) {
+    return { data: await this.config.createEducationLevel(dto) }
+  }
+
+  @Patch('education-levels/:id')
+  @UseGuards(PermissionsGuard)
+  @Permissions('config:manage')
+  @Audited('config.education_level.update')
+  async updateEducationLevel(@Param('id') id: string, @Body() dto: UpdateEducationLevelDto) {
+    return { data: await this.config.updateEducationLevel(id, dto) }
+  }
+
+  @Get('occupations')
+  async listOccupations() {
+    return { data: await this.config.listOccupations() }
+  }
+
+  @Post('occupations')
+  @UseGuards(PermissionsGuard)
+  @Permissions('config:manage')
+  @Audited('config.occupation.create')
+  async createOccupation(@Body() dto: CreateOccupationDto) {
+    return { data: await this.config.createOccupation(dto) }
+  }
+
+  @Patch('occupations/:id')
+  @UseGuards(PermissionsGuard)
+  @Permissions('config:manage')
+  @Audited('config.occupation.update')
+  async updateOccupation(@Param('id') id: string, @Body() dto: UpdateOccupationDto) {
+    return { data: await this.config.updateOccupation(id, dto) }
+  }
+
+  @Get('skills')
+  async listSkills() {
+    return { data: await this.config.listSkills() }
+  }
+
+  @Post('skills')
+  @UseGuards(PermissionsGuard)
+  @Permissions('config:manage')
+  @Audited('config.skill.create')
+  async createSkill(@Body() dto: CreateSkillDto) {
+    return { data: await this.config.createSkill(dto) }
+  }
+
+  @Patch('skills/:id')
+  @UseGuards(PermissionsGuard)
+  @Permissions('config:manage')
+  @Audited('config.skill.update')
+  async updateSkill(@Param('id') id: string, @Body() dto: UpdateSkillDto) {
+    return { data: await this.config.updateSkill(id, dto) }
   }
 }

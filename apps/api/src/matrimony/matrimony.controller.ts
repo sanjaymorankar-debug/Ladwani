@@ -41,15 +41,32 @@ export class MatrimonyController {
     @Query('maxAge') maxAge?: string,
     @Query('gender') gender?: string,
     @Query('city') city?: string,
+    @Query('nativeVillage') nativeVillage?: string,
+    @Query('educationLevelId') educationLevelId?: string,
+    @Query('occupationId') occupationId?: string,
+    @Query('incomeRange') incomeRange?: string,
+    @Query('maritalStatus') maritalStatus?: string,
+    @Query('skillId') skillId?: string,
+    @Query('subgroup') subgroup?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
-    return {
-      data: await this.matrimony.search(user.sub, {
-        minAge: minAge ? Number(minAge) : undefined,
-        maxAge: maxAge ? Number(maxAge) : undefined,
-        gender,
-        city,
-      }),
-    }
+    const result = await this.matrimony.search(user.sub, {
+      minAge: minAge ? Number(minAge) : undefined,
+      maxAge: maxAge ? Number(maxAge) : undefined,
+      gender,
+      city,
+      nativeVillage,
+      educationLevelId,
+      occupationId,
+      incomeRange,
+      maritalStatus,
+      skillId,
+      subgroup,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    })
+    return { data: result.data, total: result.total }
   }
 
   @Get('profiles/:memberId')

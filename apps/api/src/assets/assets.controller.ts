@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
 import { AssetsService } from './assets.service'
 import { RegisterAssetDto } from './dto/register-asset.dto'
 import { AddPhotoDto } from './dto/add-photo.dto'
 import { AddFacilityDto } from './dto/add-facility.dto'
 import { AddPricingDto } from './dto/add-pricing.dto'
 import { AddServiceDto } from './dto/add-service.dto'
+import { BlockDatesDto } from './dto/block-dates.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { PermissionsGuard } from '../common/guards/permissions.guard'
 import { Permissions } from '../common/decorators/permissions.decorator'
@@ -26,8 +27,35 @@ export class AssetsController {
   }
 
   @Get('search')
-  async search(@Query('categoryCode') categoryCode?: string, @Query('city') city?: string, @Query('minCapacity') minCapacity?: string) {
-    return { data: await this.assets.search({ categoryCode, city, minCapacity: minCapacity ? Number(minCapacity) : undefined }) }
+  async search(
+    @Query('categoryCode') categoryCode?: string,
+    @Query('city') city?: string,
+    @Query('areaId') areaId?: string,
+    @Query('minCapacity') minCapacity?: string,
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+    @Query('facilityCodes') facilityCodes?: string,
+    @Query('minRating') minRating?: string,
+    @Query('date') date?: string,
+    @Query('slot') slot?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    const result = await this.assets.search({
+      categoryCode,
+      city,
+      areaId,
+      minCapacity: minCapacity ? Number(minCapacity) : undefined,
+      minPrice: minPrice ? Number(minPrice) : undefined,
+      maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      facilityCodes: facilityCodes ? facilityCodes.split(',') : undefined,
+      minRating: minRating ? Number(minRating) : undefined,
+      date: date ? new Date(date) : undefined,
+      slot,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    })
+    return { data: result.data, total: result.total }
   }
 
   @Get(':id')
@@ -82,5 +110,26 @@ export class AssetsController {
   @Audited('asset.suspend.submit')
   async requestSuspend(@Param('id') id: string, @CurrentUser() user: JwtPayload, @Body('reason') reason?: string) {
     return { data: await this.assets.requestSuspend(user.sub, id, reason) }
+  }
+
+  @Get(':id/blocked-dates')
+  async listBlockedDates(@Param('id') id: string) {
+    return { data: await this.assets.listBlockedDates(id) }
+  }
+
+  @Post(':id/blocked-dates')
+  @UseGuards(PermissionsGuard)
+  @Permissions('asset:manage:own')
+  @Audited('asset.blocked_dates.create')
+  async blockDates(@Param('id') id: string, @CurrentUser() user: JwtPayload, @Body() dto: BlockDatesDto) {
+    return { data: await this.assets.blockDates(user.sub, id, dto) }
+  }
+
+  @Delete(':id/blocked-dates/:blockedDateId')
+  @UseGuards(PermissionsGuard)
+  @Permissions('asset:manage:own')
+  @Audited('asset.blocked_dates.remove')
+  async unblockDates(@Param('id') id: string, @Param('blockedDateId') blockedDateId: string, @CurrentUser() user: JwtPayload) {
+    return { data: await this.assets.unblockDates(user.sub, id, blockedDateId) }
   }
 }

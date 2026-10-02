@@ -10,21 +10,49 @@ interface MatrimonyProfile {
   heightCm: number | null
   allowContactRequests: boolean
   isVisible: boolean
+  educationLevelId: string | null
+  occupationId: string | null
+  familyBackground: string | null
+}
+
+interface LookupOption {
+  id: string
+  label: string
 }
 
 export default function MatrimonyProfilePage() {
-  const [form, setForm] = useState({ about: '', heightCm: '', allowContactRequests: true, isVisible: false })
+  const [form, setForm] = useState({
+    about: '',
+    heightCm: '',
+    allowContactRequests: true,
+    isVisible: false,
+    educationLevelId: '',
+    occupationId: '',
+    familyBackground: '',
+  })
   const [needsConsent, setNeedsConsent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [educationLevels, setEducationLevels] = useState<LookupOption[]>([])
+  const [occupations, setOccupations] = useState<LookupOption[]>([])
 
   useEffect(() => {
+    api.get<LookupOption[]>('/config/education-levels').then(setEducationLevels).catch(() => undefined)
+    api.get<LookupOption[]>('/config/occupations').then(setOccupations).catch(() => undefined)
     api
       .get<MatrimonyProfile | null>('/matrimony/profile')
       .then((p) => {
         if (p) {
-          setForm({ about: p.about ?? '', heightCm: p.heightCm ? String(p.heightCm) : '', allowContactRequests: p.allowContactRequests, isVisible: p.isVisible })
+          setForm({
+            about: p.about ?? '',
+            heightCm: p.heightCm ? String(p.heightCm) : '',
+            allowContactRequests: p.allowContactRequests,
+            isVisible: p.isVisible,
+            educationLevelId: p.educationLevelId ?? '',
+            occupationId: p.occupationId ?? '',
+            familyBackground: p.familyBackground ?? '',
+          })
         }
         setLoaded(true)
       })
@@ -41,6 +69,9 @@ export default function MatrimonyProfilePage() {
         heightCm: form.heightCm ? Number(form.heightCm) : undefined,
         allowContactRequests: form.allowContactRequests,
         isVisible: form.isVisible,
+        educationLevelId: form.educationLevelId || undefined,
+        occupationId: form.occupationId || undefined,
+        familyBackground: form.familyBackground || undefined,
         consentGranted,
       })
       setNeedsConsent(false)
@@ -72,6 +103,35 @@ export default function MatrimonyProfilePage() {
           <div className="field">
             <label htmlFor="heightCm">Height (cm)</label>
             <input id="heightCm" type="number" value={form.heightCm} onChange={(e) => setForm({ ...form, heightCm: e.target.value })} />
+          </div>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <div className="field" style={{ flex: 1, minWidth: 160 }}>
+              <label htmlFor="educationLevelId">Education</label>
+              <select id="educationLevelId" value={form.educationLevelId} onChange={(e) => setForm({ ...form, educationLevelId: e.target.value })}>
+                <option value="">Prefer not to say</option>
+                {educationLevels.map((el) => (
+                  <option key={el.id} value={el.id}>{el.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ flex: 1, minWidth: 160 }}>
+              <label htmlFor="occupationId">Occupation</label>
+              <select id="occupationId" value={form.occupationId} onChange={(e) => setForm({ ...form, occupationId: e.target.value })}>
+                <option value="">Prefer not to say</option>
+                {occupations.map((o) => (
+                  <option key={o.id} value={o.id}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="familyBackground">Family background</label>
+            <textarea
+              id="familyBackground"
+              rows={3}
+              value={form.familyBackground}
+              onChange={(e) => setForm({ ...form, familyBackground: e.target.value })}
+            />
           </div>
           <label className="row" style={{ gap: 8 }}>
             <input

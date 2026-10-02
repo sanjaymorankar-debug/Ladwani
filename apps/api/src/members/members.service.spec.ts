@@ -10,23 +10,28 @@ import { FamilyAuthorizationService } from '../common/family-authorization/famil
 describe('MembersService', () => {
   let service: MembersService
   let prisma: {
-    member: { findUnique: jest.Mock; update: jest.Mock; delete: jest.Mock; create: jest.Mock }
+    member: { findUnique: jest.Mock; update: jest.Mock; delete: jest.Mock; create: jest.Mock; findMany: jest.Mock; count: jest.Mock; findUniqueOrThrow: jest.Mock }
     familyMember: { findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock }
     userRole: { findMany: jest.Mock }
     maritalStatusHistory: { create: jest.Mock }
     marriageRecord: { create: jest.Mock }
+    memberSkill: { deleteMany: jest.Mock; createMany: jest.Mock }
+    $transaction: jest.Mock
   }
   let approvals: { submit: jest.Mock }
   let familyAuth: { isKartaOf: jest.Mock; assertIsKarta: jest.Mock }
 
   beforeEach(async () => {
     prisma = {
-      member: { findUnique: jest.fn(), update: jest.fn(), delete: jest.fn(), create: jest.fn() },
+      member: { findUnique: jest.fn(), update: jest.fn(), delete: jest.fn(), create: jest.fn(), findMany: jest.fn(), count: jest.fn(), findUniqueOrThrow: jest.fn() },
       familyMember: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       userRole: { findMany: jest.fn() },
       maritalStatusHistory: { create: jest.fn() },
       marriageRecord: { create: jest.fn() },
+      memberSkill: { deleteMany: jest.fn(), createMany: jest.fn() },
+      $transaction: jest.fn(),
     }
+    prisma.$transaction.mockImplementation((fn) => fn(prisma))
     approvals = { submit: jest.fn() }
     familyAuth = { isKartaOf: jest.fn(), assertIsKarta: jest.fn() }
 
@@ -155,6 +160,197 @@ describe('MembersService', () => {
       prisma.familyMember.findUnique.mockResolvedValue({ id: 'fm1', isKarta: true, leftAt: null })
 
       await expect(service.removeMember('fam-1', 'karta-member-id', 'karta-user')).rejects.toBeInstanceOf(ConflictException)
+    })
+  })
+
+  describe('multi-field directory search', () => {
+    const viewer = { isAuthenticated: true, userId: 'viewer-1' }
+    function member(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'm1',
+        userId: null,
+        firstName: 'Ravi',
+        lastName: 'Deshmukh',
+        gender: 'MALE',
+        status: 'ACTIVE',
+        profilePhotoId: null,
+        dateOfBirth: null,
+        maritalStatus: 'UNMARRIED',
+        currentCity: 'Pune',
+        currentState: 'MH',
+        incomeRange: null,
+        bio: null,
+        employerOrBusiness: null,
+        educationLevel: null,
+        occupation: null,
+        skills: [],
+        families: [],
+        ...overrides,
+      }
+    }
+
+    it('returns empty without hitting the database when no filter is given', async () => {
+      const result = await service.search({}, viewer)
+      expect(result).toEqual({ data: [], total: 0 })
+      expect(prisma.member.findMany).not.toHaveBeenCalled()
+    })
+
+    it('combines multiple filters into one AND-ed where clause', async () => {
+      prisma.member.findMany.mockResolvedValue([])
+      prisma.member.count.mockResolvedValue(0)
+
+      await service.search({ city: 'Pune', gender: 'MALE', maritalStatus: 'UNMARRIED', educationLevelId: 'el-1' }, viewer)
+
+      expect(prisma.member.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            deletedAt: null,
+            gender: 'MALE',
+            maritalStatus: 'UNMARRIED',
+            currentCity: { contains: 'Pune' },
+            educationLevelId: 'el-1',
+          }),
+        }),
+      )
+    })
+
+    it('paginates results and reports the true total, not just the page size', async () => {
+      prisma.member.findMany.mockResolvedValue([member()])
+      prisma.member.count.mockResolvedValue(57)
+
+      const result = await service.search({ city: 'Pune', page: 2, pageSize: 10 }, viewer)
+
+      expect(prisma.member.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 10, take: 10 }))
+      expect(result.total).toBe(57)
+      expect(result.data).toHaveLength(1)
+    })
+
+    it('caps page size even if a huge value is requested', async () => {
+      prisma.member.findMany.mockResolvedValue([])
+      prisma.member.count.mockResolvedValue(0)
+
+      await service.search({ city: 'Pune', pageSize: 10_000 }, viewer)
+
+      expect(prisma.member.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 50 }))
+    })
+
+    it('never leaks education/occupation/income to a viewer outside the registered community', async () => {
+      prisma.member.findMany.mockResolvedValue([
+        member({ incomeRange: 'L5_10L', educationLevel: { label: 'Graduate' }, occupation: { label: 'Engineer' } }),
+      ])
+      prisma.member.count.mockResolvedValue(1)
+
+      const anonymousViewer = { isAuthenticated: false }
+      const result = await service.search({ city: 'Pune' }, anonymousViewer)
+
+      expect(result.data[0]).not.toHaveProperty('incomeRange')
+      expect(result.data[0]).not.toHaveProperty('education')
+      expect(result.data[0]).not.toHaveProperty('occupation')
+    })
+
+    it('surfaces education/occupation/skills to an authenticated registered-community viewer', async () => {
+      prisma.member.findMany.mockResolvedValue([
+        member({ educationLevel: { label: 'Graduate' }, occupation: { label: 'Engineer' }, skills: [{ skill: { id: 'sk-1', label: 'Cooking' } }] }),
+      ])
+      prisma.member.count.mockResolvedValue(1)
+
+      const result = await service.search({ city: 'Pune' }, viewer)
+
+      expect(result.data[0]).toMatchObject({ education: 'Graduate', occupation: 'Engineer', skills: [{ id: 'sk-1', label: 'Cooking' }] })
+    })
+
+    it('filters to members with a visible matrimony profile when matrimonyAvailable is set', async () => {
+      prisma.member.findMany.mockResolvedValue([])
+      prisma.member.count.mockResolvedValue(0)
+
+      await service.search({ city: 'Pune', matrimonyAvailable: true }, viewer)
+
+      expect(prisma.member.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ matrimonyProfile: { isVisible: true } }) }))
+    })
+  })
+
+  describe('self-service own-profile editing', () => {
+    function findUniqueOrThrowResult(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'm1',
+        userId: 'user-1',
+        firstName: 'Ravi',
+        lastName: null,
+        gender: 'MALE',
+        status: 'ACTIVE',
+        profilePhotoId: null,
+        dateOfBirth: null,
+        maritalStatus: 'UNMARRIED',
+        currentCity: 'Pune',
+        currentState: null,
+        incomeRange: null,
+        bio: null,
+        employerOrBusiness: null,
+        educationLevel: null,
+        occupation: null,
+        skills: [],
+        families: [],
+        ...overrides,
+      }
+    }
+
+    it("resolves the caller's own member from their userId, never from a client-supplied id", async () => {
+      prisma.member.findUnique.mockResolvedValue({ id: 'm1', userId: 'user-1' })
+      prisma.member.findUniqueOrThrow.mockResolvedValue(findUniqueOrThrowResult())
+
+      await service.updateOwnProfile('user-1', { bio: 'Loves trekking' })
+
+      expect(prisma.member.findUnique).toHaveBeenCalledWith({ where: { userId: 'user-1' } })
+      expect(prisma.member.update).toHaveBeenCalledWith({ where: { id: 'm1' }, data: { bio: 'Loves trekking' } })
+    })
+
+    it('replaces the skill set rather than merging when skillIds is provided', async () => {
+      prisma.member.findUnique.mockResolvedValue({ id: 'm1', userId: 'user-1' })
+      prisma.member.findUniqueOrThrow.mockResolvedValue(findUniqueOrThrowResult())
+
+      await service.updateOwnProfile('user-1', { skillIds: ['sk-1', 'sk-2'] })
+
+      expect(prisma.memberSkill.deleteMany).toHaveBeenCalledWith({ where: { memberId: 'm1' } })
+      expect(prisma.memberSkill.createMany).toHaveBeenCalledWith({
+        data: [{ memberId: 'm1', skillId: 'sk-1' }, { memberId: 'm1', skillId: 'sk-2' }],
+        skipDuplicates: true,
+      })
+    })
+
+    it('clears all skills when skillIds is an empty array, without a pointless createMany call', async () => {
+      prisma.member.findUnique.mockResolvedValue({ id: 'm1', userId: 'user-1' })
+      prisma.member.findUniqueOrThrow.mockResolvedValue(findUniqueOrThrowResult())
+
+      await service.updateOwnProfile('user-1', { skillIds: [] })
+
+      expect(prisma.memberSkill.deleteMany).toHaveBeenCalledWith({ where: { memberId: 'm1' } })
+      expect(prisma.memberSkill.createMany).not.toHaveBeenCalled()
+    })
+
+    it('leaves skills untouched when skillIds is omitted entirely', async () => {
+      prisma.member.findUnique.mockResolvedValue({ id: 'm1', userId: 'user-1' })
+      prisma.member.findUniqueOrThrow.mockResolvedValue(findUniqueOrThrowResult())
+
+      await service.updateOwnProfile('user-1', { bio: 'Just a bio update' })
+
+      expect(prisma.memberSkill.deleteMany).not.toHaveBeenCalled()
+    })
+
+    describe('getOwnProfile — unfiltered, since it is always the owner viewing their own record', () => {
+      it('exposes raw educationLevelId/occupationId (not just labels) so the edit form can pre-select them', async () => {
+        prisma.member.findUnique.mockResolvedValue(
+          findUniqueOrThrowResult({ educationLevelId: 'el-1', occupationId: 'occ-1', skills: [{ skill: { id: 'sk-1', label: 'Cooking' } }] }),
+        )
+
+        const result = await service.getOwnProfile('user-1')
+
+        expect(result).toMatchObject({ educationLevelId: 'el-1', occupationId: 'occ-1', skills: [{ id: 'sk-1', label: 'Cooking' }] })
+      })
+
+      it('throws when the caller has no member record yet', async () => {
+        prisma.member.findUnique.mockResolvedValue(null)
+        await expect(service.getOwnProfile('user-without-member')).rejects.toThrow()
+      })
     })
   })
 })

@@ -17,6 +17,7 @@ export const DEFAULT_FIELD_VISIBILITY: Record<string, VisibilityLevel> = {
   currentAddressLine: 'PRIVATE',
   currentCity: 'REGISTERED_COMMUNITY',
   currentState: 'REGISTERED_COMMUNITY',
+  nativeVillage: 'REGISTERED_COMMUNITY',
   incomeRange: 'PRIVATE',
   education: 'REGISTERED_COMMUNITY',
   occupation: 'REGISTERED_COMMUNITY',
@@ -24,6 +25,9 @@ export const DEFAULT_FIELD_VISIBILITY: Record<string, VisibilityLevel> = {
   dateOfBirth: 'SAME_FAMILY',
   age: 'REGISTERED_COMMUNITY',
   maritalStatus: 'REGISTERED_COMMUNITY',
+  bio: 'REGISTERED_COMMUNITY',
+  employerOrBusiness: 'REGISTERED_COMMUNITY',
+  skills: 'REGISTERED_COMMUNITY',
 }
 
 /** Fields the profile owner is never allowed to raise/lower — always PRIVATE regardless of override. */

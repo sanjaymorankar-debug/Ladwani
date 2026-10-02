@@ -10,6 +10,7 @@ describe('BookingsService', () => {
   let prisma: {
     asset: { findUnique: jest.Mock }
     assetOwner: { findUnique: jest.Mock }
+    assetBlockedDate: { findFirst: jest.Mock }
     booking: { findUnique: jest.Mock; update: jest.Mock }
     bookingStatusHistory: { create: jest.Mock }
     assetAvailability: { create: jest.Mock; update: jest.Mock; updateMany: jest.Mock }
@@ -23,6 +24,7 @@ describe('BookingsService', () => {
     prisma = {
       asset: { findUnique: jest.fn() },
       assetOwner: { findUnique: jest.fn() },
+      assetBlockedDate: { findFirst: jest.fn().mockResolvedValue(null) },
       booking: { findUnique: jest.fn(), update: jest.fn() },
       bookingStatusHistory: { create: jest.fn() },
       assetAvailability: { create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
@@ -42,6 +44,18 @@ describe('BookingsService', () => {
     }).compile()
 
     service = moduleRef.get(BookingsService)
+  })
+
+  describe('owner-blocked dates are respected at booking time, not just in search', () => {
+    it('refuses a booking on a date the owner has blocked, before ever touching the availability lock', async () => {
+      prisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', status: 'ACTIVE', deletedAt: null, bookingApprovalRequired: false })
+      prisma.assetBlockedDate.findFirst.mockResolvedValue({ id: 'block-1' })
+
+      await expect(service.createBooking('user-1', { assetId: 'asset-1', date: new Date('2026-12-25') } as never)).rejects.toBeInstanceOf(
+        ConflictException,
+      )
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
   })
 
   describe('double-booking prevention (lock-then-check-then-write ordering)', () => {

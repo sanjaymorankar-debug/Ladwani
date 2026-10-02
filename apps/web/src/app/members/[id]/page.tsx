@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { api } from '../../../lib/api-client'
-import { errorMessage } from '../../../lib/auth-context'
+import { errorMessage, useAuth } from '../../../lib/auth-context'
 import { RequireAuth, TopBar, Shell, ErrorBanner, StatusPill, Avatar } from '../../../components/ui'
 
 interface MemberDetail {
@@ -14,13 +15,21 @@ interface MemberDetail {
   status: string
   maritalStatus?: string
   currentCity?: string
+  currentState?: string
+  nativeVillage?: string
   dateOfBirth?: string | null
+  education?: string
+  occupation?: string
+  employerOrBusiness?: string
+  bio?: string
+  skills?: { id: string; label: string }[]
 }
 
 const MARITAL_STATUSES = ['UNMARRIED', 'MARRIED', 'WIDOWED', 'DIVORCED', 'SEPARATED', 'NOT_STATED']
 
 export default function MemberProfilePage() {
   const { id } = useParams<{ id: string }>()
+  const { user } = useAuth()
   const [member, setMember] = useState<MemberDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -86,17 +95,24 @@ export default function MemberProfilePage() {
 
         {member && (
           <>
-            <div className="row" style={{ marginBottom: 20 }}>
-              <Avatar name={`${member.firstName} ${member.lastName ?? ''}`} deceased={member.status === 'DECEASED'} />
-              <div>
-                <h1 style={{ marginBottom: 4 }}>
-                  {member.firstName} {member.lastName ?? ''}
-                </h1>
-                <div className="row">
-                  <StatusPill status={member.status} />
-                  {member.maritalStatus && <StatusPill status={member.maritalStatus} />}
+            <div className="row" style={{ marginBottom: 20, justifyContent: 'space-between' }}>
+              <div className="row">
+                <Avatar name={`${member.firstName} ${member.lastName ?? ''}`} deceased={member.status === 'DECEASED'} />
+                <div>
+                  <h1 style={{ marginBottom: 4 }}>
+                    {member.firstName} {member.lastName ?? ''}
+                  </h1>
+                  <div className="row">
+                    <StatusPill status={member.status} />
+                    {member.maritalStatus && <StatusPill status={member.maritalStatus} />}
+                  </div>
                 </div>
               </div>
+              {user?.memberId === member.id && (
+                <Link href="/profile/edit" className="btn btn-outline">
+                  Edit my profile
+                </Link>
+              )}
             </div>
 
             <div className="card" style={{ marginBottom: 20 }}>
@@ -104,7 +120,13 @@ export default function MemberProfilePage() {
                 {member.currentCity && (
                   <div className="row" style={{ justifyContent: 'space-between' }}>
                     <dt className="muted">Current city</dt>
-                    <dd style={{ margin: 0 }}>{member.currentCity}</dd>
+                    <dd style={{ margin: 0 }}>{member.currentCity}{member.currentState ? `, ${member.currentState}` : ''}</dd>
+                  </div>
+                )}
+                {member.nativeVillage && (
+                  <div className="row" style={{ justifyContent: 'space-between' }}>
+                    <dt className="muted">Native place</dt>
+                    <dd style={{ margin: 0 }}>{member.nativeVillage}</dd>
                   </div>
                 )}
                 {member.dateOfBirth && (
@@ -113,6 +135,30 @@ export default function MemberProfilePage() {
                     <dd className="mono" style={{ margin: 0 }}>
                       {new Date(member.dateOfBirth).toLocaleDateString()}
                     </dd>
+                  </div>
+                )}
+                {member.education && (
+                  <div className="row" style={{ justifyContent: 'space-between' }}>
+                    <dt className="muted">Education</dt>
+                    <dd style={{ margin: 0 }}>{member.education}</dd>
+                  </div>
+                )}
+                {member.occupation && (
+                  <div className="row" style={{ justifyContent: 'space-between' }}>
+                    <dt className="muted">Occupation</dt>
+                    <dd style={{ margin: 0 }}>{member.occupation}{member.employerOrBusiness ? ` — ${member.employerOrBusiness}` : ''}</dd>
+                  </div>
+                )}
+                {!!member.skills?.length && (
+                  <div className="row" style={{ justifyContent: 'space-between' }}>
+                    <dt className="muted">Skills</dt>
+                    <dd style={{ margin: 0 }}>{member.skills.map((s) => s.label).join(', ')}</dd>
+                  </div>
+                )}
+                {member.bio && (
+                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <dt className="muted">About</dt>
+                    <dd style={{ margin: 0, maxWidth: '70%', textAlign: 'right' }}>{member.bio}</dd>
                   </div>
                 )}
               </dl>

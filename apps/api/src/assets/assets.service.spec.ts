@@ -95,3 +95,129 @@ describe('AssetsService — pricing quote engine (docs/11 §4)', () => {
     await expect(service.quote('asset-1', new Date('2027-03-16'))).rejects.toBeInstanceOf(NotFoundException)
   })
 })
+
+describe('AssetsService — search and date-blocking (docs/02-feature-map.md §8-10)', () => {
+  let service: AssetsService
+  let prisma: {
+    asset: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock }
+    assetBlockedDate: { create: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; delete: jest.Mock }
+    review: { groupBy: jest.Mock }
+  }
+
+  beforeEach(async () => {
+    prisma = {
+      asset: { findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn() },
+      assetBlockedDate: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), delete: jest.fn() },
+      review: { groupBy: jest.fn() },
+    }
+    const moduleRef = await Test.createTestingModule({
+      providers: [AssetsService, { provide: PrismaService, useValue: prisma }, { provide: ApprovalsService, useValue: { submit: jest.fn() } }],
+    }).compile()
+    service = moduleRef.get(AssetsService)
+  })
+
+  describe('search', () => {
+    it('excludes an asset that is reserved or pending on the requested date/slot', async () => {
+      prisma.asset.findMany.mockResolvedValue([])
+      prisma.asset.count.mockResolvedValue(0)
+
+      await service.search({ date: new Date('2027-05-01'), slot: 'FULL_DAY' })
+
+      expect(prisma.asset.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            availability: { none: { date: new Date('2027-05-01'), slot: 'FULL_DAY', status: { in: ['RESERVED', 'PENDING'] } } },
+            blockedDates: { none: { dateFrom: { lte: new Date('2027-05-01') }, dateTo: { gte: new Date('2027-05-01') } } },
+          }),
+        }),
+      )
+    })
+
+    it('AND-combines multiple required facilities rather than matching any one of them', async () => {
+      prisma.asset.findMany.mockResolvedValue([])
+      prisma.asset.count.mockResolvedValue(0)
+
+      await service.search({ facilityCodes: ['PARKING', 'AC'] })
+
+      expect(prisma.asset.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ AND: [{ facilities: { some: { facilityCode: 'PARKING' } } }, { facilities: { some: { facilityCode: 'AC' } } }] }) }),
+      )
+    })
+
+    it('filters by minimum average rating, computed from real review aggregates', async () => {
+      prisma.asset.findMany.mockResolvedValue([{ id: 'a1' }, { id: 'a2' }])
+      prisma.review.groupBy.mockResolvedValue([{ assetId: 'a1', _avg: { overallScore: 4.5 } }, { assetId: 'a2', _avg: { overallScore: 2 } }])
+
+      const result = await service.search({ minRating: 4 })
+
+      expect(result.data).toHaveLength(1)
+      expect(result.data[0]).toMatchObject({ id: 'a1', averageRating: 4.5 })
+    })
+
+    it('treats an asset with no reviews at all as rating 0, excluded by any positive minRating', async () => {
+      prisma.asset.findMany.mockResolvedValue([{ id: 'a1' }])
+      prisma.review.groupBy.mockResolvedValue([])
+
+      const result = await service.search({ minRating: 1 })
+
+      expect(result.data).toHaveLength(0)
+    })
+
+    it('caps page size even if a huge value is requested', async () => {
+      prisma.asset.findMany.mockResolvedValue([])
+      prisma.asset.count.mockResolvedValue(0)
+
+      await service.search({ pageSize: 10_000 })
+
+      expect(prisma.asset.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 50 }))
+    })
+  })
+
+  describe('owner date-blocking', () => {
+    it('lets the owner block a date range', async () => {
+      prisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', assetOwner: { userId: 'owner-1' } })
+      prisma.assetBlockedDate.create.mockResolvedValue({ id: 'block-1' })
+
+      await service.blockDates('owner-1', 'asset-1', { dateFrom: new Date('2027-01-01'), dateTo: new Date('2027-01-05') })
+
+      expect(prisma.assetBlockedDate.create).toHaveBeenCalledWith({
+        data: { assetId: 'asset-1', dateFrom: new Date('2027-01-01'), dateTo: new Date('2027-01-05'), reason: undefined },
+      })
+    })
+
+    it('refuses a block range where dateTo is before dateFrom', async () => {
+      prisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', assetOwner: { userId: 'owner-1' } })
+
+      await expect(
+        service.blockDates('owner-1', 'asset-1', { dateFrom: new Date('2027-01-05'), dateTo: new Date('2027-01-01') }),
+      ).rejects.toBeInstanceOf(BadRequestException)
+      expect(prisma.assetBlockedDate.create).not.toHaveBeenCalled()
+    })
+
+    it("refuses to let someone who doesn't own the asset block its dates", async () => {
+      prisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', assetOwner: { userId: 'someone-else' } })
+
+      await expect(
+        service.blockDates('owner-1', 'asset-1', { dateFrom: new Date('2027-01-01'), dateTo: new Date('2027-01-05') }),
+      ).rejects.toThrow()
+    })
+
+    it('lets the owner remove a blocked range it actually owns', async () => {
+      prisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', assetOwner: { userId: 'owner-1' } })
+      prisma.assetBlockedDate.findUnique.mockResolvedValue({ id: 'block-1', assetId: 'asset-1' })
+
+      const result = await service.unblockDates('owner-1', 'asset-1', 'block-1')
+
+      expect(prisma.assetBlockedDate.delete).toHaveBeenCalledWith({ where: { id: 'block-1' } })
+      expect(result).toEqual({ removed: true })
+    })
+
+    it('404s when the blocked-date row does not belong to this asset', async () => {
+      prisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', assetOwner: { userId: 'owner-1' } })
+      prisma.assetBlockedDate.findUnique.mockResolvedValue({ id: 'block-1', assetId: 'some-other-asset' })
+
+      await expect(service.unblockDates('owner-1', 'asset-1', 'block-1')).rejects.toBeInstanceOf(NotFoundException)
+      expect(prisma.assetBlockedDate.delete).not.toHaveBeenCalled()
+    })
+  })
+})
