@@ -1,3 +1,26 @@
+> ## ⚠️ Which Ladwani app is this?
+>
+> This repo is the **single Next.js app** (53 Prisma models, one process). It is
+> what `devmiladwani.agtci.com` runs, per `DEPLOYMENT.md`.
+>
+> It is **not** what serves `ladwani.bkesari.com`. `bkesari-platform/DEPLOY.md`
+> part 5 says that is the **full rebuild** — a NestJS API plus a Next.js web app,
+> two separate processes and so two Hostinger sites — in
+> `/Users/agtci/Documents/Project_Documents/Projects/community-platform`
+> (github.com/sanjaymorankar-debug/miladwani, branch `rebuild`). The platform's
+> `database/ladwani/*.sql` scripts were regenerated from **that** schema: 69
+> tables, against this app's 53 models.
+>
+> | | this repo | the rebuild |
+> |---|---|---|
+> | Shape | one Next.js app | NestJS API + Next.js web |
+> | Schema | 53 Prisma models | 69 tables |
+> | Covers | Family Registry, Directory, Matrimony | + Community Social, Bookings/Assets, Payments/Fees/Ledger, Admin/Reporting (M0–M5) |
+> | Deploys to | `devmiladwani.agtci.com` | `(dev/test)ladwani.bkesari.com` |
+>
+> So: **don't deploy this one to the bkesari tiers**, and don't assume the
+> platform's Ladwani SQL matches this app's schema — it does not.
+
 # Mi Ladwani — Community Platform
 
 Official digital platform for Ladwani Samaj: Family Registry, Member Directory & Matrimony.

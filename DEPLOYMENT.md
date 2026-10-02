@@ -1,3 +1,11 @@
+> **Before following this:** this document deploys *this* app to
+> `devmiladwani.agtci.com`. It is **not** how `ladwani.bkesari.com` is deployed —
+> `bkesari-platform/DEPLOY.md` part 5 names the NestJS + Next.js rebuild
+> (`/Users/agtci/Documents/Project_Documents/Projects/community-platform`,
+> github.com/sanjaymorankar-debug/miladwani branch `rebuild`) as the source for the
+> bkesari tiers, and that needs **two** Hostinger sites rather than one. See the
+> README for which app is which.
+
 # Deploying to devmiladwani.agtci.com
 
 Updated 10 Sep 2026. This codebase now targets **MySQL** (ported from
@@ -169,7 +177,7 @@ costs nothing and means nothing is permanently lost if you want to look back.
 Push this codebase as its own branch and merge it via PR instead:
 
 ```bash
-cd D:\Claude_development\ladwani\app
+cd /Users/agtci/Documents/Project_Documents/Projects/ladwani/app
 git remote add origin https://github.com/sanjaymorankar-debug/miladwani.git
 git fetch origin
 git push -u origin master:mysql-deploy
