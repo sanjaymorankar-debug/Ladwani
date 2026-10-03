@@ -79,14 +79,20 @@ files from [scripts/mysql/](scripts/mysql/):
 2. **Select your database in the left sidebar first.** Both files deliberately
    omit `CREATE DATABASE`/`USE`, so they import into whichever database is
    selected — that's what makes them work with Hostinger's prefixed names.
-3. Import [`scripts/mysql/01-schema.sql`](scripts/mysql/01-schema.sql) — 53
-   tables, 81 foreign keys, no rows.
+3. Import [`scripts/mysql/01-schema.sql`](scripts/mysql/01-schema.sql) — 54
+   tables, 83 foreign keys, no rows.
 4. Import [`scripts/mysql/02-reference-data.sql`](scripts/mysql/02-reference-data.sql) —
    roles, permissions, relationship types, approval rules, post types, areas,
    the ₹2,000 fee, and one admin login.
 
 Then skip step 3's `migrate deploy` and step 4's `db:seed` in Part 3 — the
 import already did both. Full detail: [scripts/mysql/README.md](scripts/mysql/README.md).
+
+**Database already live from the older `database/phpmyadmin/` files?** Those
+were missing 9 tables (assets, bookings, payments, fee tables, member
+invitations, community groups) and 15 columns. Back it up, then import
+[`scripts/mysql/03-upgrade-existing.sql`](scripts/mysql/03-upgrade-existing.sql)
+once instead of 01/02.
 
 **Option B — SSH.** Leave the database empty here and let
 `npx prisma migrate deploy` + `npm run db:seed` create everything in Part 3.
