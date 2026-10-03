@@ -1,0 +1,71 @@
+# This repository had no CI. These are the checks the dev deploy is gated on.
+#
+# Two things are deliberately NOT run here, because neither currently works,
+# and a step that cannot pass is worse than an absent one:
+#
+#   Tests   tests/ needs a .env.test and a live MySQL to point it at, and
+#           neither is in the repo (package.json runs them through
+#           scripts/with-env.js .env.test).
+#
+#   Lint    eslint.config.mjs is written against ESLint 9 (it imports
+#           "eslint/config" and uses defineConfig/globalIgnores) but the repo
+#           pins eslint 8.57.1, which has no such subpath — `npx eslint .`
+#           exits 2 before linting anything, and `next lint` on Next 14 does
+#           not read flat config at all, so it stops to ask how to configure
+#           ESLint and would hang a CI run until it timed out.
+#
+# Both are worth repairing; both are changes to the project rather than to this
+# workflow, so they are named here rather than stubbed into a green tick.
+name: CI
+
+on:
+  push:
+    branches: [main, dev, staging]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      # Never connected to. Prisma's client needs a syntactically valid URL at
+      # import time, and `next build` imports modules that construct it. The
+      # real dev, test and production credentials live only in each server's
+      # own .env, never in GitHub.
+      DATABASE_URL: mysql://build:build@127.0.0.1:3306/build
+      NEXTAUTH_SECRET: build-only-not-used-at-runtime
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # postinstall runs `prisma generate`, so the client exists after this.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Check the Prisma schema is valid
+        run: npx prisma validate
+
+      # The schema must stay MySQL: this app was ported from PostgreSQL for
+      # shared hosting, and a provider flipped back would fail only at runtime.
+      - name: Check the schema still targets MySQL
+        run: |
+          set -euo pipefail
+          grep -qE '^\s*provider\s*=\s*"mysql"' prisma/schema.prisma \
+            || { echo "::error::prisma/schema.prisma no longer targets mysql"; exit 1; }
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy guard rules
+        run: bash .github/deploy/guard.test.sh
