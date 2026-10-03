@@ -8,9 +8,12 @@ name: CI
 # targets a newer eslint-config-next. Add it back once that config is fixed.
 on:
   push:
+    # Not dev: a push there runs this same suite inside deploy-dev.yml's gate,
+    # so the build that gets published is one that passed.
     branches: [main, staging]
   pull_request:
-    branches: [main, staging]
+    branches: [main, staging, dev]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -72,8 +75,24 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Check the Prisma schema is valid
+        run: npx prisma validate
+
+      # The app was ported from PostgreSQL for shared hosting; a provider
+      # flipped back would fail only once a real query ran.
+      - name: Check the schema still targets MySQL
+        run: |
+          set -euo pipefail
+          grep -qE '^\s*provider\s*=\s*"mysql"' prisma/schema.prisma \
+            || { echo "::error::prisma/schema.prisma no longer targets mysql"; exit 1; }
+
       - name: Unit and integration tests
         run: npm test
 
       - name: Production build
         run: npm run build
+
+      # The rules that keep a dev deploy off test and production. Cheap, and
+      # the one thing here whose failure mode is publishing to the wrong tier.
+      - name: Deploy guard rules
+        run: bash .github/deploy/guard.test.sh

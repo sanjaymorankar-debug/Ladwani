@@ -1,3 +1,15 @@
+# Deploying LadWani
+
+> **Dev is now automated.** Pushing to the `dev` branch deploys this app to
+> `devladwani.bkesari.com` through `.github/workflows/deploy-dev.yml`. The
+> one-time secret setup is in `DEPLOY.md` Part 6 of the `bkesari-platform`
+> repository. The workflow refuses to deploy anywhere but that dev host —
+> `agtci.com` included, so the old site below cannot be overwritten by it.
+>
+> Everything after this note is the original manual procedure for
+> `devmiladwani.agtci.com`, kept because test and production are still promoted
+> by hand and the hPanel and database steps are the same wherever it is hosted.
+
 # Deploying to devmiladwani.agtci.com
 
 Updated 10 Sep 2026. This codebase now targets **MySQL** (ported from

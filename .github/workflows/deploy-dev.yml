@@ -1,0 +1,308 @@
+# Deploys LadWani to its dev site — and to nowhere else.
+#
+# dev is the only tier with any automation. test and production are promoted by
+# hand for now, deliberately: a mis-aimed deploy to production is the one
+# mistake this stage cannot afford. The guard enforces that mechanically, and
+# refuses agtci.com too — this app used to live at devmiladwani.agtci.com and
+# that site is not ours to overwrite.
+#
+# No database credential is stored in GitHub. The server's own .env holds them,
+# and rsync neither writes nor deletes it — see the "Upload" step.
+name: Deploy dev
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+env:
+  # The ONLY hostname this workflow may write to, hard-coded rather than taken
+  # from a secret, so a mistyped DEV_DEPLOY_PATH fails the job instead of
+  # publishing to the wrong tier. Change it here if the dev site is renamed.
+  DEV_SITE: devladwani.bkesari.com
+
+jobs:
+  # The same suite ci.yml runs, so the build that gets published is one that
+  # passed its tests against a real MySQL.
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: miladwani_test
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # A throwaway CI database. Nothing here reaches any real tier: the dev,
+      # test and production credentials live only in each server's own .env.
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/miladwani_test
+      NEXTAUTH_SECRET: ci-only-secret-not-used-in-production
+      NEXTAUTH_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The test scripts read .env.test (gitignored), so CI writes its own.
+      - name: Write .env.test
+        run: |
+          cat > .env.test <<'ENV'
+          DATABASE_URL=mysql://root:root@127.0.0.1:3306/miladwani_test
+          NEXTAUTH_SECRET=ci-only-secret-not-used-in-production
+          NEXTAUTH_URL=http://localhost:3000
+          NEXT_PUBLIC_APP_URL=http://localhost:3000
+          ADMIN_EMAIL=admin@miladwani.com
+          ADMIN_PASSWORD=CiOnlyAdmin123!
+          SEED_TEST_ACCOUNTS=true
+          STORAGE_DRIVER=LOCAL
+          UPLOAD_DIR=./uploads-test
+          PAYMENT_GATEWAY=MOCK
+          PAYMENT_SIGNING_SECRET=ci-only-signing-secret
+          ENV
+
+      - name: Apply migrations
+        run: npm run test:migrate
+
+      - name: Seed reference and UAT data
+        run: |
+          node scripts/with-env.js .env.test npm run db:seed
+          node scripts/with-env.js .env.test npm run db:seed:uat
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Check the Prisma schema is valid
+        run: npx prisma validate
+
+      # The app was ported from PostgreSQL for shared hosting; a provider
+      # flipped back would fail only once a real query ran.
+      - name: Check the schema still targets MySQL
+        run: |
+          set -euo pipefail
+          grep -qE '^\s*provider\s*=\s*"mysql"' prisma/schema.prisma \
+            || { echo "::error::prisma/schema.prisma no longer targets mysql"; exit 1; }
+
+      - name: Unit and integration tests
+        run: npm test
+
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: dev
+
+    env:
+      DEPLOY_HOST: ${{ secrets.DEV_SSH_HOST }}
+      DEPLOY_USER: ${{ secrets.DEV_SSH_USER }}
+      DEPLOY_PORT: ${{ secrets.DEV_SSH_PORT }}
+      DEPLOY_DIR: ${{ secrets.DEV_DEPLOY_PATH }}
+      SMOKE_URL: ${{ vars.DEV_SMOKE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history, so the summary below can diff the actual push range
+          # rather than guessing that the push was a single commit.
+          fetch-depth: 0
+
+      # Refuses test, production, agtci.com, gokesari.com, a non-dev branch,
+      # and any missing secret, before the job holds an SSH connection or a
+      # build. Rules in .github/deploy/guard.sh, tested by guard.test.sh.
+      - name: Refuse anything that is not dev
+        env:
+          DEPLOY_KEY: ${{ secrets.DEV_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEV_SSH_KNOWN_HOSTS }}
+        run: bash .github/deploy/guard.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # postinstall runs `prisma generate`, so the client exists after this.
+      - run: npm ci
+
+      - name: Build
+        env:
+          # Never connected to. Prisma's client wants a syntactically valid URL
+          # at import time and `next build` imports modules that construct it.
+          # The real dev credentials live only in the server's .env.
+          DATABASE_URL: mysql://build:build@127.0.0.1:3306/build
+          NEXTAUTH_SECRET: build-only-not-used-at-runtime
+        # NOTE: anything named NEXT_PUBLIC_* is baked into the bundle here,
+        # from this environment — not from the server's .env, which is read at
+        # runtime and so arrives too late. Nothing is set on purpose, because
+        # the brief keeps every credential on the server. NEXT_PUBLIC_APP_URL
+        # and NEXT_PUBLIC_APP_NAME therefore fall back to their defaults; if
+        # dev needs them set, add them as repository *variables* (they are
+        # public by definition) and pass them in here.
+        run: npm run build
+
+      - name: Set up SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.DEV_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEV_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # Pinned host key rather than StrictHostKeyChecking=no, so the job
+          # fails instead of handing the key to whatever answers on that port.
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          # 65002 is Hostinger's SSH port; DEV_SSH_PORT overrides it.
+          echo "SSH_CMD=ssh -i $HOME/.ssh/id_deploy -p ${DEPLOY_PORT:-65002} -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts" >> "$GITHUB_ENV"
+
+      - name: Upload
+        run: |
+          set -euo pipefail
+
+          # --delete keeps the server from accumulating files that have left
+          # the repo, including the previous build's hashed chunks under
+          # .next/static, which would otherwise pile up until the account hits
+          # its inode limit.
+          #
+          # The --exclude entries are load-bearing twice over: rsync neither
+          # uploads them NOR deletes them on the server. That is what protects
+          # the live site's credentials and its uploads, so this command must
+          # never grow --delete-excluded.
+          #
+          #   .env         the credentials, filled in by hand on the server
+          #   uploads/     local-dev upload directory, gitignored
+          RSYNC_FLAGS=(
+            --archive --compress --human-readable
+            --delete
+            --exclude=.env
+            --exclude=.env.*
+            --exclude=node_modules/
+            --exclude=uploads/
+          )
+
+          # prisma/ ships because npm's postinstall runs `prisma generate` on
+          # the server and needs the schema; next.config.js is read at runtime.
+          SOURCES=(
+            .next public prisma
+            package.json package-lock.json next.config.js
+          )
+
+          echo "### Files this deploy changes" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          rsync "${RSYNC_FLAGS[@]}" --dry-run --itemize-changes \
+            -e "$SSH_CMD" "${SOURCES[@]}" \
+            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_DIR/" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          rsync "${RSYNC_FLAGS[@]}" \
+            -e "$SSH_CMD" "${SOURCES[@]}" \
+            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_DIR/"
+
+      - name: Install dependencies and restart
+        env:
+          # Hostinger's Node.js sites run behind Phusion Passenger, which
+          # reloads the app when this file's mtime changes. Set the repository
+          # variable DEV_RESTART_COMMAND if your site restarts another way.
+          RESTART: ${{ vars.DEV_RESTART_COMMAND }}
+        run: |
+          set -euo pipefail
+          RESTART_CMD="${RESTART:-mkdir -p tmp && touch tmp/restart.txt}"
+          # Unquoted heredoc: the runner substitutes the path and the restart
+          # command before sending the script. The guard has established the
+          # path is absolute and free of '..'.
+          $SSH_CMD "$DEPLOY_USER@$DEPLOY_HOST" 'bash -seuo pipefail' <<REMOTE
+          cd '$DEPLOY_DIR'
+          # --omit=dev: the build is already done, so nothing dev-only is
+          # needed to serve. prisma itself is a runtime dependency here, so
+          # the postinstall `prisma generate` still runs and still produces a
+          # client with the engine binary for THIS machine — which is the
+          # reason the client is not shipped from the runner.
+          npm ci --omit=dev --no-audit --no-fund
+          $RESTART_CMD
+          REMOTE
+
+      # Migrations are NOT applied automatically. Schema changes on this estate
+      # are reviewed and applied through phpMyAdmin (or by running
+      # `npx prisma migrate deploy` over SSH), so a deploy can never alter a
+      # database on its own. This step only tells you whether this push
+      # brought any.
+      # Migrations are NOT applied automatically. Schema changes on this estate
+      # are reviewed and applied through phpMyAdmin (or by running
+      # `npx prisma migrate deploy` over SSH), so a deploy can never alter a
+      # database on its own. This step only reports what the push brought.
+      - name: Report migrations included in this deploy
+        env:
+          # The branch head before this push. Empty on a manual run.
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          NULL_SHA=0000000000000000000000000000000000000000
+          added=""
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "$NULL_SHA" ] \
+             && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            # The real range this push covers, however many commits it held.
+            added=$(git diff --name-only --diff-filter=A "$BEFORE" HEAD -- prisma/migrations/ \
+              | grep '\.sql$' || true)
+            scope="new in this push"
+          else
+            # A manual run, or a branch pushed for the first time: there is no
+            # range to diff, so report the most recent migration instead of
+            # claiming there are none.
+            added=$(git log -1 --name-only --diff-filter=A --format= -- prisma/migrations/ \
+              | grep '\.sql$' || true)
+            scope="from the most recent commit that added any"
+          fi
+
+          if [ -n "$added" ]; then
+            {
+              echo "### Migrations ($scope)"
+              echo
+              echo "The code is live, but this workflow does **not** change the"
+              echo "schema. Confirm these are applied to the dev database:"
+              echo
+              echo '```'
+              echo "$added"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::This deploy ships migrations that it did not apply ($scope)."
+          else
+            echo "No migrations $scope." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Smoke check
+        if: ${{ vars.DEV_SMOKE_URL != '' }}
+        run: |
+          set -euo pipefail
+          # Passenger reloads on the first request after the restart file is
+          # touched, so retry rather than sleep.
+          for attempt in 1 2 3 4 5 6; do
+            code=$(curl -sS -o /tmp/body -w '%{http_code}' --max-time 20 "$SMOKE_URL" || echo 000)
+            if [ "$code" = 200 ]; then
+              echo "$SMOKE_URL is up."
+              exit 0
+            fi
+            echo "attempt $attempt: HTTP $code"
+            [ "$attempt" = 6 ] || sleep 10
+          done
+          echo "::error::$SMOKE_URL did not come up. Last status: $code"
+          head -c 2000 /tmp/body || true
+          exit 1
