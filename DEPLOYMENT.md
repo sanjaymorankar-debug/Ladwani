@@ -303,3 +303,12 @@ Prisma migrations do **not** auto-roll-back. If a migration must be undone,
 restore from the scheduled database backup in step 8 above — there's no
 production data yet to lose while you're setting that backup up, but there
 will be as soon as real families start registering.
+
+## Branches and promotion
+
+| Branch | Environment |
+|---|---|
+| `staging` | A separate staging subdomain with its own database, connected in hPanel to the `staging` branch |
+| `main` | `devmiladwani.agtci.com` (current live site) |
+
+Work happens on feature branches. Open a PR into `staging`; CI (`.github/workflows/ci.yml`) must pass before merging. Test on staging, then promote with a PR from `staging` into `main`. Don't commit directly to `staging` or `main`.

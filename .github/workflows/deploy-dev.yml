@@ -29,7 +29,85 @@ env:
   DEV_SITE: devladwani.bkesari.com
 
 jobs:
+  # The same suite ci.yml runs, so the build that gets published is one that
+  # passed its tests against a real MySQL.
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: miladwani_test
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # A throwaway CI database. Nothing here reaches any real tier: the dev,
+      # test and production credentials live only in each server's own .env.
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/miladwani_test
+      NEXTAUTH_SECRET: ci-only-secret-not-used-in-production
+      NEXTAUTH_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The test scripts read .env.test (gitignored), so CI writes its own.
+      - name: Write .env.test
+        run: |
+          cat > .env.test <<'ENV'
+          DATABASE_URL=mysql://root:root@127.0.0.1:3306/miladwani_test
+          NEXTAUTH_SECRET=ci-only-secret-not-used-in-production
+          NEXTAUTH_URL=http://localhost:3000
+          NEXT_PUBLIC_APP_URL=http://localhost:3000
+          ADMIN_EMAIL=admin@miladwani.com
+          ADMIN_PASSWORD=CiOnlyAdmin123!
+          SEED_TEST_ACCOUNTS=true
+          STORAGE_DRIVER=LOCAL
+          UPLOAD_DIR=./uploads-test
+          PAYMENT_GATEWAY=MOCK
+          PAYMENT_SIGNING_SECRET=ci-only-signing-secret
+          ENV
+
+      - name: Apply migrations
+        run: npm run test:migrate
+
+      - name: Seed reference and UAT data
+        run: |
+          node scripts/with-env.js .env.test npm run db:seed
+          node scripts/with-env.js .env.test npm run db:seed:uat
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Check the Prisma schema is valid
+        run: npx prisma validate
+
+      # The app was ported from PostgreSQL for shared hosting; a provider
+      # flipped back would fail only once a real query ran.
+      - name: Check the schema still targets MySQL
+        run: |
+          set -euo pipefail
+          grep -qE '^\s*provider\s*=\s*"mysql"' prisma/schema.prisma \
+            || { echo "::error::prisma/schema.prisma no longer targets mysql"; exit 1; }
+
+      - name: Unit and integration tests
+        run: npm test
+
   deploy:
+    needs: check
     runs-on: ubuntu-latest
     environment: dev
 
@@ -63,18 +141,6 @@ jobs:
 
       # postinstall runs `prisma generate`, so the client exists after this.
       - run: npm ci
-
-      - name: Verify before building
-        env:
-          DATABASE_URL: mysql://build:build@127.0.0.1:3306/build
-        run: |
-          set -euo pipefail
-          npm run typecheck
-          npx prisma validate
-          # The app was ported from PostgreSQL for shared hosting; a provider
-          # flipped back would fail only once a real query ran.
-          grep -qE '^\s*provider\s*=\s*"mysql"' prisma/schema.prisma \
-            || { echo "::error::prisma/schema.prisma no longer targets mysql"; exit 1; }
 
       - name: Build
         env:

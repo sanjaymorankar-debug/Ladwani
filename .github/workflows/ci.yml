@@ -1,43 +1,41 @@
-# This repository had no CI. These are the checks the dev deploy is gated on.
-#
-# Two things are deliberately NOT run here, because neither currently works,
-# and a step that cannot pass is worse than an absent one:
-#
-#   Tests   tests/ needs a .env.test and a live MySQL to point it at, and
-#           neither is in the repo (package.json runs them through
-#           scripts/with-env.js .env.test).
-#
-#   Lint    eslint.config.mjs is written against ESLint 9 (it imports
-#           "eslint/config" and uses defineConfig/globalIgnores) but the repo
-#           pins eslint 8.57.1, which has no such subpath — `npx eslint .`
-#           exits 2 before linting anything, and `next lint` on Next 14 does
-#           not read flat config at all, so it stops to ask how to configure
-#           ESLint and would hang a CI run until it timed out.
-#
-# Both are worth repairing; both are changes to the project rather than to this
-# workflow, so they are named here rather than stubbed into a green tick.
 name: CI
 
+# Runs on every push and pull request to staging and main. The tests exercise
+# real Prisma queries and constraints, so a MySQL service container matching
+# production (Hostinger MySQL) is provided rather than a mock.
+#
+# Lint is not run: `next lint` is interactive under Next 14 and eslint.config.mjs
+# targets a newer eslint-config-next. Add it back once that config is fixed.
 on:
   push:
-    branches: [main, dev, staging]
+    # Not dev: a push there runs this same suite inside deploy-dev.yml's gate,
+    # so the build that gets published is one that passed.
+    branches: [main, staging]
   pull_request:
+    branches: [main, staging, dev]
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: miladwani_test
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
-      # Never connected to. Prisma's client needs a syntactically valid URL at
-      # import time, and `next build` imports modules that construct it. The
-      # real dev, test and production credentials live only in each server's
-      # own .env, never in GitHub.
-      DATABASE_URL: mysql://build:build@127.0.0.1:3306/build
-      NEXTAUTH_SECRET: build-only-not-used-at-runtime
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/miladwani_test
+      NEXTAUTH_SECRET: ci-only-secret-not-used-in-production
+      NEXTAUTH_URL: http://localhost:3000
 
     steps:
       - uses: actions/checkout@v4
@@ -47,8 +45,32 @@ jobs:
           node-version: 22
           cache: npm
 
-      # postinstall runs `prisma generate`, so the client exists after this.
       - run: npm ci
+
+      # The test scripts read .env.test (gitignored), so CI writes its own.
+      - name: Write .env.test
+        run: |
+          cat > .env.test <<'ENV'
+          DATABASE_URL=mysql://root:root@127.0.0.1:3306/miladwani_test
+          NEXTAUTH_SECRET=ci-only-secret-not-used-in-production
+          NEXTAUTH_URL=http://localhost:3000
+          NEXT_PUBLIC_APP_URL=http://localhost:3000
+          ADMIN_EMAIL=admin@miladwani.com
+          ADMIN_PASSWORD=CiOnlyAdmin123!
+          SEED_TEST_ACCOUNTS=true
+          STORAGE_DRIVER=LOCAL
+          UPLOAD_DIR=./uploads-test
+          PAYMENT_GATEWAY=MOCK
+          PAYMENT_SIGNING_SECRET=ci-only-signing-secret
+          ENV
+
+      - name: Apply migrations
+        run: npm run test:migrate
+
+      - name: Seed reference and UAT data
+        run: |
+          node scripts/with-env.js .env.test npm run db:seed
+          node scripts/with-env.js .env.test npm run db:seed:uat
 
       - name: Typecheck
         run: npm run typecheck
@@ -56,16 +78,21 @@ jobs:
       - name: Check the Prisma schema is valid
         run: npx prisma validate
 
-      # The schema must stay MySQL: this app was ported from PostgreSQL for
-      # shared hosting, and a provider flipped back would fail only at runtime.
+      # The app was ported from PostgreSQL for shared hosting; a provider
+      # flipped back would fail only once a real query ran.
       - name: Check the schema still targets MySQL
         run: |
           set -euo pipefail
           grep -qE '^\s*provider\s*=\s*"mysql"' prisma/schema.prisma \
             || { echo "::error::prisma/schema.prisma no longer targets mysql"; exit 1; }
 
-      - name: Build
+      - name: Unit and integration tests
+        run: npm test
+
+      - name: Production build
         run: npm run build
 
+      # The rules that keep a dev deploy off test and production. Cheap, and
+      # the one thing here whose failure mode is publishing to the wrong tier.
       - name: Deploy guard rules
         run: bash .github/deploy/guard.test.sh
