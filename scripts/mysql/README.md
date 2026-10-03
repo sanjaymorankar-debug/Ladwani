@@ -33,7 +33,7 @@ Full walkthrough with screenshots' worth of detail: [`../../DEPLOYMENT.md`](../.
    they import into whatever database is currently selected. That's what lets
    them work with Hostinger's prefixed database names.
 3. **Import** tab → Choose File → `01-schema.sql` → **Go**.
-   Creates 53 tables and 81 foreign keys. No rows.
+   Creates 54 tables (+ `_prisma_migrations`) and 83 foreign keys. No rows.
 4. **Import** tab again → `02-reference-data.sql` → **Go**.
    Inserts roles, the permission matrix, relationship types, approval rules,
    post types, areas, income ranges, settings, the ₹2,000 family registration
@@ -64,7 +64,7 @@ happens, gzip the file first (phpMyAdmin accepts `.sql.gz`) or use the
 From the app directory on a machine that can reach the database:
 
 ```bash
-npx prisma migrate deploy   # creates all 53 tables
+npx prisma migrate deploy   # creates all 54 tables
 npm run db:seed             # inserts the same reference data
 ```
 
@@ -78,14 +78,14 @@ npm run db:seed             # inserts the same reference data
 
 | File | What it is |
 |---|---|
-| `01-schema.sql` | Structure only — 53 tables, 81 foreign keys, no rows. Includes the `_prisma_migrations` table. |
-| `02-reference-data.sql` | Data only — reference/config rows plus the `_prisma_migrations` row and one admin login. No test accounts, no families, no member data. |
+| `01-schema.sql` | Structure only — 54 tables, 83 foreign keys, no rows: all four Prisma migrations' DDL, in order, plus the `_prisma_migrations` table. |
+| `02-reference-data.sql` | Data only — reference/config rows, the four `_prisma_migrations` rows and one admin login. No test accounts, no families, no member data. |
+| `03-upgrade-existing.sql` | For a database **already live** that was built from the older `database/phpmyadmin/` files. Adds the 9 missing tables and 15 missing columns, the missing reference data and the migration records, without touching existing rows. Run once, after a backup. |
 | `create-database.sql` | Creates the database + a dedicated user. **Does not work on Hostinger shared hosting** (needs `CREATE USER`/`GRANT` privileges you don't have there) — it's for a VPS or managed MySQL instead. |
 
 ### Why the `_prisma_migrations` row matters
 
-The data file inserts a row recording migration `20260910163143_init` as
-already applied. So if you import via phpMyAdmin now and later run
+The data file inserts rows recording every migration as already applied. So if you import via phpMyAdmin now and later run
 `npx prisma migrate deploy` on the server, Prisma sees the migration is done
 and does nothing — instead of trying to re-create tables that already exist
 and failing. The two options stay compatible in either order.
@@ -104,9 +104,12 @@ mysql -u root -p -e "DROP DATABASE IF EXISTS miladwani_sqlgen; CREATE DATABASE m
 node scripts/with-env.js .env.sqlgen npx prisma migrate deploy
 node scripts/with-env.js .env.sqlgen npm run db:seed
 
-# 2. Dump structure and data separately
-mysqldump -u root -p --no-data --no-tablespaces --skip-add-drop-table \
-  --default-character-set=utf8mb4 miladwani_sqlgen > scripts/mysql/01-schema.sql
+# 2. 01-schema.sql = the _prisma_migrations CREATE TABLE followed by every
+#    prisma/migrations/*/migration.sql in order (portable Prisma DDL; a
+#    mysqldump of a MariaDB server would turn JSON columns into LONGTEXT).
+#    Don't add SET FOREIGN_KEY_CHECKS=0 to it: on MariaDB that rewrites every
+#    ON DELETE RESTRICT as NO ACTION and Prisma then reports drift.
+#    Data is dumped:
 mysqldump -u root -p --no-create-info --no-tablespaces --complete-insert \
   --default-character-set=utf8mb4 miladwani_sqlgen > scripts/mysql/02-reference-data.sql
 ```

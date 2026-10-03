@@ -363,6 +363,7 @@ model Member {
   groupsConvened        CommunityGroup[]       @relation("GroupConvener")
   communityGroups       CommunityGroupMember[]
   invitations           MemberInvitation[]
+  profileDetails        MemberProfileDetail?
 
   @@map("members")
 }
@@ -584,6 +585,11 @@ model Address {
   state           String?
   country         String  @default("India")
   pincode         String?
+  taluka          String?
+  // Geo-tag (WGS84) from the browser or an adjusted map pin. Optional, so a
+  // member who denies location access can still save the address.
+  latitude        Float?
+  longitude       Float?
   isPrimary       Boolean @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -592,6 +598,50 @@ model Address {
   member Member? @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@map("addresses")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PERSONAL PROFILE DETAILS
+// ─────────────────────────────────────────────────────────────────
+
+// Extra personal-information answers from the Edit Profile form. One row per
+// member, created on first save — existing members have no row, which reads
+// as "everything empty". Fields under a toggle are only ever stored while
+// that toggle is on (enforced in src/lib/profile-details.ts).
+model MemberProfileDetail {
+  id                     String   @id @default(cuid())
+  memberId               String   @unique
+  educationLevel         String?  // NONE, PRIMARY, SECONDARY, HIGHER_SECONDARY, ITI, DIPLOMA, GRADUATE, POST_GRADUATE, DOCTORATE, PROFESSIONAL, OTHER
+  educationOther         String?  // free text, only when educationLevel = OTHER
+  educationStream        String?
+  educationInstitution   String?
+  annualIncomeRange      String?  // BELOW_2L, 2L_5L, 5L_10L, 10L_20L, 20L_50L, ABOVE_50L, NOT_SAY
+
+  // Unmarried-only flow
+  isEarning              Boolean  @default(false)
+  isPursuingEducation    Boolean  @default(false)
+  currentCourse          String?
+  currentInstitution     String?
+  expectedCompletionYear Int?
+  earningType            String?  // JOB, BUSINESS
+  companyName            String?
+  designation            String?
+  jobSector              String?  // GOVERNMENT, PRIVATE, OTHER
+  businessName           String?
+  businessType           String?
+  readyForMarriage       Boolean  @default(false)
+  lookingForMarriage     Boolean  @default(false)
+  marriageHeightCm       Int?
+  motherTongue           String?
+  nativePlace            String?
+  partnerExpectations    String?  @db.Text
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("member_profile_details")
 }
 
 // ─────────────────────────────────────────────────────────────────

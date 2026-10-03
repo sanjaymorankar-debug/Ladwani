@@ -4,7 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getMemberAccess } from '@/lib/member-auth'
 import { validatePincode } from '@/lib/validators'
-import { requiresApproval, createApprovalRecord, applyAddressChange } from '@/lib/approvals'
+import { submitAddressChange, type AddressChangePayload } from '@/lib/approvals'
+import { validateCoordinates } from '@/lib/profile-details'
 
 const ALLOWED_TYPES = ['CURRENT', 'NATIVE']
 
@@ -36,7 +37,11 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const pinError = validatePincode(body.pincode, body.country || 'India')
   if (pinError) return NextResponse.json({ message: pinError }, { status: 400 })
 
-  const data = {
+  const geoError = validateCoordinates(body.latitude, body.longitude)
+  if ((body.latitude !== undefined || body.longitude !== undefined) && geoError) return NextResponse.json({ message: geoError.message }, { status: 400 })
+
+  const payload: AddressChangePayload = {
+    addressType: addressType as 'CURRENT' | 'NATIVE',
     line1: body.line1 || null,
     line2: body.line2 || null,
     city: body.city || null,
@@ -44,30 +49,20 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     state: body.state || null,
     country: body.country || 'India',
     pincode: body.pincode || null,
+    // Optional extras; left untouched when the caller doesn't send them.
+    ...(body.taluka !== undefined ? { taluka: body.taluka || null } : {}),
+    ...(body.latitude !== undefined ? { latitude: body.latitude === null || body.latitude === '' ? null : Number(body.latitude) } : {}),
+    ...(body.longitude !== undefined ? { longitude: body.longitude === null || body.longitude === '' ? null : Number(body.longitude) } : {}),
   }
-  const payload = { addressType: addressType as 'CURRENT' | 'NATIVE', ...data }
-  const existing = await prisma.address.findFirst({ where: { memberId: params.id, addressType } })
 
-  // First-time entry is always direct. Changing an address that is already on
-  // record is gated (§28) unless staff make the change themselves; a pending
-  // request blocks a second one so reviewers never see a stale queue.
-  if (existing && !access.isStaff && (await requiresApproval('member.address.change'))) {
-    const pending = await prisma.approval.findFirst({
-      where: { actionCode: 'member.address.change', entityId: params.id, status: { in: ['SUBMITTED', 'UNDER_REVIEW'] } },
-    })
-    if (pending) {
-      return NextResponse.json({ message: 'An address change for this member is already awaiting review' }, { status: 409 })
-    }
-    await prisma.$transaction((tx) =>
-      createApprovalRecord(tx, {
-        actionCode: 'member.address.change', entityType: 'member', entityId: params.id,
-        fieldName: addressType, oldValue: { line1: existing.line1, city: existing.city, state: existing.state, pincode: existing.pincode },
-        newValue: payload, submittedBy: session!.user!.id as string,
-      })
-    )
+  const result = await prisma.$transaction((tx) =>
+    submitAddressChange(tx, { memberId: params.id, payload, isStaff: access.isStaff, submittedBy: session!.user!.id as string })
+  )
+  if (result.status === 'already_pending') {
+    return NextResponse.json({ message: 'An address change for this member is already awaiting review' }, { status: 409 })
+  }
+  if (result.status === 'pending') {
     return NextResponse.json({ message: 'Address change submitted for review.', pendingApproval: true }, { status: 202 })
   }
-
-  const address = await prisma.$transaction((tx) => applyAddressChange(tx, params.id, payload))
-  return NextResponse.json({ message: 'Address saved', address })
+  return NextResponse.json({ message: 'Address saved', address: result.address })
 }
