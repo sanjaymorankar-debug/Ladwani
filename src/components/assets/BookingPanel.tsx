@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -28,7 +29,7 @@ export default function BookingPanel({ assetId, bookingMode, ratePerDay, ratePer
     if (!startAt || !endAt) return toast.error('Choose a start and end')
     setBusy(true)
     try {
-      const res = await fetch(`/api/assets/${assetId}/bookings`, {
+      const res = await fetch(`${BASE_PATH}/api/assets/${assetId}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -55,11 +56,11 @@ export default function BookingPanel({ assetId, bookingMode, ratePerDay, ratePer
       // In MOCK mode this stands in for the gateway's hosted checkout page.
       // With a live gateway this is where its SDK would run instead; either
       // way the server verifies the result before anything is confirmed.
-      const credsRes = await fetch(`/api/payments/${held.paymentId}/settle`)
+      const credsRes = await fetch(`${BASE_PATH}/api/payments/${held.paymentId}/settle`)
       if (!credsRes.ok) throw new Error('Payment gateway is not available')
       const creds = await credsRes.json()
 
-      const res = await fetch(`/api/payments/${held.paymentId}/settle`, {
+      const res = await fetch(`${BASE_PATH}/api/payments/${held.paymentId}/settle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gatewayPaymentId: creds.gatewayPaymentId, signature: creds.signature }),

@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -84,7 +85,9 @@ export default function Sidebar() {
           <Settings className="w-5 h-5 flex-shrink-0" />
           {!collapsed && <span>Settings</span>}
         </Link>
-        <button onClick={() => signOut({ callbackUrl: '/login' })}
+        {/* NextAuth navigates the browser to this itself, so unlike
+            router.push it does not get the prefix applied for us. */}
+        <button onClick={() => signOut({ callbackUrl: `${BASE_PATH}/login` })}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors">
           <LogOut className="w-5 h-5 flex-shrink-0" />
           {!collapsed && <span>Sign Out</span>}

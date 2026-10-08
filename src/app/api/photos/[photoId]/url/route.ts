@@ -1,3 +1,4 @@
+import { BASE_PATH } from '@/lib/api-path'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
@@ -31,7 +32,12 @@ export async function GET(req: Request, { params }: { params: { photoId: string 
   const variant = searchParams.get('variant') === 'thumbnail' ? 'thumbnail' : 'optimized'
 
   if (activeStorageDriver() === 'LOCAL') {
-    return NextResponse.json({ url: `/api/photos/${photo.id}/file?variant=${variant}` })
+    // The browser fetches this URL, so it carries the prefix the app is served
+    // under — unlike the pathname comparisons in middleware, which see a path
+    // Next has already stripped.
+    return NextResponse.json({
+      url: `${BASE_PATH}/api/photos/${photo.id}/file?variant=${variant}`,
+    })
   }
 
   const key = (variant === 'thumbnail' ? photo.thumbnailKey : photo.optimizedKey) || photo.storageKey

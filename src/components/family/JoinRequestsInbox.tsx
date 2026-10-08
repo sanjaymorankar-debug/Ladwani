@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { UserPlus, Check, X } from 'lucide-react'
@@ -20,7 +21,7 @@ export default function JoinRequestsInbox({ familyId }: { familyId: string }) {
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = async () => {
-    const res = await fetch(`/api/families/${familyId}/join-requests`)
+    const res = await fetch(`${BASE_PATH}/api/families/${familyId}/join-requests`)
     if (res.ok) {
       const data = await res.json()
       setRequests(data.requests ?? [])
@@ -34,7 +35,7 @@ export default function JoinRequestsInbox({ familyId }: { familyId: string }) {
   const respond = async (reqId: string, decision: 'APPROVE' | 'REJECT') => {
     setBusyId(reqId)
     try {
-      const res = await fetch(`/api/families/${familyId}/join-requests/${reqId}`, {
+      const res = await fetch(`${BASE_PATH}/api/families/${familyId}/join-requests/${reqId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision }),

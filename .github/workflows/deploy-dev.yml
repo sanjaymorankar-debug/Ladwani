@@ -95,6 +95,12 @@ jobs:
       - name: Check the Prisma schema is valid
         run: npx prisma validate
 
+      # basePath does not rewrite fetch(), so a newly added `fetch('/api/...')`
+      # typechecks, passes the tests, and then calls the hub's root instead of
+      # this app. Nothing else catches that.
+      - name: Check every API URL carries BASE_PATH
+        run: bash scripts/check-base-path.sh
+
       # The app was ported from PostgreSQL for shared hosting; a provider
       # flipped back would fail only once a real query ran.
       - name: Check the schema still targets MySQL
@@ -149,6 +155,12 @@ jobs:
           # The real dev credentials live only in the server's .env.
           DATABASE_URL: mysql://build:build@127.0.0.1:3306/build
           NEXTAUTH_SECRET: build-only-not-used-at-runtime
+          # The hub forwards /ladwani/ here WITHOUT stripping the prefix, so
+          # the app owns it. Needed at build time because Next inlines it into
+          # the client bundles — and it must ALSO be set in the server's .env,
+          # because `next start` reads next.config.js again to route. See
+          # next.config.js.
+          BASE_PATH: /ladwani
         # NOTE: anything named NEXT_PUBLIC_* is baked into the bundle here,
         # from this environment — not from the server's .env, which is read at
         # runtime and so arrives too late. Nothing is set on purpose, because

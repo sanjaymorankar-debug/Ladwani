@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -108,7 +109,7 @@ export default function EditMemberPage() {
     heightCm: true, weightKg: true, bodyType: true, bloodGroup: true, physicalDisability: true,
   })
   useEffect(() => {
-    fetch('/api/settings/physical-fields').then((r) => (r.ok ? r.json() : null)).then((d) => d && setPhysical(d.config)).catch(() => {})
+    fetch(`${BASE_PATH}/api/settings/physical-fields`).then((r) => (r.ok ? r.json() : null)).then((d) => d && setPhysical(d.config)).catch(() => {})
   }, [])
 
   const schema = useMemo(() => makeSchema(savedMobile), [savedMobile])
@@ -120,10 +121,10 @@ export default function EditMemberPage() {
   // over whatever the user has typed since.
   const fetchMember = (isCurrent: () => boolean = () => true) =>
     Promise.all([
-      fetch(`/api/members/${memberId}`).then((r) => r.json()),
+      fetch(`${BASE_PATH}/api/members/${memberId}`).then((r) => r.json()),
       // Older records simply have no details row / current address yet;
       // those load as empty fields.
-      fetch(`/api/members/${memberId}/profile-details`).then((r) => (r.ok ? r.json() : {})) as Promise<any>,
+      fetch(`${BASE_PATH}/api/members/${memberId}/profile-details`).then((r) => (r.ok ? r.json() : {})) as Promise<any>,
     ])
       .then(([data, extra]) => {
         if (!isCurrent()) return
@@ -197,7 +198,7 @@ export default function EditMemberPage() {
     setIsLoading(true)
     try {
       const { details, address: currentAddress, ...rest } = data
-      const res = await fetch(`/api/members/${memberId}`, {
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Sparkles, Plus, X } from 'lucide-react'
@@ -15,7 +16,7 @@ export default function SkillsManager({ memberId }: { memberId: string }) {
   const [suggestions, setSuggestions] = useState<string[]>([])
 
   const load = () =>
-    fetch(`/api/members/${memberId}`)
+    fetch(`${BASE_PATH}/api/members/${memberId}`)
       .then((r) => r.json())
       .then((d) => setSkills(d.skills ?? []))
 
@@ -25,7 +26,7 @@ export default function SkillsManager({ memberId }: { memberId: string }) {
   // Typing something not on the list still works - it is added as a new skill.
   useEffect(() => {
     const t = setTimeout(() => {
-      fetch(`/api/skills?q=${encodeURIComponent(name.trim())}`)
+      fetch(`${BASE_PATH}/api/skills?q=${encodeURIComponent(name.trim())}`)
         .then((r) => (r.ok ? r.json() : { skills: [] }))
         .then((d) => setSuggestions((d.skills ?? []).map((s: { name: string }) => s.name)))
         .catch(() => {})
@@ -37,7 +38,7 @@ export default function SkillsManager({ memberId }: { memberId: string }) {
     if (!name.trim()) return
     setAdding(true)
     try {
-      const res = await fetch(`/api/members/${memberId}/skills`, {
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/skills`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
@@ -53,7 +54,7 @@ export default function SkillsManager({ memberId }: { memberId: string }) {
   }
 
   const remove = async (skillId: string) => {
-    await fetch(`/api/members/${memberId}/skills?skillId=${skillId}`, { method: 'DELETE' })
+    await fetch(`${BASE_PATH}/api/members/${memberId}/skills?skillId=${skillId}`, { method: 'DELETE' })
     setSkills((s) => s.filter((x) => x.skillId !== skillId))
   }
 

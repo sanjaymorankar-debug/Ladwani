@@ -78,6 +78,12 @@ jobs:
       - name: Check the Prisma schema is valid
         run: npx prisma validate
 
+      # basePath does not rewrite fetch(), so a newly added `fetch('/api/...')`
+      # typechecks, passes the tests, and then calls the hub's root instead of
+      # this app. Nothing else catches that.
+      - name: Check every API URL carries BASE_PATH
+        run: bash scripts/check-base-path.sh
+
       # The app was ported from PostgreSQL for shared hosting; a provider
       # flipped back would fail only once a real query ran.
       - name: Check the schema still targets MySQL
