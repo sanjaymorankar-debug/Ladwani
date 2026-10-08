@@ -61,13 +61,13 @@ jobs:
           PAYMENT_SIGNING_SECRET=ci-only-signing-secret
           ENV
 
-      - name: Apply migrations
-        run: npm run test:migrate
-
-      - name: Seed reference and UAT data
-        run: |
-          node scripts/with-env.js .env.test npm run db:seed
-          node scripts/with-env.js .env.test npm run db:seed:uat
+      # test:setup is migrate + both seeds, in the order uat-seed needs. Defined
+      # in package.json so CI and a developer's machine cannot drift apart --
+      # this step used to spell the two seeds out here, which meant the knowledge
+      # lived only in CI and anyone running the suite locally had to rediscover
+      # it. See tests/README.md.
+      - name: Prepare the test database
+        run: npm run test:setup
 
       - name: Typecheck
         run: npm run typecheck

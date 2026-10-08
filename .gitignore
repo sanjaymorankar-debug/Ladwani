@@ -42,3 +42,6 @@ prisma/migrations/*.sql.bak
 
 # Uploads (local dev)
 uploads/
+
+# Files written by test runs (UPLOAD_DIR in .env.test)
+uploads-test
