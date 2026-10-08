@@ -2,7 +2,7 @@
   "name": "miladwani",
   "version": "1.0.0",
   "private": true,
-  "description": "Mi Ladwani — Community Family Registry, Directory & Matrimony Platform",
+  "description": "Mi Ladwani \u2014 Community Family Registry, Directory & Matrimony Platform",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -19,6 +19,9 @@
     "db:reset": "prisma migrate reset",
     "test": "node scripts/with-env.js .env.test npx vitest run",
     "test:migrate": "node scripts/with-env.js .env.test npx prisma migrate deploy",
+    "test:seed": "node scripts/with-env.js .env.test npx ts-node --project prisma/seeds/tsconfig.seed.json prisma/seeds/seed.ts",
+    "test:seed:uat": "node scripts/with-env.js .env.test npx ts-node --project prisma/seeds/tsconfig.seed.json prisma/seeds/uat-seed.ts",
+    "test:setup": "npm run test:migrate && npm run test:seed && npm run test:seed:uat",
     "migrate:mysql-to-postgres": "ts-node --project prisma/seeds/tsconfig.seed.json scripts/migrate-mysql-to-postgres.ts",
     "test:smtp": "node scripts/with-env.js .env node scripts/test-smtp.js"
   },
