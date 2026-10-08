@@ -15,7 +15,14 @@ interface AddressForm {
 
 const EMPTY: AddressForm = { line1: '', line2: '', city: '', district: '', state: '', pincode: '', country: 'India' }
 
-export default function AddressesManager({ memberId }: { memberId: string }) {
+// `types` limits which addresses are edited here — the Edit Profile form
+// edits the CURRENT address (with its map pin) itself, so it shows NATIVE only.
+export default function AddressesManager({
+  memberId, types = ['CURRENT', 'NATIVE'],
+}: {
+  memberId: string
+  types?: ('CURRENT' | 'NATIVE')[]
+}) {
   const [current, setCurrent] = useState<AddressForm>({ ...EMPTY })
   const [native, setNative] = useState<AddressForm>({ ...EMPTY })
   const [savingCurrent, setSavingCurrent] = useState(false)
@@ -66,8 +73,9 @@ export default function AddressesManager({ memberId }: { memberId: string }) {
   return (
     <div className="card space-y-5">
       <h3 className="font-semibold text-gray-900 border-b border-gray-100 pb-2 flex items-center gap-2">
-        <MapPin className="w-4 h-4 text-saffron-600" /> Addresses
+        <MapPin className="w-4 h-4 text-saffron-600" /> {types.includes('CURRENT') ? 'Addresses' : 'Native / Original Address'}
       </h3>
+      {types.includes('CURRENT') && (
       <div className="space-y-2">
         <p className="text-sm font-medium text-gray-600">Current Residence</p>
         <Fields data={current} setData={setCurrent} />
@@ -76,7 +84,9 @@ export default function AddressesManager({ memberId }: { memberId: string }) {
           {savingCurrent ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save Current Address
         </button>
       </div>
-      <div className="space-y-2 border-t border-gray-100 pt-4">
+      )}
+      {types.includes('NATIVE') && (
+      <div className={`space-y-2 ${types.includes('CURRENT') ? 'border-t border-gray-100 pt-4' : ''}`}>
         <p className="text-sm font-medium text-gray-600">Native / Original Residence</p>
         <Fields data={native} setData={setNative} />
         <button type="button" onClick={() => save('NATIVE', native, setSavingNative)} disabled={savingNative}
@@ -84,6 +94,7 @@ export default function AddressesManager({ memberId }: { memberId: string }) {
           {savingNative ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save Native Address
         </button>
       </div>
+      )}
     </div>
   )
 }
