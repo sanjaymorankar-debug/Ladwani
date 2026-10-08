@@ -1,3 +1,10 @@
+> **Before following this:** this document deploys the app on **this branch
+> (`main`)** to `devmiladwani.agtci.com`. It is **not** how `ladwani.bkesari.com`
+> is deployed — that is branch **`rebuild`** of this same repository (renamed from
+> `miladwani`), a NestJS API plus a Next.js web app needing **two** Hostinger sites
+> rather than one. See `bkesari-platform/DEPLOY.md` part 5, and the README here for
+> which branch is which.
+
 # Deploying to devmiladwani.agtci.com
 
 Updated 10 Sep 2026. This codebase now targets **MySQL** (ported from
@@ -169,8 +176,8 @@ costs nothing and means nothing is permanently lost if you want to look back.
 Push this codebase as its own branch and merge it via PR instead:
 
 ```bash
-cd D:\Claude_development\ladwani\app
-git remote add origin https://github.com/sanjaymorankar-debug/miladwani.git
+cd /Users/agtci/Documents/Project_Documents/Projects/ladwani/app
+git remote add origin https://github.com/sanjaymorankar-debug/Ladwani.git
 git fetch origin
 git push -u origin master:mysql-deploy
 ```
@@ -187,7 +194,7 @@ you can `git clone`/`git pull` yourself over the SSH terminal it gives you:
 ```bash
 ssh <hpanel-user>@<host>
 cd ~/miladwani           # or wherever hPanel's Node app root is
-git clone https://github.com/sanjaymorankar-debug/miladwani.git .
+git clone https://github.com/sanjaymorankar-debug/Ladwani.git .
 git checkout main        # after the PR above is merged
 ```
 

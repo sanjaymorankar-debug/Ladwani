@@ -10,7 +10,11 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     testTimeout: 20000,
     hookTimeout: 30000,
-    fileParallelism: false, // shared Postgres test DB - avoid cross-test races
+    // Every test file imports @/lib/prisma and shares one MySQL test database,
+    // so running files concurrently races on the same fixture rows. The schema
+    // is MySQL (prisma/schema.prisma: provider = "mysql"); this said Postgres,
+    // which it never was for the test path.
+    fileParallelism: false,
   },
   resolve: {
     alias: {

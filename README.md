@@ -1,3 +1,26 @@
+> ## ⚠️ Two unrelated apps live in this repository — check your branch
+>
+> This repository was renamed from `miladwani` to **`Ladwani`**, and it holds **two
+> different applications on unrelated histories**. `git merge-base main rebuild`
+> finds no common ancestor, so these are not a fork and a mainline — they are two
+> codebases sharing one repo.
+>
+> | Branch | App | Schema | Deploys to |
+> |---|---|---|---|
+> | **`main`** (you are reading its README) | one Next.js app, single process | 53 Prisma models | `devmiladwani.agtci.com` |
+> | **`rebuild`** | NestJS API **+** Next.js web — two processes, so two Hostinger sites | **73** Prisma models | `(dev/test)ladwani.bkesari.com` |
+>
+> `rebuild` covers Family Registry, Matrimony, Community Social, Bookings/Assets,
+> Payments/Fees/Ledger and Admin/Reporting (M0–M6). This branch covers Family
+> Registry, Directory and Matrimony only. On the Mac the rebuild is checked out at
+> `/Users/agtci/Documents/Project_Documents/Projects/community-platform`.
+>
+> **So:** everything below describes the `main` app and `devmiladwani.agtci.com`.
+> For the bkesari tiers, use `rebuild` and `bkesari-platform/DEPLOY.md` part 5.
+> The platform's `database/ladwani/*.sql` scripts are generated from **`rebuild`**'s
+> schema (73 tables), not this branch's — do not import them into a database for
+> this app.
+
 # Mi Ladwani — Community Platform
 
 Official digital platform for Ladwani Samaj: Family Registry, Member Directory & Matrimony.
@@ -23,8 +46,8 @@ Official digital platform for Ladwani Samaj: Family Registry, Member Directory &
 ### 2. Clone & Install
 
 ```bash
-git clone https://github.com/sanjaymorankar-debug/miladwani.git
-cd miladwani
+git clone https://github.com/sanjaymorankar-debug/Ladwani.git
+cd Ladwani
 npm install
 ```
 
@@ -113,7 +136,7 @@ NEXT_PUBLIC_APP_URL=https://devmiladwani.agtci.com
 git init
 git add .
 git commit -m "feat: initial Mi Ladwani platform"
-git remote add origin https://github.com/sanjaymorankar-debug/miladwani.git
+git remote add origin https://github.com/sanjaymorankar-debug/Ladwani.git
 git push -u origin main
 ```
 
