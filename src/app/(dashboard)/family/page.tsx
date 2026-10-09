@@ -6,7 +6,7 @@ import { Users, TreePine, MapPin, Plus, Edit, ChevronRight, CheckCircle2 } from 
 import { calculateAge, genderLabel, maritalLabel, MARITAL_STATUS_LABELS, GENDER_LABELS } from '@/lib/utils'
 import PendingFamilyInvitations from '@/components/family/PendingFamilyInvitations'
 
-export default async function FamilyPage() {
+export default async function FamilyPage({ searchParams }: { searchParams?: { f?: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return null
 
@@ -15,7 +15,10 @@ export default async function FamilyPage() {
     include: {
       member: {
         include: {
+          // F24: every active membership; ?f= picks which family to show.
           families: {
+            where: { leftAt: null },
+            orderBy: { joinedAt: 'asc' },
             include: {
               family: {
                 include: {
@@ -30,14 +33,18 @@ export default async function FamilyPage() {
                 },
               },
             },
-            take: 1,
           },
         },
       },
     },
   })
 
-  const family = user?.member?.families[0]?.family
+  const memberships = user?.member?.families ?? []
+  const current = memberships.find((m) => m.familyId === searchParams?.f) ?? memberships[0]
+  const family = current?.family
+  const roleCodes = memberships.map((m) => m.relationshipRole).filter(Boolean) as string[]
+  const roleLabels = new Map((await prisma.relationshipType.findMany({ where: { code: { in: roleCodes } }, select: { code: true, label: true } })).map((t) => [t.code, t.label]))
+  const roleOf = (m: (typeof memberships)[number]) => (m.isKarta ? 'Karta' : m.relationshipRole ? roleLabels.get(m.relationshipRole) ?? m.relationshipRole : 'Member')
   const members = family?.members ?? []
   const address = family?.addresses[0]
 
@@ -71,6 +78,20 @@ export default async function FamilyPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {memberships.length > 1 && (
+        <div className="card">
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">My Families</h2>
+          <div className="flex flex-wrap gap-2">
+            {memberships.map((m) => (
+              <Link key={m.familyId} href={`/family?f=${m.familyId}`}
+                className={`px-3 py-2 rounded-xl border text-sm ${m.familyId === family.id ? 'border-saffron-400 bg-saffron-50 text-saffron-800' : 'border-gray-200 text-gray-700 hover:border-saffron-300'}`}>
+                <span className="font-medium">{m.family.name}</span>
+                <span className="text-xs text-gray-500"> · {roleOf(m)}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="card">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-4">

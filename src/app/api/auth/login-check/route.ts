@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateLogin, type LoginErrorCode } from '@/lib/auth'
+import { adminSecondFactorRequired } from '@/lib/auth-config'
+import { issueOtp, OTP_TTL_MINUTES } from '@/lib/otp'
+import { sendEmail } from '@/lib/email'
 import { checkRateLimit } from '@/lib/rate-limit'
 
 /**
@@ -43,6 +46,26 @@ export async function POST(req: NextRequest) {
   const result = await validateLogin(identifier, password)
   if (!result.ok) {
     return NextResponse.json({ ok: false, message: MESSAGES[result.code] }, { status: 401 })
+  }
+
+  // F32: Admins get a second-factor code by email; the form then signs in
+  // with identifier + password + code.
+  if (result.user.roles.includes('ADMIN') && adminSecondFactorRequired()) {
+    if (!result.user.email) {
+      return NextResponse.json({ ok: false, message: 'This Admin account has no email for its sign-in code. Contact another Admin.' }, { status: 401 })
+    }
+    const { code } = await issueOtp(result.user.id, 'ADMIN_2FA')
+    try {
+      await sendEmail({
+        to: result.user.email,
+        subject: 'Your Mi Ladwani Admin sign-in code',
+        html: `<p>Your Admin sign-in code is <strong style="font-size:20px;letter-spacing:4px">${code}</strong>.</p><p>It expires in ${OTP_TTL_MINUTES} minutes. If you did not try to sign in, change your password.</p>`,
+        text: `Your Mi Ladwani Admin sign-in code: ${code} (expires in ${OTP_TTL_MINUTES} minutes)`,
+      })
+    } catch {
+      return NextResponse.json({ ok: false, message: 'The sign-in code could not be emailed. Please try again shortly.' }, { status: 503 })
+    }
+    return NextResponse.json({ ok: true, otpRequired: true, message: 'We emailed you a 6-digit sign-in code.' })
   }
 
   return NextResponse.json({ ok: true })

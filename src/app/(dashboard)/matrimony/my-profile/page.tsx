@@ -8,11 +8,17 @@ export default function MyMatrimonyProfilePage() {
   const [profile, setProfile] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isToggling, setIsToggling] = useState(false)
+  // F37: the toggle is offered only when eligible (Unmarried / Divorced / Widowed, legal age, and earning under the workbook rules).
+  const [eligibility, setEligibility] = useState<{ ok: boolean; reason?: string }>({ ok: true })
+  const [details, setDetails] = useState({ expectations: '', horoscope: '', contactPreference: 'SELF', heightCm: '' })
 
   useEffect(() => {
     fetch('/api/matrimony/profiles/mine')
       .then((r) => r.json())
-      .then((d) => setProfile(d.profile))
+      .then((d) => {
+        setProfile(d.profile); setEligibility(d.eligibility ?? { ok: true })
+        if (d.profile) setDetails({ expectations: d.profile.expectations ?? '', horoscope: d.profile.horoscope ?? '', contactPreference: d.profile.contactPreference ?? 'SELF', heightCm: d.profile.heightCm ? String(d.profile.heightCm) : '' })
+      })
       .finally(() => setIsLoading(false))
   }, [])
 
@@ -31,6 +37,16 @@ export default function MyMatrimonyProfilePage() {
       toast.success(profile.isVisible ? 'Profile hidden from matrimony search' : 'Profile visible in matrimony search')
     } catch (e: any) { toast.error(e.message) }
     finally { setIsToggling(false) }
+  }
+
+  const saveDetails = async () => {
+    const res = await fetch(`/api/matrimony/profiles/${profile.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...details, heightCm: details.heightCm ? Number(details.heightCm) : null }),
+    })
+    const json = await res.json()
+    if (!res.ok) return toast.error(json.message)
+    toast.success('Saved')
   }
 
   if (isLoading) return (
@@ -71,17 +87,20 @@ export default function MyMatrimonyProfilePage() {
             <Link href="/matrimony/create-profile" className="btn-secondary text-sm flex items-center gap-1.5">
               <Edit className="w-3.5 h-3.5" /> Edit
             </Link>
-            <button onClick={toggleVisibility} disabled={isToggling}
+            {(profile.isVisible || eligibility.ok) && <button onClick={toggleVisibility} disabled={isToggling}
               className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
                 profile.isVisible
                   ? 'bg-red-50 text-red-600 hover:bg-red-100'
                   : 'bg-green-50 text-green-600 hover:bg-green-100'
               }`}>
               {isToggling ? <Loader2 className="w-4 h-4 animate-spin" /> : profile.isVisible ? 'Hide Profile' : 'Show Profile'}
-            </button>
+            </button>}
           </div>
         </div>
 
+        {!eligibility.ok && !profile.isVisible && (
+          <p className="mb-4 text-sm text-amber-800 bg-amber-50 rounded-lg p-2">{eligibility.reason}</p>
+        )}
         {profile.about && (
           <div className="mb-4 pb-4 border-b border-gray-100">
             <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">About</p>
@@ -97,6 +116,19 @@ export default function MyMatrimonyProfilePage() {
             <div><span className="text-gray-500 text-xs">Languages</span><div className="font-medium">{profile.languages.join(', ')}</div></div>
           )}
         </div>
+      </div>
+
+      <div className="card space-y-2 text-sm">
+        <p className="font-medium text-gray-700">Bureau details</p>
+        <label className="form-label">Height (cm)<input className="form-input" type="number" value={details.heightCm} onChange={(e) => setDetails({ ...details, heightCm: e.target.value })} /></label>
+        <label className="form-label">Expectations<textarea className="form-input" rows={2} value={details.expectations} onChange={(e) => setDetails({ ...details, expectations: e.target.value })} /></label>
+        <label className="form-label">Horoscope details (optional)<textarea className="form-input" rows={2} value={details.horoscope} onChange={(e) => setDetails({ ...details, horoscope: e.target.value })} /></label>
+        <label className="form-label">When an interest is accepted, share
+          <select className="form-input" value={details.contactPreference} onChange={(e) => setDetails({ ...details, contactPreference: e.target.value })}>
+            <option value="SELF">My contact details</option><option value="KARTA">My Karta&apos;s contact details</option><option value="BOTH">Both</option>
+          </select>
+        </label>
+        <button type="button" className="btn-primary text-sm" onClick={saveDetails}>Save details</button>
       </div>
 
       <div className="card">

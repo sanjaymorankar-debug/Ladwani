@@ -6,7 +6,7 @@ import { getMemberAccess } from '@/lib/member-auth'
 import { deletePhotoObjects } from '@/lib/storage'
 
 const VALID_VISIBILITY = new Set([
-  'PRIVATE', 'SAME_FAMILY', 'REGISTERED_MEMBERS', 'SAME_AREA', 'MATRIMONY_ONLY', 'PUBLIC_COMMUNITY', 'ADMIN_OPERATOR',
+  'PRIVATE', 'SAME_FAMILY', 'FRIENDS', 'FRIEND_LIST', 'REGISTERED_MEMBERS', 'SAME_AREA', 'MATRIMONY_ONLY', 'PUBLIC_COMMUNITY', 'ADMIN_OPERATOR',
 ])
 
 export async function PATCH(req: Request, { params }: { params: { id: string; photoId: string } }) {
@@ -25,12 +25,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string; ph
   if (body.visibility && !VALID_VISIBILITY.has(body.visibility)) {
     return NextResponse.json({ message: 'Invalid visibility value' }, { status: 400 })
   }
+  // F34: "a friend list" names one of the member's own lists.
+  if (body.visibility === 'FRIEND_LIST') {
+    const list = body.audienceListId ? await prisma.friendList.findUnique({ where: { id: String(body.audienceListId) } }) : null
+    if (!list || list.ownerMemberId !== params.id) return NextResponse.json({ message: 'Choose one of your friend lists' }, { status: 400 })
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.photo.update({
       where: { id: params.photoId },
       data: {
         visibility: body.visibility ?? undefined,
+        ...(body.visibility ? { audienceListId: body.visibility === 'FRIEND_LIST' ? String(body.audienceListId) : null } : {}),
         caption: body.caption !== undefined ? body.caption : undefined,
       },
     })

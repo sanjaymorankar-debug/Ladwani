@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma'
  * Who may edit a member profile.
  *
  *  - the member themself
- *  - platform staff (ADMIN / OPERATOR)
+ *  - an Admin (Operators no longer edit member data — Roles & Access gives
+ *    them "role in family only", decision 3)
  *  - the Karta of that member's family, **but only for members who have no
  *    login account of their own** — children, elderly parents, deceased
  *    relatives. Somebody has to be able to maintain those records, and the
@@ -29,7 +30,7 @@ export async function getMemberAccess(session: Session | null, memberId: string)
   if (!member) return denied
 
   const roles = ((session.user as any).roles ?? []) as string[]
-  const isStaff = roles.includes('ADMIN') || roles.includes('OPERATOR')
+  const isStaff = roles.includes('ADMIN')
   const isOwn = !!member.userId && member.userId === session.user.id
   const viewerMemberId = (session.user as any).memberId as string | null
 

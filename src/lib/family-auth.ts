@@ -12,7 +12,8 @@ export async function getFamilyAccess(session: Session | null, familyId: string)
   }
 
   const roles = ((session.user as any).roles ?? []) as string[]
-  const isStaff = roles.includes('ADMIN') || roles.includes('OPERATOR')
+  // Admin only: Roles & Access gives Operators no family management (decision 3).
+  const isStaff = roles.includes('ADMIN')
   const memberId = (session.user as any).memberId as string | null
 
   let isMember = false

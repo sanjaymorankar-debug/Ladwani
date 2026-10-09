@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { isActiveAdmin } from '@/lib/scope'
 import {
   Users, Building2, Heart, Bell, ShieldCheck,
   CheckCircle2, Clock, AlertTriangle, TrendingUp, UserCheck
@@ -11,12 +12,16 @@ export default async function AdminDashboardPage() {
   const session = await getServerSession(authOptions)
   const roles = (session?.user as any)?.roles as string[] ?? []
   if (!roles.includes('ADMIN') && !roles.includes('OPERATOR')) redirect('/dashboard')
+  // Global counts are Admin only (owner's decision; checked against the
+  // database). Operators get the same page without them: their own work is
+  // in My Verification Tasks.
+  const isAdmin = !!session?.user?.id && (await isActiveAdmin(session.user.id))
 
   const [
     totalFamilies, totalMembers, maleMembers, femaleMembers,
     marriedMembers, unmarriedMembers, deceasedMembers, matrimonialProfiles,
     pendingApprovals, totalPosts, pendingFamilies
-  ] = await Promise.all([
+  ] = !isAdmin ? Array(11).fill(0) as number[] : await Promise.all([
     prisma.family.count({ where: { status: 'ACTIVE' } }),
     prisma.member.count({ where: { status: 'ACTIVE' } }),
     prisma.member.count({ where: { status: 'ACTIVE', gender: 'MALE' } }),
@@ -45,11 +50,11 @@ export default async function AdminDashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 font-display flex items-center gap-2">
             <ShieldCheck className="w-6 h-6 text-blue-600" />
-            {roles.includes('ADMIN') ? 'Admin Dashboard' : 'Operator Dashboard'}
+            {isAdmin ? 'Admin Dashboard' : 'Operator Dashboard'}
           </h1>
           <p className="text-gray-500 text-sm mt-0.5">Community platform management</p>
         </div>
-        {pendingApprovals > 0 && (
+        {isAdmin && pendingApprovals > 0 && (
           <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded-lg text-sm font-medium">
             <Clock className="w-4 h-4" />
             {pendingApprovals} pending approval{pendingApprovals !== 1 ? 's' : ''}
@@ -57,8 +62,8 @@ export default async function AdminDashboardPage() {
         )}
       </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      {/* Stats grid (Admin only) */}
+      {isAdmin && <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {statCards.map((s) => (
           <div key={s.label} className="card">
             <div className={`w-10 h-10 ${s.color} rounded-xl flex items-center justify-center mb-3`}>
@@ -69,11 +74,11 @@ export default async function AdminDashboardPage() {
             <div className="text-xs text-gray-400 mt-0.5">{s.sub}</div>
           </div>
         ))}
-      </div>
+      </div>}
 
       {/* Quick actions */}
       <div className="grid md:grid-cols-3 gap-4">
-        <div className="card">
+        {isAdmin && <div className="card">
           <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
             <Clock className="w-4 h-4 text-amber-500" /> Pending Actions
           </h3>
@@ -87,7 +92,7 @@ export default async function AdminDashboardPage() {
               <span className="font-medium text-amber-600">{pendingApprovals}</span>
             </div>
           </div>
-        </div>
+        </div>}
 
         <div className="card">
           <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -108,7 +113,7 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
 
-        {roles.includes('ADMIN') && (
+        {isAdmin && (
           <div className="card">
             <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-red-500" /> Admin Only
@@ -118,6 +123,8 @@ export default async function AdminDashboardPage() {
                 { href: '/admin/users', label: 'User Management' },
                 { href: '/admin/roles', label: 'Roles & Permissions' },
                 { href: '/admin/audit-logs', label: 'Audit Logs' },
+                { href: '/admin/data-requests', label: 'Data Requests & Consents' },
+                { href: '/reports', label: 'Reports' },
                 { href: '/admin/settings', label: 'System Settings' },
               ].map((a) => (
                 <a key={a.href} href={a.href} className="flex items-center justify-between text-sm py-2 text-blue-600 hover:text-blue-700 border-b border-gray-50 last:border-0">

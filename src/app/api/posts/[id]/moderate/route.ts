@@ -2,17 +2,18 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { canModeratePost, alertAudience } from '@/lib/posts'
 
-/** Operator/Admin approve or reject a submitted post. */
+/**
+ * Approve or reject a submitted post, or hide a published one. Community
+ * posts: Operator / Admin (as before). F36: District / State / National posts
+ * are moderated by that LadWani body's President or Secretary, or an Admin.
+ */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
   const roles = ((session.user as any).roles ?? []) as string[]
-  if (!roles.includes('ADMIN') && !roles.includes('OPERATOR')) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
-  }
-
   const body = await req.json()
   const action = body.action as 'approve' | 'reject' | 'hide'
   if (!['approve', 'reject', 'hide'].includes(action)) {
@@ -21,6 +22,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const post = await prisma.post.findUnique({ where: { id: params.id } })
   if (!post || post.deletedAt) return NextResponse.json({ message: 'Post not found' }, { status: 404 })
+  if (!(await canModeratePost(session, post))) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+  // Only a waiting post is approved or rejected; only a live one is hidden.
+  const from = action === 'hide' ? ['PUBLISHED'] : ['PENDING_APPROVAL']
+  if (!from.includes(post.status)) return NextResponse.json({ message: `A ${post.status.toLowerCase().replace('_', ' ')} post cannot be ${action}d` }, { status: 409 })
 
   const status = action === 'approve' ? 'PUBLISHED' : action === 'reject' ? 'REJECTED' : 'HIDDEN'
 
@@ -50,7 +55,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     await tx.auditLog.create({
       data: {
         actorId: session.user!.id as string,
-        actorRole: roles[0],
+        actorRole: roles.includes('ADMIN') ? 'ADMIN' : roles.includes('OPERATOR') ? 'OPERATOR' : 'BODY_OFFICER',
         action: `post.${action}`,
         entityType: 'post',
         entityId: post.id,
@@ -62,5 +67,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return result
   })
 
+  if (updated.status === 'PUBLISHED') await alertAudience(updated)
   return NextResponse.json({ message: `Post ${action}d`, status: updated.status })
 }

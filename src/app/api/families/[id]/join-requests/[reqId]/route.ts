@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { genderedCode } from '@/lib/relations'
 import { canManageFamily } from '@/lib/family-auth'
+import { roleGenderError, joinRequestExpired } from '@/lib/family-rules'
+import { recordAudit } from '@/lib/audit'
 
 export async function PATCH(req: Request, { params }: { params: { id: string; reqId: string } }) {
   const session = await getServerSession(authOptions)
@@ -21,6 +24,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string; re
   if (joinRequest.status !== 'PENDING') {
     return NextResponse.json({ message: 'This request has already been resolved' }, { status: 409 })
   }
+  // F15: an unanswered request lapses after the expiry window (default 30 days).
+  if (await joinRequestExpired(joinRequest.createdAt)) {
+    await prisma.familyJoinRequest.update({ where: { id: joinRequest.id }, data: { status: 'EXPIRED' } })
+    return NextResponse.json({ message: 'This request has expired. Ask the person to send a new one.' }, { status: 409 })
+  }
 
   // Who gets to answer depends on who asked. A Karta approving a request to
   // join their family is not the same act as a person accepting an invitation
@@ -38,6 +46,20 @@ export async function PATCH(req: Request, { params }: { params: { id: string; re
     return NextResponse.json({ message: "Only this family's Karta can respond to join requests" }, { status: 403 })
   }
 
+  // F15: on accept the Karta may correct the claimed relationship role.
+  let roleCode = joinRequest.relationshipTypeCode
+  let relativeTo = joinRequest.relatedToMemberId
+  if (decision === 'APPROVE' && joinRequest.direction === 'MEMBER_REQUEST' && (body.relationshipTypeCode || body.relatedToMemberId)) {
+    roleCode = body.relationshipTypeCode ?? roleCode
+    relativeTo = body.relatedToMemberId ?? relativeTo
+    const person = await prisma.member.findUnique({ where: { id: joinRequest.memberId }, select: { gender: true } })
+    const genderError = await roleGenderError(roleCode, person?.gender)
+    if (genderError) return NextResponse.json({ message: genderError }, { status: 400 })
+    if (relativeTo && !(await prisma.familyMember.findFirst({ where: { familyId: params.id, memberId: relativeTo, leftAt: null } }))) {
+      return NextResponse.json({ message: 'The person this relationship is relative to is not in this family' }, { status: 400 })
+    }
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.familyJoinRequest.update({
       where: { id: joinRequest.id },
@@ -46,39 +68,49 @@ export async function PATCH(req: Request, { params }: { params: { id: string; re
         respondedBy: session.user.id,
         respondedAt: new Date(),
         responseNote: body.note ?? null,
+        relationshipTypeCode: roleCode,
+        relatedToMemberId: relativeTo,
       },
     })
 
     if (decision === 'APPROVE') {
-      // Guard a race: the member could have joined a different family
-      // between requesting and this approval landing.
-      const alreadyLinked = await tx.familyMember.findFirst({
-        where: { memberId: joinRequest.memberId, leftAt: null },
+      // Rule 1: membership of other families is fine. A row from an earlier
+      // stay in this family (removed / ended) is re-activated.
+      const previous = await tx.familyMember.findUnique({
+        where: { familyId_memberId: { familyId: params.id, memberId: joinRequest.memberId } },
       })
 
-      if (!alreadyLinked) {
-        await tx.familyMember.create({
-          data: { familyId: params.id, memberId: joinRequest.memberId, joinedBy: session.user.id },
-        })
+      if (!previous || previous.leftAt) {
+        const data = {
+          joinedBy: session.user.id, joinedAt: new Date(), leftAt: null, leftReason: null, status: 'ACTIVE',
+          relationshipRole: roleCode, relativeToMemberId: relativeTo,
+        }
+        if (previous) await tx.familyMember.update({ where: { id: previous.id }, data })
+        else await tx.familyMember.create({ data: { familyId: params.id, memberId: joinRequest.memberId, ...data } })
 
-        if (joinRequest.relatedToMemberId && joinRequest.relationshipTypeCode) {
-          const relType = await tx.relationshipType.findUnique({ where: { code: joinRequest.relationshipTypeCode } })
+        if (relativeTo && roleCode) {
+          const relType = await tx.relationshipType.findUnique({ where: { code: roleCode } })
           if (relType) {
-            await tx.memberRelationship.create({
-              data: {
+            await tx.memberRelationship.upsert({
+              where: { fromMemberId_toMemberId_relationshipTypeId: { fromMemberId: joinRequest.memberId, toMemberId: relativeTo, relationshipTypeId: relType.id } },
+              update: { isActive: true, familyId: params.id },
+              create: {
                 fromMemberId: joinRequest.memberId,
-                toMemberId: joinRequest.relatedToMemberId,
+                toMemberId: relativeTo,
                 relationshipTypeId: relType.id,
                 familyId: params.id,
                 createdBy: session.user.id,
               },
             })
             if (relType.inverseCode) {
-              const inverseType = await tx.relationshipType.findUnique({ where: { code: relType.inverseCode } })
+              const relativeGender = (await tx.member.findUnique({ where: { id: relativeTo }, select: { gender: true } }))?.gender
+              const inverseType = await tx.relationshipType.findUnique({ where: { code: genderedCode(relType.inverseCode, relativeGender) } })
               if (inverseType) {
-                await tx.memberRelationship.create({
-                  data: {
-                    fromMemberId: joinRequest.relatedToMemberId,
+                await tx.memberRelationship.upsert({
+                  where: { fromMemberId_toMemberId_relationshipTypeId: { fromMemberId: relativeTo, toMemberId: joinRequest.memberId, relationshipTypeId: inverseType.id } },
+                  update: { isActive: true, familyId: params.id },
+                  create: {
+                    fromMemberId: relativeTo,
                     toMemberId: joinRequest.memberId,
                     relationshipTypeId: inverseType.id,
                     familyId: params.id,
@@ -92,17 +124,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string; re
       }
     }
 
-    await tx.auditLog.create({
-      data: {
-        actorId: session.user.id,
-        action: joinRequest.direction === 'KARTA_INVITE'
-          ? `family.invite.${decision === 'APPROVE' ? 'accept' : 'decline'}`
-          : `family.join_request.${decision.toLowerCase()}`,
-        entityType: 'family_join_request',
-        entityId: joinRequest.id,
-        newValue: { direction: joinRequest.direction },
-      },
-    })
+    await recordAudit({
+      actorId: session.user.id,
+      action: joinRequest.direction === 'KARTA_INVITE'
+        ? `family.invite.${decision === 'APPROVE' ? 'accept' : 'decline'}`
+        : `family.join_request.${decision.toLowerCase()}`,
+      entityType: 'family_join_request', entityId: joinRequest.id,
+      oldValue: { status: 'PENDING', relationshipTypeCode: joinRequest.relationshipTypeCode, relatedToMemberId: joinRequest.relatedToMemberId },
+      newValue: { status: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED', direction: joinRequest.direction, relationshipTypeCode: roleCode, relatedToMemberId: relativeTo, note: body.note ?? null },
+    }, req, tx)
 
     // Close the loop for whoever is waiting on the answer.
     const notifyUserId =

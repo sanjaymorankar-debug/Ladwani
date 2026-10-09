@@ -1,5 +1,19 @@
 import { Session } from 'next-auth'
 import { prisma } from '@/lib/prisma'
+import { operatorHasOpenTaskFor } from '@/lib/verification'
+import { areFriends, inFriendList } from '@/lib/friends'
+
+/**
+ * Full (unredacted) view of a member: Admin always; an Operator only while
+ * holding an undecided verification task for that member (Roles & Access:
+ * Operator sees "assigned tasks only" — decision 3).
+ */
+export async function hasStaffView(session: Session | null, memberId: string): Promise<boolean> {
+  const roles = ((session?.user as any)?.roles ?? []) as string[]
+  if (roles.includes('ADMIN')) return true
+  if (roles.includes('OPERATOR') && session?.user?.id) return operatorHasOpenTaskFor(session.user.id, memberId)
+  return false
+}
 
 /**
  * Shared visibility vocabulary for both MemberFieldVisibility and
@@ -12,16 +26,17 @@ import { prisma } from '@/lib/prisma'
  * which covers the cases spec explicitly worries about (exact address,
  * private photos).
  */
+export const PHOTO_VISIBILITIES = ['PRIVATE', 'SAME_FAMILY', 'FRIENDS', 'FRIEND_LIST', 'REGISTERED_MEMBERS', 'SAME_AREA', 'MATRIMONY_ONLY', 'PUBLIC_COMMUNITY', 'ADMIN_OPERATOR']
+
 export async function canViewByVisibility(
   session: Session | null,
   ownerMemberId: string,
-  visibility: string
+  visibility: string,
+  audienceListId?: string | null
 ): Promise<boolean> {
   if (!session?.user?.id) return false
 
-  const roles = ((session.user as any).roles ?? []) as string[]
-  const isStaff = roles.includes('ADMIN') || roles.includes('OPERATOR')
-  if (isStaff) return true
+  if (await hasStaffView(session, ownerMemberId)) return true
 
   const viewerMemberId = (session.user as any).memberId as string | null
   if (viewerMemberId && viewerMemberId === ownerMemberId) return true
@@ -42,8 +57,13 @@ export async function canViewByVisibility(
     return !!shared
   }
 
-  // REGISTERED_MEMBERS, PUBLIC_COMMUNITY, MATRIMONY_ONLY, SAME_AREA
-  return true
+  // F34: friends, or one of the owner's friend lists.
+  if (visibility === 'FRIENDS') return areFriends(ownerMemberId, viewerMemberId)
+  if (visibility === 'FRIEND_LIST') return !!audienceListId && inFriendList(audienceListId, ownerMemberId, viewerMemberId)
+
+  // REGISTERED_MEMBERS, PUBLIC_COMMUNITY, MATRIMONY_ONLY, SAME_AREA. Anything
+  // else (a mistyped value) is treated as private, never as public.
+  return ['REGISTERED_MEMBERS', 'PUBLIC_COMMUNITY', 'MATRIMONY_ONLY', 'SAME_AREA'].includes(visibility)
 }
 
 /** field key (as used by MemberFieldVisibility/the privacy page) -> Member columns it gates. Conservative fallback when nothing is configured. */
@@ -66,10 +86,8 @@ export async function redactMemberForViewer<T extends Record<string, any>>(
   session: Session | null,
   member: T
 ): Promise<T> {
-  const roles = ((session?.user as any)?.roles ?? []) as string[]
-  const isStaff = roles.includes('ADMIN') || roles.includes('OPERATOR')
   const viewerMemberId = (session?.user as any)?.memberId as string | null
-  if (isStaff || (viewerMemberId && viewerMemberId === member.id)) return member
+  if ((viewerMemberId && viewerMemberId === member.id) || (await hasStaffView(session, member.id))) return member
 
   const [overrides, defaults] = await Promise.all([
     prisma.memberFieldVisibility.findMany({ where: { memberId: member.id } }),
@@ -86,4 +104,46 @@ export async function redactMemberForViewer<T extends Record<string, any>>(
   }
 
   return member
+}
+
+/**
+ * Batch form of redactMemberForViewer for list endpoints (/api/members,
+ * /api/search): the same per-member privacy settings and fallbacks, loaded
+ * with a fixed number of queries instead of several per row.
+ */
+export async function redactMembersForViewer<T extends Record<string, any>>(
+  session: Session | null,
+  members: T[]
+): Promise<T[]> {
+  const roles = ((session?.user as any)?.roles ?? []) as string[]
+  const viewerMemberId = (session?.user as any)?.memberId as string | null
+  if (roles.includes('ADMIN') || !members.length) return members
+
+  const ids = members.map((m) => m.id as string)
+  const [overrides, defaults, ownerLinks, viewerLinks] = await Promise.all([
+    prisma.memberFieldVisibility.findMany({ where: { memberId: { in: ids } } }),
+    prisma.fieldVisibilityDefault.findMany({ where: { entityType: 'member' } }),
+    prisma.familyMember.findMany({ where: { memberId: { in: ids }, leftAt: null }, select: { memberId: true, familyId: true } }),
+    viewerMemberId
+      ? prisma.familyMember.findMany({ where: { memberId: viewerMemberId, leftAt: null }, select: { familyId: true } })
+      : Promise.resolve([] as { familyId: string }[]),
+  ])
+  const overrideMap = new Map(overrides.map((o) => [`${o.memberId}:${o.fieldName}`, o.visibility]))
+  const defaultMap = new Map(defaults.map((d) => [d.fieldName, d.defaultVisibility]))
+  const viewerFamilies = new Set(viewerLinks.map((l) => l.familyId))
+  const sharesFamily = new Set(ownerLinks.filter((l) => viewerFamilies.has(l.familyId)).map((l) => l.memberId))
+
+  return members.map((member) => {
+    if (viewerMemberId && member.id === viewerMemberId) return member
+    const out: Record<string, any> = { ...member }
+    for (const [fieldKey, { keys, fallback }] of Object.entries(FIELD_MAP)) {
+      const visibility = overrideMap.get(`${member.id}:${fieldKey}`) ?? defaultMap.get(fieldKey) ?? fallback
+      const allowed =
+        visibility === 'PRIVATE' || visibility === 'ADMIN_OPERATOR' ? false
+        : visibility === 'SAME_FAMILY' ? sharesFamily.has(member.id)
+        : true
+      if (!allowed) for (const k of keys) out[k] = null
+    }
+    return out as T
+  })
 }

@@ -26,6 +26,9 @@ async function cleanup() {
     await prisma.auditLog.deleteMany({ where: { actorId: u.id } })
     await prisma.verificationToken.deleteMany({ where: { userId: u.id } })
     await prisma.consentRecord.deleteMany({ where: { userId: u.id } })
+    // P1 (F01): sign-up also links the Mul Gaon and sends a welcome notification.
+    await prisma.notification.deleteMany({ where: { recipientId: u.id } })
+    if (u.member) await prisma.memberArea.deleteMany({ where: { memberId: u.member.id } })
     // Registering a family now raises a registration-fee invoice, which holds
     // a reference to the member.
     if (u.member) {
@@ -49,6 +52,8 @@ const baseBody = {
   firstName: 'Intent',
   lastName: 'Tester',
   password: 'TestPass123',
+  // P1 (F01): gender, date of birth (18+) and Mul Gaon are mandatory at sign-up.
+  gender: 'MALE', dateOfBirth: '1990-05-01', mulGaonAreaId: 'area-mh-vil-loni-kalbhor',
 }
 
 describe('Registration join-intent (spec §2, §7)', () => {
@@ -62,15 +67,15 @@ describe('Registration join-intent (spec §2, §7)', () => {
     expect(res.status).toBe(400)
   })
 
-  it('accepts a signup with no mobile number (mobile is optional)', async () => {
+  // Owner's decision (F01): mobile is mandatory at sign-up. Updated with the
+  // owner's approval; this test used to check that mobile was optional.
+  it('refuses a signup with no mobile number (mobile is mandatory)', async () => {
     const res = await postRegister(req({
       ...baseBody, email: 'nomobile@example.test', joinIntent: 'JOIN_EXISTING',
     }))
-    expect(res.status).toBe(201)
-    const user = await prisma.user.findUniqueOrThrow({ where: { email: 'nomobile@example.test' } })
-    expect(user.mobile).toBeNull()
-    // ...and can sign in with just the email.
-    expect((await validateLogin('nomobile@example.test', baseBody.password)).ok).toBe(true)
+    expect(res.status).toBe(400)
+    expect((await res.json()).message).toMatch(/mobile/i)
+    expect(await prisma.user.findUnique({ where: { email: 'nomobile@example.test' } })).toBeNull()
   })
 
   it('rejects an unrecognised join choice', async () => {
@@ -95,10 +100,11 @@ describe('Registration join-intent (spec §2, §7)', () => {
     expect(user.userRoles.map((ur) => ur.role.code)).toEqual(['MEMBER'])
     // And a Member profile exists for them (spec §9, §32).
     expect(user.member).not.toBeNull()
-    // Verification is currently switched off, so the account is usable right
-    // away — no OTP step. (Set NEXT_PUBLIC_AUTH_REQUIRE_VERIFICATION=true to
-    // go back to PENDING-until-verified.)
-    expect(user.status).toBe('ACTIVE')
+    // Verification is currently switched off, so the account can sign in right
+    // away — no OTP step. P1 (F01): it starts DRAFT (profile only) until two
+    // operators approve it. (NEXT_PUBLIC_AUTH_REQUIRE_VERIFICATION=true puts
+    // PENDING-until-verified in front of that.)
+    expect(user.status).toBe('DRAFT')
   })
 
   it('lets a brand-new account sign in immediately with no OTP', async () => {
@@ -112,7 +118,7 @@ describe('Registration join-intent (spec §2, §7)', () => {
   })
 
   it('stores the JOIN_EXISTING choice with the same MEMBER-only role', async () => {
-    const res = await postRegister(req({ ...baseBody, email: EMAIL_JOINER, joinIntent: 'JOIN_EXISTING' }))
+    const res = await postRegister(req({ ...baseBody, email: EMAIL_JOINER, mobile: MOBILE_JOINER, joinIntent: 'JOIN_EXISTING' }))
     expect(res.status).toBe(201)
 
     const user = await prisma.user.findUniqueOrThrow({
@@ -129,6 +135,8 @@ describe('Registration join-intent (spec §2, §7)', () => {
       include: { member: true },
     })
 
+    // P1 (F09 precondition): only an approved (ACTIVE) account creates a family.
+    await prisma.user.update({ where: { id: user.id }, data: { status: 'ACTIVE' } })
     mockSessionAs({ id: user.id, roles: ['MEMBER'], memberId: user.member!.id, status: 'ACTIVE' })
     const res = await postFamilies(
       new Request('http://x/api/families', {

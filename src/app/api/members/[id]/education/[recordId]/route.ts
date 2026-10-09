@@ -33,6 +33,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string; re
         qualification: body.qualification ?? record.qualification,
         specialization: body.specialization ?? record.specialization,
         institution: body.institution ?? record.institution,
+        university: body.university ?? record.university,
+        grade: body.grade ?? record.grade,
         yearCompleted: body.yearCompleted ? parseInt(body.yearCompleted) : record.yearCompleted,
         isHighest: body.isHighest ?? record.isHighest,
         isOngoing: body.isOngoing ?? record.isOngoing,

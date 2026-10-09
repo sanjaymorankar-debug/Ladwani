@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { withdrawMatrimonyOnMarriage } from '@/lib/matrimony'
 import { UNMARRIED_FLOW_RESET } from '@/lib/profile-details'
+import { generateMemberNumber } from '@/lib/utils'
 
 /**
  * Whether an action needs Operator/Admin review before it takes effect.
@@ -19,6 +20,10 @@ export async function requiresApproval(actionCode: string): Promise<boolean> {
 export interface SpouseLinkPayload {
   spouseMemberId?: string | null
   externalSpouseName?: string | null
+  /** F23: date of the marriage (ISO). */
+  marriageDate?: string | null
+  /** F23: spouse not yet on the site, recorded as a person (so their side of the tree can be built). */
+  newSpouse?: { firstName: string; lastName?: string | null; gender: 'MALE' | 'FEMALE'; dateOfBirth?: string | null } | null
 }
 
 /**
@@ -37,11 +42,24 @@ export async function applySpouseLink(
   const member = await tx.member.findUnique({ where: { id: memberId } })
   if (!member) throw new Error('Member not found')
 
+  // F23: a new spouse becomes a (non-login) person record when applied.
+  if (!payload.spouseMemberId && payload.newSpouse) {
+    const ns = payload.newSpouse
+    const created = await tx.member.create({
+      data: {
+        memberNumber: generateMemberNumber(), firstName: ns.firstName, lastName: ns.lastName ?? null, gender: ns.gender,
+        dateOfBirth: ns.dateOfBirth ? new Date(ns.dateOfBirth) : null, maritalStatus: 'UNMARRIED', status: 'ACTIVE', createdBy: actorId,
+      },
+    })
+    payload = { ...payload, spouseMemberId: created.id }
+  }
+
   await tx.marriageRecord.create({
     data: {
       memberId1: memberId,
       memberId2: payload.spouseMemberId ?? null,
       externalSpouseName: payload.spouseMemberId ? null : payload.externalSpouseName ?? null,
+      marriageDate: payload.marriageDate ? new Date(payload.marriageDate) : null,
       status: 'MARRIED',
       createdBy: actorId,
     },
@@ -113,6 +131,7 @@ export async function applySpouseLink(
     where: { memberId: { in: [memberId, payload.spouseMemberId ?? ''] } },
     data: UNMARRIED_FLOW_RESET,
   })
+  return { spouseMemberId: payload.spouseMemberId ?? null }
 }
 
 export async function createApprovalRecord(
@@ -211,15 +230,37 @@ export async function applyKartaChange(tx: Prisma.TransactionClient, payload: Ka
     where: { familyId: payload.familyId, isKarta: true, memberId: { not: payload.newKartaMemberId } },
     include: { member: { select: { userId: true } } },
   })
+  // F16: the old Karta becomes a normal member; their role is stated relative
+  // to the new Karta where the relationship says so (e.g. new Karta was 'son'
+  // of the old one → old Karta is 'father').
+  const newRole = target.relationshipRole
+  const inverse = newRole ? await tx.relationshipType.findUnique({ where: { code: newRole } }) : null
   for (const p of previous) {
-    await tx.familyMember.update({ where: { id: p.id }, data: { isKarta: false } })
+    const oldMember = await tx.member.findUnique({ where: { id: p.memberId }, select: { gender: true } })
+    let role: string | null = null
+    if (inverse?.inverseCode && target.relativeToMemberId === p.memberId) {
+      const inv = await tx.relationshipType.findUnique({ where: { code: inverse.inverseCode } })
+      const genderOk = !inv?.genderApplicable || ['ANY', oldMember?.gender].includes(inv.genderApplicable)
+      role = genderOk ? inverse.inverseCode : inverse.inverseCode === 'father' ? 'mother' : inverse.inverseCode === 'mother' ? 'father' : null
+    }
+    await tx.familyMember.update({
+      where: { id: p.id },
+      data: { isKarta: false, relationshipRole: role, relativeToMemberId: role ? payload.newKartaMemberId : null },
+    })
     if (kartaRole && p.member.userId) {
       await tx.userRole.deleteMany({ where: { userId: p.member.userId, roleId: kartaRole.id, familyId: payload.familyId } })
     }
   }
 
-  await tx.familyMember.update({ where: { id: target.id }, data: { isKarta: true } })
-  await tx.family.update({ where: { id: payload.familyId }, data: { kartaMemberId: payload.newKartaMemberId, updatedBy: actorId } })
+  await tx.familyMember.update({ where: { id: target.id }, data: { isKarta: true, relationshipRole: 'karta', relativeToMemberId: null } })
+  await tx.family.update({
+    where: { id: payload.familyId },
+    data: {
+      kartaMemberId: payload.newKartaMemberId, updatedBy: actorId,
+      // F16: a vacant family is whole again.
+      ...(family.status === 'KARTA_VACANT' ? { status: 'ACTIVE' as const } : {}),
+    },
+  })
   if (kartaRole) {
     const exists = await tx.userRole.findFirst({
       where: { userId: target.member.userId!, roleId: kartaRole.id, familyId: payload.familyId },
@@ -233,7 +274,10 @@ export async function applyKartaChange(tx: Prisma.TransactionClient, payload: Ka
 }
 
 export interface AddressChangePayload {
-  addressType: 'CURRENT' | 'NATIVE'
+  addressType: 'CURRENT' | 'NATIVE' | 'PERMANENT'
+  // F02: location-master link and the "same as current" flag (PERMANENT).
+  areaId?: string | null
+  sameAsCurrent?: boolean
   line1?: string | null
   line2?: string | null
   city?: string | null
@@ -248,7 +292,7 @@ export interface AddressChangePayload {
   longitude?: number | null
 }
 
-/** Upserts the member's CURRENT or NATIVE address and syncs the flat Member fields. */
+/** Upserts the member's CURRENT, NATIVE or PERMANENT address and syncs the flat Member fields. */
 export async function applyAddressChange(tx: Prisma.TransactionClient, memberId: string, p: AddressChangePayload) {
   const data = {
     line1: p.line1 || null,
@@ -261,6 +305,8 @@ export async function applyAddressChange(tx: Prisma.TransactionClient, memberId:
     ...(p.taluka !== undefined ? { taluka: p.taluka || null } : {}),
     ...(p.latitude !== undefined ? { latitude: p.latitude ?? null } : {}),
     ...(p.longitude !== undefined ? { longitude: p.longitude ?? null } : {}),
+    ...(p.areaId !== undefined ? { areaId: p.areaId ?? null } : {}),
+    ...(p.sameAsCurrent !== undefined ? { sameAsCurrent: !!p.sameAsCurrent } : {}),
     isPrimary: p.addressType === 'CURRENT',
   }
   const existing = await tx.address.findFirst({ where: { memberId, addressType: p.addressType } })
@@ -268,12 +314,15 @@ export async function applyAddressChange(tx: Prisma.TransactionClient, memberId:
     ? await tx.address.update({ where: { id: existing.id }, data })
     : await tx.address.create({ data: { ...data, addressableType: 'member', memberId, addressType: p.addressType } })
 
-  await tx.member.update({
-    where: { id: memberId },
-    data: p.addressType === 'CURRENT'
-      ? { currentCity: data.city, currentState: data.state, currentCountry: data.country }
-      : { nativeVillage: data.city, nativeDistrict: data.district, nativeState: data.state },
-  })
+  // PERMANENT (F02) has no flat copy on the member row.
+  if (p.addressType !== 'PERMANENT') {
+    await tx.member.update({
+      where: { id: memberId },
+      data: p.addressType === 'CURRENT'
+        ? { currentCity: data.city, currentState: data.state, currentCountry: data.country }
+        : { nativeVillage: data.city, nativeDistrict: data.district, nativeState: data.state },
+    })
+  }
   return address
 }
 
@@ -283,9 +332,12 @@ export type AddressChangeResult =
   | { status: 'already_pending' }
 
 /**
- * Saves a member's CURRENT or NATIVE address the way §28 requires: first-time
- * entry is direct; changing an address already on record is queued for
- * review unless staff make the change; a pending request blocks a second.
+ * Saves a member's CURRENT or NATIVE address. First-time entry is direct.
+ * Changing an address already on record is queued for review only while the
+ * approval rule 'member.address.change' requires it (§28); since the owner's
+ * F08 decision it is off, so changes save instantly. A pending request blocks
+ * a second; a direct save closes a request still waiting for the same
+ * address, so a reviewer can never apply an older address over a newer one.
  * Shared by the address editor and the Edit Profile form.
  */
 export async function submitAddressChange(
@@ -312,5 +364,9 @@ export async function submitAddressChange(
     return { status: 'pending' }
   }
 
+  await tx.approval.updateMany({
+    where: { actionCode: 'member.address.change', entityId: memberId, fieldName: payload.addressType, status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'ESCALATED'] } },
+    data: { status: 'REJECTED', reviewedBy: submittedBy, reviewedAt: new Date(), reviewNote: 'Superseded: the address was changed directly.' },
+  })
   return { status: 'applied', address: await applyAddressChange(tx, memberId, payload) }
 }

@@ -134,15 +134,20 @@ export async function validatePhotoUpload(file: File): Promise<ValidatedUpload> 
   // via its mime type is rejected here.
   let meta
   try {
-    meta = await sharp(buffer).metadata()
+    // limitInputPixels guards against "decompression bomb" images.
+    meta = await sharp(buffer, { limitInputPixels: 40_000_000 }).metadata()
   } catch {
     throw new Error('That file is not a readable image.')
   }
   if (!meta.width || !meta.height) {
     throw new Error('Could not read image dimensions — the file may be corrupt.')
   }
+  // F34: the bytes must really be JPEG / PNG / WEBP (sharp also opens GIF,
+  // TIFF, SVG…), and the stored type comes from the bytes, not the client.
+  const detected = meta.format === 'jpeg' ? 'image/jpeg' : meta.format === 'png' ? 'image/png' : meta.format === 'webp' ? 'image/webp' : null
+  if (!detected) throw new Error('Only JPEG, PNG or WEBP images are allowed.')
 
-  return { buffer, mimeType: file.type, width: meta.width, height: meta.height }
+  return { buffer, mimeType: detected, width: meta.width, height: meta.height }
 }
 
 export interface UploadedPhotoKeys {
