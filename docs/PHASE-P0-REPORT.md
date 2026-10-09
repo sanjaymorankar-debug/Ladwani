@@ -187,7 +187,7 @@ There was also a browser check against the production build:
 1. Pull the branch and run `npm ci && npm run build`.
 2. Migrate:
    - **SSH:** `npx prisma migrate deploy`, then `npm run db:seed` (idempotent upserts — never overwrites existing rows; leave `SEED_TEST_ACCOUNTS` unset outside dev/test).
-   - **phpMyAdmin:** import `database/phpmyadmin/add_p0_team_roles.sql`. It is `INSERT IGNORE`, so if `prisma migrate deploy` is run later it re-applies the same migration harmlessly.
+   - **phpMyAdmin:** import `database/phpmyadmin/add_p0_team_roles.sql` (after `01`/`02`, or after `03-upgrade-existing.sql` on staging). It is `INSERT IGNORE`, safe to import twice, and records the migration in `_prisma_migrations`, so a later `prisma migrate deploy` skips it (verified).
 3. New env key (optional): `SMS_DRIVER=LOG`. No other new keys.
 4. No cron entry or storage-permission change is needed for P0. Uploads are unchanged.
 5. Restart the Node app in hPanel.
