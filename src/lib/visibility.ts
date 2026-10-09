@@ -87,3 +87,45 @@ export async function redactMemberForViewer<T extends Record<string, any>>(
 
   return member
 }
+
+/**
+ * Batch form of redactMemberForViewer for list endpoints (/api/members,
+ * /api/search): the same per-member privacy settings and fallbacks, loaded
+ * with a fixed number of queries instead of several per row.
+ */
+export async function redactMembersForViewer<T extends Record<string, any>>(
+  session: Session | null,
+  members: T[]
+): Promise<T[]> {
+  const roles = ((session?.user as any)?.roles ?? []) as string[]
+  const viewerMemberId = (session?.user as any)?.memberId as string | null
+  if (roles.includes('ADMIN') || !members.length) return members
+
+  const ids = members.map((m) => m.id as string)
+  const [overrides, defaults, ownerLinks, viewerLinks] = await Promise.all([
+    prisma.memberFieldVisibility.findMany({ where: { memberId: { in: ids } } }),
+    prisma.fieldVisibilityDefault.findMany({ where: { entityType: 'member' } }),
+    prisma.familyMember.findMany({ where: { memberId: { in: ids }, leftAt: null }, select: { memberId: true, familyId: true } }),
+    viewerMemberId
+      ? prisma.familyMember.findMany({ where: { memberId: viewerMemberId, leftAt: null }, select: { familyId: true } })
+      : Promise.resolve([] as { familyId: string }[]),
+  ])
+  const overrideMap = new Map(overrides.map((o) => [`${o.memberId}:${o.fieldName}`, o.visibility]))
+  const defaultMap = new Map(defaults.map((d) => [d.fieldName, d.defaultVisibility]))
+  const viewerFamilies = new Set(viewerLinks.map((l) => l.familyId))
+  const sharesFamily = new Set(ownerLinks.filter((l) => viewerFamilies.has(l.familyId)).map((l) => l.memberId))
+
+  return members.map((member) => {
+    if (viewerMemberId && member.id === viewerMemberId) return member
+    const out: Record<string, any> = { ...member }
+    for (const [fieldKey, { keys, fallback }] of Object.entries(FIELD_MAP)) {
+      const visibility = overrideMap.get(`${member.id}:${fieldKey}`) ?? defaultMap.get(fieldKey) ?? fallback
+      const allowed =
+        visibility === 'PRIVATE' || visibility === 'ADMIN_OPERATOR' ? false
+        : visibility === 'SAME_FAMILY' ? sharesFamily.has(member.id)
+        : true
+      if (!allowed) for (const k of keys) out[k] = null
+    }
+    return out as T
+  })
+}
