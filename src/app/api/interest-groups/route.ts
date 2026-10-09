@@ -42,7 +42,7 @@ export async function GET(req: Request) {
     where: {
       groupType: INTEREST_GROUP_TYPE, parentGroupId: null, deletedAt: null, status: 'ACTIVE', isActive: true,
       ...(age !== null && age < 18 ? { isChildSafe: true } : {}),
-      ...(q ? { name: { contains: q } } : {}),
+      ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
     },
     select: {
       id: true, name: true, description: true, isChildSafe: true,
