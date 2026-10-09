@@ -55,7 +55,7 @@ Tick each line and note anything unexpected. The automated test for each flow is
 - [ ] F38 Search by district / Gotra (same-Gotra flagged); interest → accept (also by the Karta) → contact shown.
 
 ## P6 — Reports and data rights
-- [ ] F39 A District team member's Reports show only their district; CSV opens in Excel; the Admin sees the Operator SLA.
+- [ ] F39 A District team member's Reports show only their district; CSV opens in Excel; the Admin sees the Operator SLA; an Operator's Admin Panel shows no global counts.
 - [ ] F40 Settings → Download My Data. Request deletion → Admin → Data requests → Anonymise; the person stays in trees as "Former member". Search consents by Person ID. Audit Logs → "ID proof only".
 
 ## Sign-off

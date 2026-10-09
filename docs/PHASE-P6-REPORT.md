@@ -111,4 +111,11 @@ A browser run against the production build covered:
 ## 9. Decisions needed
 1. **Production go-live:** when, and who runs the steps above?
 2. **Content-Security-Policy and rate limiting** (proposals in §2): build them now, or after launch?
-3. **The old Operator access to `/api/admin/stats`** (global counts) is left as it was. Restrict it to Admin to match "Operators see their tasks only"?
+3. ~~**Operator access to global counts**~~ — decided: Admin only (§10).
+
+## 10. Follow-up: global counts are Admin only (your decision)
+- **`/api/admin/stats`** now answers only Admins. Operators, State / District teams and members get 403. The Admin role is checked against the database, not taken from the session token (as in P0 decision 2).
+- **The `/admin` page** showed Operators the same global counts. It now shows them only to Admins. Operators still open the page as their "Operator Dashboard" and keep its Quick Actions; the counts, the "pending approvals" banner and the Pending Actions card are hidden. Their own work stays under My Verification Tasks. Scoped teams keep `/reports`.
+- **No migration, no data change.** No existing test covered this endpoint.
+- **Test added:** `F39 the global counts (/api/admin/stats) are Admin only` in `tests/p6/F39-F40-reports-data-rights.test.ts` (Operator, District team, State team and member get 403; Admin gets the five counts). **409 passed**, twice in a row on a fresh database; typecheck clean; build OK.
+- **Browser check (production build):** Operator → `/admin` shows "Operator Dashboard" with no counts and `/api/admin/stats` returns 403; Admin → counts shown and the API returns 200.

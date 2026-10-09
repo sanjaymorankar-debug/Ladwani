@@ -11,6 +11,7 @@ import { POST as askDeletion, DELETE as cancelDeletion } from '@/app/api/my/dele
 import { GET as deletionQueue } from '@/app/api/admin/deletion-requests/route'
 import { POST as processDeletion } from '@/app/api/admin/deletion-requests/[id]/route'
 import { GET as consents } from '@/app/api/admin/consents/route'
+import { GET as globalStats } from '@/app/api/admin/stats/route'
 import { POST as memberPhoto } from '@/app/api/members/[id]/photos/route'
 import { toCsv } from '@/lib/dashboard'
 
@@ -53,6 +54,15 @@ describe('F39 Dashboards and reports', () => {
     expect(Array.isArray(all.sla)).toBe(true)
 
     expect((await report(plain)).status).toBe(403)
+  })
+
+  it('F39 the global counts (/api/admin/stats) are Admin only; Operators and teams are refused', async () => {
+    const op = await fx.operator('op', geo.district)
+    const stats = async (as: Person) => { actAs(as); return globalStats(json('http://x/api/admin/stats', 'GET') as any) }
+    for (const p of [op, districtTeam, stateTeam, plain]) expect((await stats(p)).status).toBe(403)
+    const ok = await stats(admin)
+    expect(ok.status).toBe(200)
+    expect(Object.keys(await ok.json())).toEqual(['families', 'members', 'matrimonial', 'pendingApprovals', 'posts'])
   })
 
   it('F39 age and education distributions respect the scope', async () => {
