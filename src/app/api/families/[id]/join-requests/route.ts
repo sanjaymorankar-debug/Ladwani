@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { canManageFamily } from '@/lib/family-auth'
+import { requireActiveAccount } from '@/lib/account-state'
 
 // Karta/staff view of pending requests to join this family, and of the
 // invitations this family has sent out that are still awaiting a reply.
@@ -47,6 +48,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  // F01: a DRAFT / unapproved account may only fill in its own profile.
+  const notActive = await requireActiveAccount(session.user?.id as string)
+  if (notActive) return notActive
 
   const family = await prisma.family.findUnique({ where: { id: params.id } })
   if (!family) return NextResponse.json({ message: 'Family not found' }, { status: 404 })

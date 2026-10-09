@@ -21,17 +21,32 @@ export const claimInvitationSchema = z.object({
   path: ['confirmPassword'],
 })
 
+/** F01: mobile is mandatory in the workbook; existing accounts made it optional. One switch decides. */
+export const registrationRequiresMobile = process.env.NEXT_PUBLIC_REGISTRATION_REQUIRE_MOBILE === 'true'
+
+/** Whole years between a date of birth and today (rule 6: age is never typed). */
+export function ageOn(dob: Date, today = new Date()) {
+  let age = today.getFullYear() - dob.getFullYear()
+  const m = today.getMonth() - dob.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--
+  return age
+}
+
 export const registerSchema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
   lastName: z.string().min(1, 'Last name is required'),
   // Email is the primary account identifier. Mobile stays supported (existing
   // accounts sign in with it, and it's useful contact info) but is optional.
   email: z.string().min(1, 'Email address is required').email('Invalid email address'),
-  mobile: z
-    .string()
-    .regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number')
-    .optional()
-    .or(z.literal('')),
+  mobile: registrationRequiresMobile
+    ? z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number')
+    : z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number').optional().or(z.literal('')),
+  // F01: gender, date of birth and Mul Gaon are captured at sign-up.
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER'], { errorMap: () => ({ message: 'Select your gender' }) }),
+  dateOfBirth: z.string().min(1, 'Date of birth is required')
+    .refine((v) => !Number.isNaN(new Date(v).getTime()) && new Date(v) <= new Date(), 'Enter a valid date of birth in the past')
+    .refine((v) => ageOn(new Date(v)) >= 18, 'You must be 18 or older to register yourself. Younger members are added by their Karta.'),
+  mulGaonAreaId: z.string().min(1, 'Select your Mul Gaon (native village)'),
   password: passwordSchema,
   confirmPassword: z.string(),
   joinIntent: z.enum(['KARTA', 'JOIN_EXISTING'], {

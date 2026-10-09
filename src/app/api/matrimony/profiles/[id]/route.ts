@@ -45,7 +45,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const roles: string[] = (session.user as any)?.roles ?? []
   const isOwner = profile.member.userId === session.user.id
-  if (!isOwner && !roles.includes('ADMIN') && !roles.includes('OPERATOR')) {
+  if (!isOwner && !roles.includes('ADMIN')) {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
   }
 

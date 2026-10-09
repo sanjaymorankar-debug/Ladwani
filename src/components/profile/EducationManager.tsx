@@ -8,6 +8,8 @@ interface EducationRecord {
   level: string | null
   qualification: string | null
   institution: string | null
+  university?: string | null
+  grade?: string | null
   yearCompleted: number | null
   isHighest: boolean
 }
@@ -17,7 +19,7 @@ const LEVELS = ['SCHOOL', 'DIPLOMA', 'ITI', 'UG', 'PG', 'DOCTORATE', 'PROFESSION
 export default function EducationManager({ memberId }: { memberId: string }) {
   const [records, setRecords] = useState<EducationRecord[]>([])
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ level: '', qualification: '', institution: '', yearCompleted: '' })
+  const [form, setForm] = useState({ level: '', qualification: '', institution: '', university: '', grade: '', yearCompleted: '' })
 
   const load = () =>
     fetch(`/api/members/${memberId}`)
@@ -39,7 +41,7 @@ export default function EducationManager({ memberId }: { memberId: string }) {
         body: JSON.stringify({ ...form, isHighest: records.length === 0 }),
       })
       if (!res.ok) throw new Error((await res.json()).message)
-      setForm({ level: '', qualification: '', institution: '', yearCompleted: '' })
+      setForm({ level: '', qualification: '', institution: '', university: '', grade: '', yearCompleted: '' })
       await load()
       toast.success('Education record added')
     } catch (e: any) {
@@ -64,6 +66,8 @@ export default function EducationManager({ memberId }: { memberId: string }) {
           <div>
             <span className="font-medium text-gray-900">{r.qualification || r.level}</span>
             {r.institution && <span className="text-gray-500"> — {r.institution}</span>}
+            {r.university && <span className="text-gray-500">, {r.university}</span>}
+            {r.grade && <span className="text-gray-400"> · {r.grade}</span>}
             {r.yearCompleted && <span className="text-gray-400"> ({r.yearCompleted})</span>}
             {r.isHighest && <span className="badge-orange text-xs ml-2">Highest</span>}
           </div>
@@ -81,8 +85,12 @@ export default function EducationManager({ memberId }: { memberId: string }) {
           className="form-input text-sm" placeholder="Qualification (e.g. B.E. Computer Engineering)" />
         <input value={form.institution} onChange={(e) => setForm({ ...form, institution: e.target.value })}
           className="form-input text-sm" placeholder="Institution" />
+        <input value={form.university} onChange={(e) => setForm({ ...form, university: e.target.value })}
+          className="form-input text-sm" placeholder="University" />
         <input value={form.yearCompleted} onChange={(e) => setForm({ ...form, yearCompleted: e.target.value })}
-          type="number" className="form-input text-sm" placeholder="Year completed" />
+          type="number" className="form-input text-sm" placeholder="Passing year" />
+        <input value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })}
+          className="form-input text-sm" placeholder="Grade / class" />
       </div>
       <button type="button" onClick={add} disabled={adding} className="btn-secondary text-sm w-full flex items-center justify-center gap-1.5 disabled:opacity-60">
         <Plus className="w-4 h-4" /> Add Education Record

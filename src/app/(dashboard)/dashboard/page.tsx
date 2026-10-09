@@ -61,8 +61,24 @@ export default async function DashboardPage() {
     { href: '/matrimony', icon: Heart, label: 'Matrimony', desc: member?.matrimonialProfile?.isVisible ? 'Profile visible' : 'Set up profile', color: 'text-pink-600 bg-pink-50' },
   ]
 
+  // F01: until two operators approve the registration, the account can only
+  // fill in its own profile — point it at the verification page.
+  const accountStatus = (session.user as any).status as string | undefined
+  const pendingVerification = !!accountStatus && ['DRAFT', 'PENDING_APPROVAL', 'CORRECTION_REQUIRED', 'REJECTED'].includes(accountStatus)
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+      {pendingVerification && (
+        <Link href="/verification" className="block rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 hover:bg-amber-100">
+          <p className="font-semibold">
+            {accountStatus === 'PENDING_APPROVAL' ? 'Your registration is being verified'
+              : accountStatus === 'CORRECTION_REQUIRED' ? 'Your registration needs a correction'
+              : accountStatus === 'REJECTED' ? 'Your registration was not approved'
+              : 'Complete your registration'}
+          </p>
+          <p className="text-sm mt-0.5">Family, community and matrimony features open once two community operators verify your profile. Open Verification →</p>
+        </Link>
+      )}
       {/* Welcome banner */}
       <div className="bg-gradient-to-r from-saffron-600 to-orange-500 rounded-2xl p-6 text-white shadow-sm">
         <div className="flex items-start justify-between">

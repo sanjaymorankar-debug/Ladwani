@@ -230,6 +230,12 @@ async function main() {
     update: {},
     create: { key: 'matrimony.contact_exchange', value: '"ACCEPT_FIRST"', description: 'When to reveal contact: ACCEPT_FIRST or FAMILY_APPROVAL' }
   })
+  // F06: approval SLA in days (configurable).
+  await prisma.setting.upsert({
+    where: { key: 'approval.sla_days' },
+    update: {},
+    create: { key: 'approval.sla_days', value: 7, description: 'Days an Operator has to decide a verification task before it is escalated (F06)' },
+  })
   console.log('✅ Settings created')
 
   // ── Fees ───────────────────────────────────────────────────────
@@ -538,7 +544,28 @@ async function main() {
     update: {},
     create: { id: `test-operator-district-${operatorUser.id}`, userId: operatorUser.id, roleId: operatorRole.id, areaId: puneDistrict.id },
   })
-  console.log('✅ Location master demo + team accounts created (NATIONAL / STATE / DISTRICT team)')
+  // OP-04: at least 3 Operators per district, so 2 are always free (F04).
+  for (const n of [2, 3]) {
+    const op = await prisma.user.upsert({
+      where: { email: `test.operator${n}@example.test` },
+      update: {},
+      create: {
+        email: `test.operator${n}@example.test`, mobile: `900000002${n}`, passwordHash: testPwdHash,
+        emailVerified: true, mobileVerified: true, status: 'ACTIVE',
+      },
+    })
+    await prisma.userRole.upsert({
+      where: { id: `test-operator-district-${op.id}` },
+      update: {},
+      create: { id: `test-operator-district-${op.id}`, userId: op.id, roleId: operatorRole.id, areaId: puneDistrict.id },
+    })
+    await prisma.member.upsert({
+      where: { memberNumber: `MEM-TEST-OPERATOR${n}` },
+      update: {},
+      create: { memberNumber: `MEM-TEST-OPERATOR${n}`, userId: op.id, firstName: 'Test', lastName: `Operator${n}`, gender: 'FEMALE', status: 'ACTIVE' },
+    })
+  }
+  console.log('✅ Location master demo + team accounts created (NATIONAL / STATE / DISTRICT team, 3 Pune operators)')
 
   console.log('\n🎉 Seed complete!\n')
   console.log('Admin credentials:')
@@ -553,6 +580,7 @@ async function main() {
   console.log('  test.national@example.test     - NATIONAL_TEAM (view all)')
   console.log('  test.state@example.test        - STATE_TEAM, Maharashtra')
   console.log('  test.district@example.test     - DISTRICT_TEAM, Pune district')
+  console.log('  test.operator2/3@example.test  - OPERATOR, Pune district (with test.operator: 3 per OP-04)')
 }
 
 main()

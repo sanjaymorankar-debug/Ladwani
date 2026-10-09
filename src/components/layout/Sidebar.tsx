@@ -5,7 +5,8 @@ import { usePathname } from 'next/navigation'
 import {
   Home, Users, Heart, Bell, Search,
   Settings, LogOut, ChevronLeft, ChevronRight,
-  Building2, Newspaper, UserCircle, ShieldCheck, Receipt, UsersRound
+  Building2, Newspaper, UserCircle, ShieldCheck, Receipt, UsersRound,
+  BadgeCheck, ClipboardCheck, Activity
 } from 'lucide-react'
 import { signOut, useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
@@ -27,6 +28,7 @@ const nav = [
   { href: '/community', icon: Newspaper, label: 'Community' },
   { href: '/search', icon: Search, label: 'Search' },
   { href: '/profile', icon: UserCircle, label: 'My Profile' },
+  { href: '/verification', icon: BadgeCheck, label: 'Verification' },
   { href: '/notifications', icon: Bell, label: 'Notifications' },
 ]
 
@@ -39,6 +41,8 @@ export default function Sidebar() {
   // F33: the link is a convenience only — /team-directory re-checks scope server-side.
   const hasTeamView = ['ADMIN', 'NATIONAL_TEAM', 'STATE_TEAM', 'DISTRICT_TEAM']
     .some((r) => (session?.user as any)?.roles?.includes(r))
+  // F07: per-operator approval status is Admin and State team only.
+  const hasMonitor = ['ADMIN', 'STATE_TEAM'].some((r) => (session?.user as any)?.roles?.includes(r))
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href)
 
@@ -80,6 +84,20 @@ export default function Sidebar() {
               isActive('/team-directory') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
             <Users className="w-5 h-5 flex-shrink-0" />
             {!collapsed && <span>Team Directory</span>}
+          </Link>
+        )}
+        {isOperator && (
+          <Link href="/admin/verification" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+            isActive('/admin/verification') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
+            <ClipboardCheck className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>My Verification Tasks</span>}
+          </Link>
+        )}
+        {hasMonitor && (
+          <Link href="/approval-monitor" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+            isActive('/approval-monitor') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
+            <Activity className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>Approval Monitor</span>}
           </Link>
         )}
         {(isAdmin || isOperator) && (

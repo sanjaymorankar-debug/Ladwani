@@ -2,10 +2,14 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { requireActiveAccount } from '@/lib/account-state'
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  // F01: a DRAFT / unapproved account may only fill in its own profile.
+  const notActive = await requireActiveAccount(session.user?.id as string)
+  if (notActive) return notActive
 
   const body = await req.json()
   const roles = ((session.user as any).roles ?? []) as string[]

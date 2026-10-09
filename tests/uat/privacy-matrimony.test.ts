@@ -42,7 +42,10 @@ describe('TC-PRIV — field visibility', () => {
 
   it('TC-PRIV-003 staff can still see the field (support access), and it is a deliberate exception', async () => {
     const owner = await account('MEMBER-01')
-    const op = await account('OPERATOR-01')
+    // Decision 3 (approved 9 Oct 2026): "staff" support access is Admin only;
+    // an Operator sees the field only while holding a verification task for
+    // the member (covered in tests/p1/F05-blind-verification.test.ts).
+    const op = await account('ADMIN-01')
     actAs({ userId: op.userId, roles: op.roles, memberId: op.memberId })
     const seen = await (await getMember(jsonReq('http://x', 'GET') as any, { params: { id: owner.memberId } })).json()
     expect(seen.mobilePrimary).toBe('9800000001')

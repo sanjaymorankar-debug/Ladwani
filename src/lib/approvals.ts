@@ -233,7 +233,10 @@ export async function applyKartaChange(tx: Prisma.TransactionClient, payload: Ka
 }
 
 export interface AddressChangePayload {
-  addressType: 'CURRENT' | 'NATIVE'
+  addressType: 'CURRENT' | 'NATIVE' | 'PERMANENT'
+  // F02: location-master link and the "same as current" flag (PERMANENT).
+  areaId?: string | null
+  sameAsCurrent?: boolean
   line1?: string | null
   line2?: string | null
   city?: string | null
@@ -248,7 +251,7 @@ export interface AddressChangePayload {
   longitude?: number | null
 }
 
-/** Upserts the member's CURRENT or NATIVE address and syncs the flat Member fields. */
+/** Upserts the member's CURRENT, NATIVE or PERMANENT address and syncs the flat Member fields. */
 export async function applyAddressChange(tx: Prisma.TransactionClient, memberId: string, p: AddressChangePayload) {
   const data = {
     line1: p.line1 || null,
@@ -261,6 +264,8 @@ export async function applyAddressChange(tx: Prisma.TransactionClient, memberId:
     ...(p.taluka !== undefined ? { taluka: p.taluka || null } : {}),
     ...(p.latitude !== undefined ? { latitude: p.latitude ?? null } : {}),
     ...(p.longitude !== undefined ? { longitude: p.longitude ?? null } : {}),
+    ...(p.areaId !== undefined ? { areaId: p.areaId ?? null } : {}),
+    ...(p.sameAsCurrent !== undefined ? { sameAsCurrent: !!p.sameAsCurrent } : {}),
     isPrimary: p.addressType === 'CURRENT',
   }
   const existing = await tx.address.findFirst({ where: { memberId, addressType: p.addressType } })
@@ -268,12 +273,15 @@ export async function applyAddressChange(tx: Prisma.TransactionClient, memberId:
     ? await tx.address.update({ where: { id: existing.id }, data })
     : await tx.address.create({ data: { ...data, addressableType: 'member', memberId, addressType: p.addressType } })
 
-  await tx.member.update({
-    where: { id: memberId },
-    data: p.addressType === 'CURRENT'
-      ? { currentCity: data.city, currentState: data.state, currentCountry: data.country }
-      : { nativeVillage: data.city, nativeDistrict: data.district, nativeState: data.state },
-  })
+  // PERMANENT (F02) has no flat copy on the member row.
+  if (p.addressType !== 'PERMANENT') {
+    await tx.member.update({
+      where: { id: memberId },
+      data: p.addressType === 'CURRENT'
+        ? { currentCity: data.city, currentState: data.state, currentCountry: data.country }
+        : { nativeVillage: data.city, nativeDistrict: data.district, nativeState: data.state },
+    })
+  }
   return address
 }
 

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { raiseFamilyRegistrationInvoice } from '@/lib/fees'
+import { requireActiveAccount } from '@/lib/account-state'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -42,6 +43,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // F01: a DRAFT / unapproved account may only fill in its own profile.
+  const notActive = await requireActiveAccount(session.user?.id as string)
+  if (notActive) return notActive
 
   const memberId = (session.user as any).memberId as string | null
   if (!memberId) {

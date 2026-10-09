@@ -1,5 +1,18 @@
 import { Session } from 'next-auth'
 import { prisma } from '@/lib/prisma'
+import { operatorHasOpenTaskFor } from '@/lib/verification'
+
+/**
+ * Full (unredacted) view of a member: Admin always; an Operator only while
+ * holding an undecided verification task for that member (Roles & Access:
+ * Operator sees "assigned tasks only" — decision 3).
+ */
+export async function hasStaffView(session: Session | null, memberId: string): Promise<boolean> {
+  const roles = ((session?.user as any)?.roles ?? []) as string[]
+  if (roles.includes('ADMIN')) return true
+  if (roles.includes('OPERATOR') && session?.user?.id) return operatorHasOpenTaskFor(session.user.id, memberId)
+  return false
+}
 
 /**
  * Shared visibility vocabulary for both MemberFieldVisibility and
@@ -19,9 +32,7 @@ export async function canViewByVisibility(
 ): Promise<boolean> {
   if (!session?.user?.id) return false
 
-  const roles = ((session.user as any).roles ?? []) as string[]
-  const isStaff = roles.includes('ADMIN') || roles.includes('OPERATOR')
-  if (isStaff) return true
+  if (await hasStaffView(session, ownerMemberId)) return true
 
   const viewerMemberId = (session.user as any).memberId as string | null
   if (viewerMemberId && viewerMemberId === ownerMemberId) return true
@@ -66,10 +77,8 @@ export async function redactMemberForViewer<T extends Record<string, any>>(
   session: Session | null,
   member: T
 ): Promise<T> {
-  const roles = ((session?.user as any)?.roles ?? []) as string[]
-  const isStaff = roles.includes('ADMIN') || roles.includes('OPERATOR')
   const viewerMemberId = (session?.user as any)?.memberId as string | null
-  if (isStaff || (viewerMemberId && viewerMemberId === member.id)) return member
+  if ((viewerMemberId && viewerMemberId === member.id) || (await hasStaffView(session, member.id))) return member
 
   const [overrides, defaults] = await Promise.all([
     prisma.memberFieldVisibility.findMany({ where: { memberId: member.id } }),

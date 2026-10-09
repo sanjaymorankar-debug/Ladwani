@@ -7,9 +7,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { signIn } from 'next-auth/react'
 import { Eye, EyeOff, Loader2, CheckCircle2, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { registerSchema, type RegisterInput } from '@/lib/validators'
+import { registerSchema, registrationRequiresMobile, type RegisterInput } from '@/lib/validators'
+import AreaCascadePicker from '@/components/shared/AreaCascadePicker'
 import { requireAccountVerification } from '@/lib/auth-config'
-import { resolveOnboardingPath } from '@/lib/dashboard-routing'
 
 type Step = 'account' | 'verify' | 'done'
 
@@ -27,7 +27,7 @@ export default function RegisterPage() {
   const [otp, setOtp] = useState('')
   const stepIndex = steps.findIndex((s) => s.key === step)
 
-  const { register, handleSubmit, watch, getValues, formState: { errors } } = useForm<RegisterInput>({
+  const { register, handleSubmit, watch, getValues, setValue, formState: { errors } } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
     defaultValues: { consentAccepted: true },
   })
@@ -46,6 +46,9 @@ export default function RegisterPage() {
           lastName: data.lastName,
           email: data.email,
           mobile: data.mobile,
+          gender: data.gender,
+          dateOfBirth: data.dateOfBirth,
+          mulGaonAreaId: data.mulGaonAreaId,
           password: data.password,
           joinIntent: data.joinIntent,
           consentAccepted: data.consentAccepted,
@@ -69,7 +72,9 @@ export default function RegisterPage() {
         redirect: false,
       })
       if (signInRes?.ok) {
-        router.push(resolveOnboardingPath(data.joinIntent) ?? '/dashboard')
+        // F01: a new account is DRAFT — complete the profile and submit it
+        // for verification before family / community features open up.
+        router.push('/verification')
         router.refresh()
       } else {
         // Account exists either way — fall back to the manual sign-in screen.
@@ -161,8 +166,34 @@ export default function RegisterPage() {
                     {errors.email && <p className="form-error">{errors.email.message}</p>}
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label">Gender *</label>
+                      <select {...register('gender')} className="form-input" defaultValue="">
+                        <option value="" disabled>Select</option>
+                        <option value="MALE">Male</option>
+                        <option value="FEMALE">Female</option>
+                        <option value="OTHER">Other</option>
+                      </select>
+                      {errors.gender && <p className="form-error">{errors.gender.message}</p>}
+                    </div>
+                    <div>
+                      <label className="form-label">Date of Birth *</label>
+                      <input {...register('dateOfBirth')} type="date" className="form-input" max={new Date().toISOString().slice(0, 10)} />
+                      {errors.dateOfBirth && <p className="form-error">{errors.dateOfBirth.message}</p>}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 -mt-2">You must be 18 or older. Children are added by their family&apos;s Karta.</p>
+
                   <div>
-                    <label className="form-label">Mobile Number (optional)</label>
+                    <label className="form-label mb-2">Mul Gaon (native village) *</label>
+                    <input type="hidden" {...register('mulGaonAreaId')} />
+                    <AreaCascadePicker idPrefix="mulgaon" onChange={(id) => setValue('mulGaonAreaId', id, { shouldValidate: !!id })} />
+                    {errors.mulGaonAreaId && <p className="form-error">{errors.mulGaonAreaId.message}</p>}
+                  </div>
+
+                  <div>
+                    <label className="form-label">Mobile Number {registrationRequiresMobile ? '*' : '(optional)'}</label>
                     <input {...register('mobile')} className="form-input" placeholder="9876543210" maxLength={10} />
                     {errors.mobile && <p className="form-error">{errors.mobile.message}</p>}
                   </div>
@@ -294,14 +325,13 @@ export default function RegisterPage() {
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Mi Ladwani!</h2>
                 <p className="text-gray-500 mb-6">
-                  {joinIntent === 'KARTA'
-                    ? 'Your account is ready. Sign in to register your family — you become its Karta once the family is created.'
-                    : 'Your account is ready. Sign in to find your family and send a join request.'}
+                  Your account is ready. Sign in, complete your profile and upload your ID proof — two community
+                  operators then verify it. {joinIntent === 'KARTA'
+                    ? 'Once approved you can register your family and become its Karta.'
+                    : 'Once approved you can find your family and send a join request.'}
                 </p>
                 <Link
-                  href={`/login?callbackUrl=${encodeURIComponent(
-                    joinIntent === 'KARTA' ? '/family/setup?mode=register' : '/family/setup?mode=search'
-                  )}`}
+                  href={`/login?callbackUrl=${encodeURIComponent('/verification')}`}
                   className="btn-primary inline-flex items-center gap-2 px-8 py-3"
                 >
                   Sign In Now
