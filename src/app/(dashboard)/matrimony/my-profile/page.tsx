@@ -8,7 +8,7 @@ export default function MyMatrimonyProfilePage() {
   const [profile, setProfile] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isToggling, setIsToggling] = useState(false)
-  // F37: the toggle is offered only when eligible (Unmarried, earning, legal age under the workbook rules).
+  // F37: the toggle is offered only when eligible (Unmarried / Divorced / Widowed, legal age, and earning under the workbook rules).
   const [eligibility, setEligibility] = useState<{ ok: boolean; reason?: string }>({ ok: true })
   const [details, setDetails] = useState({ expectations: '', horoscope: '', contactPreference: 'SELF', heightCm: '' })
 

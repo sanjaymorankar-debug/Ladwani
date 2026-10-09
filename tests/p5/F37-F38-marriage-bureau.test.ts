@@ -64,7 +64,7 @@ describe('F37 Opt in / out of the marriage bureau', () => {
     expect(await prisma.matrimonialProfile.findUniqueOrThrow({ where: { id: groomProfile } })).toMatchObject({ horoscope: 'Mesh rashi', contactPreference: 'BOTH' })
   })
 
-  it('F37 workbook rules: only unmarried AND earning members may list; the reason is shown instead of the toggle', async () => {
+  it('F37 workbook rules: only earning members may list; the reason is shown instead of the toggle', async () => {
     actAs(bride)
     const m = await (await mine()).json()
     expect(m.eligibility).toMatchObject({ ok: false })
@@ -74,12 +74,30 @@ describe('F37 Opt in / out of the marriage bureau', () => {
     await earning(bride)
     brideProfile = await profileFor(bride)
     expect((await toggle(bride, brideProfile, true)).status).toBe(200)
-    // Divorced is not allowed under the workbook rules (OP-08 assumption).
-    await prisma.member.update({ where: { id: viewer.memberId }, data: { maritalStatus: 'DIVORCED' } })
-    await earning(viewer)
-    actAs(viewer)
-    expect((await createProfile(json('http://x', 'POST', {}))).status).toBe(403)
-    await prisma.member.update({ where: { id: viewer.memberId }, data: { maritalStatus: 'UNMARRIED' } })
+  })
+
+  it('F37 OP-08: Divorced and Widowed members may list (earning rule still applies); Married and Separated may not', async () => {
+    for (const status of ['DIVORCED', 'WIDOWED'] as const) {
+      const p = await fx.adult(`op8${status[0]}`, { dob: '1988-01-01' })
+      await prisma.member.update({ where: { id: p.memberId }, data: { maritalStatus: status } })
+      actAs(p)
+      expect((await createProfile(json('http://x', 'POST', {}))).status).toBe(403) // not earning yet
+      await earning(p)
+      const id = await profileFor(p)
+      expect((await toggle(p, id, true)).status).toBe(200)
+      actAs(bride)
+      const res = await (await list(json('http://x/api/matrimony/profiles', 'GET'))).json()
+      expect(res.profiles.find((c: any) => c.memberId === p.memberId)).toMatchObject({ maritalStatus: status })
+    }
+    for (const status of ['MARRIED', 'SEPARATED'] as const) {
+      const p = await fx.adult(`op8${status[0]}`, { dob: '1988-01-01' })
+      await prisma.member.update({ where: { id: p.memberId }, data: { maritalStatus: status } })
+      await earning(p)
+      actAs(p)
+      const res = await createProfile(json('http://x', 'POST', {}))
+      expect(res.status).toBe(403)
+      expect((await res.json()).message).toMatch(status === 'MARRIED' ? /married/i : /Separated/)
+    }
   })
 
   it('F37 a status that cannot be listed takes the listing down automatically', async () => {
@@ -146,7 +164,7 @@ describe('F38 Browse and express interest', () => {
     expect((await sendInterest(json('http://x', 'POST', { toMemberId: groom.memberId, fromMemberId: bride.memberId }))).status).toBe(409) // already accepted
   })
 
-  it('switching bureau.workbook_rules off restores the earlier rules (anyone browses; divorced may list)', async () => {
+  it('switching bureau.workbook_rules off drops the earning and browse rules (anyone browses; a non-earning divorced member may list)', async () => {
     await setRules(false)
     try {
       actAs(viewer)

@@ -1,6 +1,6 @@
 import { Session } from 'next-auth'
 import { prisma } from '@/lib/prisma'
-import { MATRIMONY_ELIGIBLE_STATUSES } from '@/lib/matrimony'
+import { MATRIMONY_ELIGIBLE_STATUSES, matrimonyIneligibleReason } from '@/lib/matrimony'
 import { isEarning } from '@/lib/occupation'
 import { legalAgeError } from '@/lib/marriage'
 import { areaChain, chainLevel } from '@/lib/locations'
@@ -14,11 +14,13 @@ import { ageOn } from '@/lib/validators'
  * details); contact shared only once an interest is accepted; same-Gotra
  * flag; income as a band; the Karta is told on opt-in and may answer interests.
  *
+ * Who may list, always: Unmarried, Divorced or Widowed (OP-08, owner's
+ * decision); never Married or Separated (the marriage still legally stands).
+ *
  * Setting `bureau.workbook_rules` (ON by default — the owner's decision):
- * only Unmarried AND earning members may list, and only listed members and
- * their Karta may browse and send interests. Switching it to false restores
- * the earlier rules (Unmarried / Divorced / Widowed may list; any member may
- * browse).
+ * listing also needs the member to be earning, and only listed members and
+ * their Karta may browse and send interests. Switching it to false drops
+ * those two rules (any member may browse).
  */
 export async function workbookRules() {
   const s = await prisma.setting.findUnique({ where: { key: 'bureau.workbook_rules' } })
@@ -36,13 +38,13 @@ export async function bureauEligibility(memberId: string): Promise<{ ok: true } 
   const strict = await workbookRules()
   const age = legalAgeError({ firstName: m.firstName, gender: m.gender, dateOfBirth: m.dateOfBirth }, new Date())
   if (age) return { ok: false, reason: age }
+  if (!MATRIMONY_ELIGIBLE_STATUSES.includes(m.maritalStatus)) {
+    return { ok: false, reason: matrimonyIneligibleReason(m.maritalStatus) }
+  }
   if (strict) {
     if (!m.dateOfBirth) return { ok: false, reason: 'Add your date of birth first.' }
-    if (m.maritalStatus !== 'UNMARRIED') return { ok: false, reason: 'Only unmarried members can register for the marriage bureau.' }
     const earning = isEarning(m.employmentStatus, m.profileDetails?.annualIncomeRange) || m.profileDetails?.isEarning === true
     if (!earning) return { ok: false, reason: 'The marriage bureau is for members who are earning (set your social status and income band).' }
-  } else if (!MATRIMONY_ELIGIBLE_STATUSES.includes(m.maritalStatus)) {
-    return { ok: false, reason: m.maritalStatus === 'MARRIED' ? 'A married member cannot be listed in matrimony.' : 'This marital status is not eligible for matrimony listings.' }
   }
   return { ok: true }
 }

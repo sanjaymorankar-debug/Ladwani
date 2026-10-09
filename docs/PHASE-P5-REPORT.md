@@ -44,7 +44,7 @@ Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as P0�
 - Reported items are reviewed by Operators and Admins. Body officers can also review reported posts addressed to their body.
 
 ### d) Open points
-- **OP-08** (Widowed / Divorced in the bureau) — see decisions.
+- **OP-08** (Widowed / Divorced in the bureau) — decided: allowed (see §10).
 
 ## 2. Change list
 
@@ -113,12 +113,12 @@ Settings to review:
 - Contact preference defaults to the member's own details. "Karta" shares the Karta's details instead.
 
 ## 8. Decisions needed
-1. **OP-08:** with the workbook rules on, Widowed and Divorced members cannot list. Should they be allowed?
+1. ~~**OP-08**~~ — decided: Widowed and Divorced members may list (§10).
 2. **Community-wide posts:** keep Operator moderation for every member post to the whole community, or publish them at once (the workbook only requires moderation for District / State / National posts)?
 
 ## 9. Follow-up: workbook bureau rules switched on (your decision)
 - **Migration** `20261009200000_bureau_workbook_rules_on` (phpMyAdmin: `set_bureau_workbook_rules_on.sql`) sets `bureau.workbook_rules` = true. The code also treats a missing setting as on. Rollback: `down.sql` sets it back to false.
-- **Effect on live data:** no member rows change. Listings that no longer qualify (Divorced or Widowed members, or anyone not marked as earning) stay switched on but are hidden from search until the member qualifies. Members who want to list must set their social status to Working and choose an income band. Members who are not listed (and are not a listed member's Karta) can no longer browse or send interests.
+- **Effect on live data:** no member rows change. Listings that no longer qualify (anyone not marked as earning; at the time also Divorced or Widowed members, reversed by OP-08 in §10) stay switched on but are hidden from search until the member qualifies. Members who want to list must set their social status to Working and choose an income band. Members who are not listed (and are not a listed member's Karta) can no longer browse or send interests.
 - **Existing tests updated to the new behaviour.** Each test now makes its UAT members bureau-ready (earning, listed) inside `try/finally` and puts them back afterwards, using the new helper `bureauReady` in `tests/uat/helpers.ts`. What each test checks:
   - `TC-MAT-001/002`: a listed viewer sees the profile and loses it on opt-out. **Added:** a viewer who is not listed gets 403.
   - `TC-MAT-007/008`: a listed member sends an interest that is accepted.
@@ -129,3 +129,9 @@ Settings to review:
 - **My own P5 bureau tests** now run with the rules on by default. A new test checks that switching the setting off restores the earlier rules.
 - Tests: **406 passed**, twice in a row on a fresh database. Typecheck clean; build OK.
 - Fixed in passing: the bureau search showed wrong income-band labels (10L_25L / 25L_50L instead of the schema's 10L_20L / 20L_50L).
+
+## 10. Follow-up: OP-08 decided — Widowed and Divorced may list (your decision)
+- **Rule now:** Unmarried, Divorced and Widowed members may list, as long as they are of legal age and (with the workbook rules on) earning. Married and Separated members may not (a separation leaves the marriage legally standing). Browsing and interests are unchanged: listed members and their Karta.
+- **Code:** `src/lib/bureau.ts` `bureauEligibility` now uses the same eligible-status list as the search filter (`MATRIMONY_ELIGIBLE_STATUSES`) in both modes. The reason shown for Married / Separated is the existing one from `src/lib/matrimony.ts`.
+- **No migration, no data change.** Divorced or Widowed members who had already switched their listing on (and are earning) reappear in search.
+- **Tests:** my own P5 test that encoded the old assumption ("Divorced is refused") was replaced with a test named for F37 / OP-08. It checks that Divorced and Widowed members are refused until earning, then list and appear in search, and that Married and Separated members are refused with a reason. No existing UAT test depended on the old rule. **407 passed**, twice in a row on a fresh database; typecheck clean.
