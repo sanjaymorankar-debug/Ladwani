@@ -1,4 +1,6 @@
 import { vi } from 'vitest'
+import fs from 'fs/promises'
+import path from 'path'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { p0Fixtures } from '../p0/fixtures'
@@ -110,6 +112,9 @@ export function p1Fixtures(prefix: string) {
     await prisma.familyMember.deleteMany({ where: { familyId: { in: familyIds } } })
     await prisma.family.deleteMany({ where: { id: { in: familyIds } } })
     await base.cleanup()
+    // Encrypted test proofs written under UPLOAD_DIR.
+    const root = path.resolve(process.env.UPLOAD_DIR || 'uploads')
+    for (const id of members) await fs.rm(path.join(root, 'id-proofs', id), { recursive: true, force: true })
   }
 
   return { ...base, geography, operator, applicant, declare, family, cleanup }
