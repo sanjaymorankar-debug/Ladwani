@@ -157,7 +157,9 @@ The browser run against the production build covered:
 ## 8. Decisions needed
 1. ~~**Mobile mandatory at sign-up?**~~ — decided: mandatory (§9).
 2. ~~**Address changes by verified members**~~ — decided: they save instantly (§10).
-3. **Accounts that pre-date P1** are ACTIVE without dual approval. Leave them, or ask them to submit ID proof (status → DRAFT)? The latter would rewrite data, so it needs your yes.
+3. ~~**Accounts that pre-date P1**~~ — decided: leave them as they are (§11).
+
+No P1 decisions remain open.
 
 ## 9. Follow-up: mobile mandatory at sign-up (your decision)
 - **Rule now:** self-registration needs a valid 10-digit Indian mobile number (starting 6–9), unique per account, as well as the email. A missing number gets "Mobile number is required"; the form shows the field as required.
@@ -177,3 +179,9 @@ The browser run against the production build covered:
 - **Existing test updated with your approval** (it predates this PR): `tests/uat/personal-info-form.test.ts` › `TC-PIF-014`. Its first half (first entry saves directly; re-saving the same address does nothing) is unchanged. Its second half expected the moved address to wait for an Operator; it now expects it to save instantly with no review request.
 - **New tests** in `tests/p1/F08-sensitive-changes.test.ts`: an ACTIVE member's address change saves at once with no review request; a request left waiting from before is closed by the next direct change.
 - Tests: **412 passed**, twice in a row on a fresh database; typecheck clean.
+
+## 11. Follow-up: accounts created before P1 stay as they are (your decision)
+- **Rule:** accounts that were ACTIVE before P1 stay ACTIVE. They are not asked for ID proof and do not go through the two-Operator approval. This was already the behaviour: the P1 migration rewrote no statuses.
+- **Unchanged for them:** from now on, a change to their name, date of birth, gender, Mul Gaon or ID proof goes through the two-Operator re-approval (F08), like any ACTIVE member.
+- **No code, migration or data change.**
+- **Test added** to lock the decision in: `F01 accounts created before P1 stay as they are` in `tests/p1/F01-F02-registration-profile.test.ts`. An ACTIVE account with no ID proof and no approval history can post and edit its profile, and its status is not changed. **413 passed**, twice in a row on a fresh database.

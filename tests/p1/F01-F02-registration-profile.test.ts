@@ -118,6 +118,21 @@ describe('F01 User self-registration', () => {
     const own = await patchMember(json('http://x', 'PATCH', { biography: 'My story' }), { params: { id: person!.memberId } })
     expect(own.status).toBe(200)
   })
+
+  it("F01 accounts created before P1 stay as they are (owner's decision): ACTIVE with no ID proof or approval, full access, status untouched", async () => {
+    // An account from before P1: ACTIVE, never went through ID proof or the two-Operator approval.
+    const { person, user } = await signUp()
+    await prisma.user.update({ where: { id: user!.id }, data: { status: 'ACTIVE' } })
+    expect(await prisma.idProof.count({ where: { userId: user!.id } })).toBe(0)
+    const general = await prisma.postType.findFirstOrThrow({ where: { code: 'GENERAL' } })
+    actAs(person!)
+    const post = await postPost(json('http://x/api/posts', 'POST', { postTypeId: general.id, content: 'Still here' }))
+    expect(post.status).toBe(201)
+    actAs(person!)
+    expect((await patchMember(json('http://x', 'PATCH', { biography: 'Old member' }), { params: { id: person!.memberId } })).status).toBe(200)
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: user!.id } })).status).toBe('ACTIVE')
+    await prisma.post.deleteMany({ where: { authorId: user!.id } })
+  })
 })
 
 describe('F02 Complete personal profile', () => {
