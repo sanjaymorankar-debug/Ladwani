@@ -13,8 +13,12 @@ import { NotificationsService } from '../notifications/notifications.service'
  * fail cleanly, and the database never ends up with two bookings holding
  * the same slot.
  *
- * Requires a real DATABASE_URL (see apps/api/.env or CI's mysql service).
- * Run via `npm run test:integration`, not the default `npm test`.
+ * Requires a real DATABASE_URL against a throwaway database — this suite
+ * creates and deletes users, assets and bookings. Locally, copy
+ * apps/api/.env.test.example to apps/api/.env.test and run `npm run
+ * test:local` from the repo root, which migrates the database first. In CI
+ * the mysql service supplies DATABASE_URL, so `npm run test:integration`
+ * is enough there. Either way, not the default `npm test`.
  */
 describe('Booking concurrency (real MySQL)', () => {
   const prisma = new PrismaService()
