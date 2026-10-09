@@ -36,6 +36,9 @@ export default function Sidebar() {
   const { data: session } = useSession()
   const isAdmin = (session?.user as any)?.roles?.includes('ADMIN')
   const isOperator = (session?.user as any)?.roles?.includes('OPERATOR')
+  // F33: the link is a convenience only — /team-directory re-checks scope server-side.
+  const hasTeamView = ['ADMIN', 'NATIONAL_TEAM', 'STATE_TEAM', 'DISTRICT_TEAM']
+    .some((r) => (session?.user as any)?.roles?.includes(r))
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href)
 
@@ -71,6 +74,14 @@ export default function Sidebar() {
             {!collapsed && <span className="truncate">{item.label}</span>}
           </Link>
         ))}
+        {hasTeamView && (
+          <Link href="/team-directory" title={collapsed ? 'Team Directory' : undefined}
+            className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-2',
+              isActive('/team-directory') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
+            <Users className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>Team Directory</span>}
+          </Link>
+        )}
         {(isAdmin || isOperator) && (
           <Link href="/admin" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors mt-2">
             <ShieldCheck className="w-5 h-5 flex-shrink-0" />

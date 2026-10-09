@@ -101,7 +101,7 @@ model UserRole {
   userId    String
   roleId    String
   familyId  String?  // scoped Karta role
-  areaId    String?  // scoped Operator role
+  areaId    String?  // scoped role: OPERATOR / DISTRICT_TEAM -> a DISTRICT area, STATE_TEAM -> a STATE area (src/lib/scope.ts)
   grantedBy String?
   grantedAt DateTime @default(now())
   expiresAt DateTime?
@@ -725,7 +725,7 @@ model Area {
   id        String  @id @default(cuid())
   parentId  String?
   name      String
-  type      String  // COUNTRY, STATE, DISTRICT, CITY, AREA, GROUP
+  type      String  // location master: COUNTRY, STATE, DISTRICT, TALUKA, VILLAGE, CITY; legacy: AREA, GROUP
   code      String?
   isActive  Boolean @default(true)
   sortOrder Int     @default(0)

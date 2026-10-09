@@ -15,6 +15,15 @@ async function main() {
     prisma.role.upsert({ where: { code: 'ASSET_OWNER' }, update: {}, create: { code: 'ASSET_OWNER', label: 'Asset Owner', isSystem: true } }),
   ])
   const [memberRole, kartaRole, operatorRole, adminRole, assetOwnerRole] = roles
+  // P0 (F32/F33): body-team roles and the Admin-granted export permission.
+  // Also inserted by migration 20261009120000_p0_team_roles, so a database
+  // that was migrated but never re-seeded still has them.
+  const [nationalTeamRole, stateTeamRole, districtTeamRole, dataExportRole] = await Promise.all([
+    prisma.role.upsert({ where: { code: 'NATIONAL_TEAM' }, update: {}, create: { code: 'NATIONAL_TEAM', label: 'National team', isSystem: true } }),
+    prisma.role.upsert({ where: { code: 'STATE_TEAM' }, update: {}, create: { code: 'STATE_TEAM', label: 'State team', isSystem: true } }),
+    prisma.role.upsert({ where: { code: 'DISTRICT_TEAM' }, update: {}, create: { code: 'DISTRICT_TEAM', label: 'District team', isSystem: true } }),
+    prisma.role.upsert({ where: { code: 'DATA_EXPORT' }, update: {}, create: { code: 'DATA_EXPORT', label: 'Data export permission', isSystem: true } }),
+  ])
   console.log('✅ Roles created')
 
   // ── Permissions + role→permission matrix ───────────────────────
@@ -39,6 +48,8 @@ async function main() {
     { code: 'asset:manage_own', label: 'Manage own assets', module: 'asset' },
     { code: 'group:manage_own', label: 'Register and convene community groups', module: 'group' },
     { code: 'group:approve', label: 'Approve community groups', module: 'group' },
+    { code: 'directory:view_scoped', label: 'View members in own data scope (F33)', module: 'directory' },
+    { code: 'directory:export', label: 'Export the scoped member directory (F33)', module: 'directory' },
   ]
   const permissionRecords: Record<string, string> = {}
   for (const p of permissions) {
@@ -59,11 +70,17 @@ async function main() {
       'family:member_add', 'family:approve', 'approval:review',
       'group:manage_own', 'group:approve',
     ],
+    NATIONAL_TEAM: ['member:edit_own', 'matrimony:manage_own', 'family:view_tree', 'group:manage_own', 'directory:view_scoped'],
+    STATE_TEAM: ['member:edit_own', 'matrimony:manage_own', 'family:view_tree', 'group:manage_own', 'directory:view_scoped'],
+    DISTRICT_TEAM: ['member:edit_own', 'matrimony:manage_own', 'family:view_tree', 'group:manage_own', 'directory:view_scoped'],
+    DATA_EXPORT: ['directory:export'],
     ADMIN: permissions.map((p) => p.code), // full access
   }
   const roleByCode: Record<string, string> = {
     MEMBER: memberRole.id, KARTA: kartaRole.id, OPERATOR: operatorRole.id,
     ADMIN: adminRole.id, ASSET_OWNER: assetOwnerRole.id,
+    NATIONAL_TEAM: nationalTeamRole.id, STATE_TEAM: stateTeamRole.id,
+    DISTRICT_TEAM: districtTeamRole.id, DATA_EXPORT: dataExportRole.id,
   }
   for (const [roleCode, permCodes] of Object.entries(ROLE_PERMISSIONS)) {
     for (const permCode of permCodes) {
@@ -460,6 +477,69 @@ async function main() {
 
   console.log('✅ Test accounts created (MEMBER, KARTA x2, OPERATOR, ASSET_OWNER, ADMIN)')
 
+  // ── P0 location master demo + team accounts (dev/test only) ────
+  // State > District > Taluka > Village, as the workbook's location master
+  // defines it. Added beside the existing India > Maharashtra > city rows,
+  // which are left as they are.
+  const loc = async (id: string, name: string, type: string, parentId: string) =>
+    prisma.area.upsert({ where: { id }, update: {}, create: { id, name, type, parentId } })
+  const puneDistrict = await loc('area-mh-dist-pune', 'Pune', 'DISTRICT', maharashtra.id)
+  const haveli = await loc('area-mh-tal-haveli', 'Haveli', 'TALUKA', puneDistrict.id)
+  const loni = await loc('area-mh-vil-loni-kalbhor', 'Loni Kalbhor', 'VILLAGE', haveli.id)
+  const nagpurDistrict = await loc('area-mh-dist-nagpur', 'Nagpur', 'DISTRICT', maharashtra.id)
+  const nagpurRural = await loc('area-mh-tal-nagpur-rural', 'Nagpur Rural', 'TALUKA', nagpurDistrict.id)
+  await loc('area-mh-vil-wadi', 'Wadi', 'VILLAGE', nagpurRural.id)
+  const gujarat = await loc('area-gj', 'Gujarat', 'STATE', india.id)
+  const ahmedabad = await loc('area-gj-dist-ahmedabad', 'Ahmedabad', 'DISTRICT', gujarat.id)
+  const daskroi = await loc('area-gj-tal-daskroi', 'Daskroi', 'TALUKA', ahmedabad.id)
+  const aslali = await loc('area-gj-vil-aslali', 'Aslali', 'VILLAGE', daskroi.id)
+
+  // Give the two seeded test members a home village so the scoped directory
+  // has something to show: one in Pune district, one in another state.
+  const homeArea = async (memberId: string, areaId: string) =>
+    prisma.memberArea.upsert({
+      where: { memberId_areaId: { memberId, areaId } },
+      update: {},
+      create: { memberId, areaId, isPrimary: true },
+    })
+  await homeArea(testMember.id, loni.id)
+  await homeArea(otherKartaMember.id, aslali.id)
+
+  const teamAccounts = [
+    { email: 'test.national@example.test', mobile: '9000000007', number: 'MEM-TEST-NATIONAL', last: 'National', roleId: nationalTeamRole.id, areaId: null as string | null },
+    { email: 'test.state@example.test', mobile: '9000000008', number: 'MEM-TEST-STATE', last: 'StateTeam', roleId: stateTeamRole.id, areaId: maharashtra.id },
+    { email: 'test.district@example.test', mobile: '9000000009', number: 'MEM-TEST-DISTRICT', last: 'DistrictTeam', roleId: districtTeamRole.id, areaId: puneDistrict.id },
+  ]
+  for (const t of teamAccounts) {
+    const u = await prisma.user.upsert({
+      where: { email: t.email },
+      update: {},
+      create: {
+        email: t.email, mobile: t.mobile, passwordHash: testPwdHash,
+        emailVerified: true, mobileVerified: true, status: 'ACTIVE',
+      },
+    })
+    for (const [suffix, roleId, areaId] of [['member', memberRole.id, null], ['team', t.roleId, t.areaId]] as const) {
+      await prisma.userRole.upsert({
+        where: { id: `test-${suffix}-role-${u.id}` },
+        update: {},
+        create: { id: `test-${suffix}-role-${u.id}`, userId: u.id, roleId, areaId },
+      })
+    }
+    await prisma.member.upsert({
+      where: { memberNumber: t.number },
+      update: {},
+      create: { memberNumber: t.number, userId: u.id, firstName: 'Test', lastName: t.last, gender: 'MALE', status: 'ACTIVE' },
+    })
+  }
+  // The operator is mapped to Pune district (F32 step 2).
+  await prisma.userRole.upsert({
+    where: { id: `test-operator-district-${operatorUser.id}` },
+    update: {},
+    create: { id: `test-operator-district-${operatorUser.id}`, userId: operatorUser.id, roleId: operatorRole.id, areaId: puneDistrict.id },
+  })
+  console.log('✅ Location master demo + team accounts created (NATIONAL / STATE / DISTRICT team)')
+
   console.log('\n🎉 Seed complete!\n')
   console.log('Admin credentials:')
   console.log(`  Email:    ${process.env.ADMIN_EMAIL ?? 'admin@miladwani.com'}`)
@@ -470,6 +550,9 @@ async function main() {
   console.log('  test.other-karta@example.test  - KARTA of "Other" family (for cross-family authz tests)')
   console.log('  test.operator@example.test     - OPERATOR')
   console.log('  test.assetowner@example.test   - ASSET_OWNER')
+  console.log('  test.national@example.test     - NATIONAL_TEAM (view all)')
+  console.log('  test.state@example.test        - STATE_TEAM, Maharashtra')
+  console.log('  test.district@example.test     - DISTRICT_TEAM, Pune district')
 }
 
 main()
