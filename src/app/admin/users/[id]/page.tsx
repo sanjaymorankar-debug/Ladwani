@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -17,7 +18,7 @@ export default function UserDetailPage() {
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/admin/users/${params.id}`)
+    fetch(`${BASE_PATH}/api/admin/users/${params.id}`)
       .then((r) => r.json())
       .then(setUser)
   }, [params.id])
@@ -25,7 +26,7 @@ export default function UserDetailPage() {
   const updateStatus = async (status: string) => {
     setIsSaving(true)
     try {
-      const res = await fetch(`/api/admin/users/${params.id}`, {
+      const res = await fetch(`${BASE_PATH}/api/admin/users/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -44,14 +45,14 @@ export default function UserDetailPage() {
     const hasRole = user?.userRoles?.some((ur: any) => ur.role.code === roleCode)
     setIsSaving(true)
     try {
-      const res = await fetch(`/api/admin/users/${params.id}`, {
+      const res = await fetch(`${BASE_PATH}/api/admin/users/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ toggleRole: roleCode }),
       })
       if (!res.ok) throw new Error('Update failed')
       toast.success(hasRole ? `Role ${roleCode} removed` : `Role ${roleCode} added`)
-      const updated = await fetch(`/api/admin/users/${params.id}`).then((r) => r.json())
+      const updated = await fetch(`${BASE_PATH}/api/admin/users/${params.id}`).then((r) => r.json())
       setUser(updated)
     } catch (e: any) {
       toast.error(e.message)

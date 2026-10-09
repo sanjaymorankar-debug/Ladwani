@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -21,7 +22,7 @@ export default function NewGroupForm({ areas }: { areas: { id: string; name: str
     if (!form.name.trim()) return toast.error('Give the group a name')
     setBusy(true)
     try {
-      const res = await fetch('/api/groups', {
+      const res = await fetch(`${BASE_PATH}/api/groups`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, areaId: form.areaId || null }),

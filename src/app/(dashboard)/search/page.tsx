@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState, useTransition } from 'react'
 import { Search, Filter, MapPin, GraduationCap, Users, Loader2, SlidersHorizontal } from 'lucide-react'
 import Link from 'next/link'
@@ -37,7 +38,7 @@ export default function SearchPage() {
       if (maxAge) params.set('maxAge', maxAge)
       if (education) params.set('education', education)
 
-      const res = await fetch(`/api/search?${params}`)
+      const res = await fetch(`${BASE_PATH}/api/search?${params}`)
       const data = await res.json()
       setResults(data.members ?? [])
       setTotal(data.total ?? 0)

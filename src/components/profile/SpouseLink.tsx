@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { Heart, Search, Loader2 } from 'lucide-react'
@@ -12,7 +13,7 @@ export default function SpouseLink({ memberId, onDone }: { memberId: string; onD
 
   const search = async () => {
     if (!query.trim()) return
-    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
+    const res = await fetch(`${BASE_PATH}/api/search?q=${encodeURIComponent(query)}`)
     const data = await res.json()
     setResults(data.members ?? [])
   }
@@ -20,7 +21,7 @@ export default function SpouseLink({ memberId, onDone }: { memberId: string; onD
   const submit = async (payload: { spouseMemberId?: string; externalSpouseName?: string }) => {
     setBusy(true)
     try {
-      const res = await fetch(`/api/members/${memberId}/spouse`, {
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/spouse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

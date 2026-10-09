@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Plus, Trash2 } from 'lucide-react'
@@ -19,7 +20,7 @@ export default function SkillsAdmin() {
   const [filter, setFilter] = useState('')
 
   const load = () =>
-    fetch('/api/admin/skills').then((r) => r.json()).then((d) => setSkills(d.skills ?? []))
+    fetch(`${BASE_PATH}/api/admin/skills`).then((r) => r.json()).then((d) => setSkills(d.skills ?? []))
   useEffect(() => { load() }, [])
 
   const call = async (url: string, init: RequestInit, ok?: string) => {
@@ -32,7 +33,7 @@ export default function SkillsAdmin() {
   }
 
   const add = async () => {
-    if (await call('/api/admin/skills', { method: 'POST', body: JSON.stringify({ name, category }) }, 'Skill added')) {
+    if (await call(`${BASE_PATH}/api/admin/skills`, { method: 'POST', body: JSON.stringify({ name, category }) }, 'Skill added')) {
       setName(''); setCategory('')
     }
   }
@@ -60,11 +61,11 @@ export default function SkillsAdmin() {
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <button type="button" className="text-xs text-gray-600 hover:text-gray-900"
-                onClick={() => call(`/api/admin/skills/${s.id}`, { method: 'PATCH', body: JSON.stringify({ isActive: !s.isActive }) })}>
+                onClick={() => call(`${BASE_PATH}/api/admin/skills/${s.id}`, { method: 'PATCH', body: JSON.stringify({ isActive: !s.isActive }) })}>
                 {s.isActive ? 'Deactivate' : 'Activate'}
               </button>
               <button type="button" className="text-gray-400 hover:text-red-500"
-                onClick={() => confirm(`Delete "${s.name}"?`) && call(`/api/admin/skills/${s.id}`, { method: 'DELETE' }, 'Deleted')}>
+                onClick={() => confirm(`Delete "${s.name}"?`) && call(`${BASE_PATH}/api/admin/skills/${s.id}`, { method: 'DELETE' }, 'Deleted')}>
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>

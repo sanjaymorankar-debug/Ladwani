@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import Link from 'next/link'
 import { Heart, MessageSquare, Share2, MoreHorizontal, Pin, Flag } from 'lucide-react'
@@ -24,7 +25,7 @@ export default function PostCard({ post, viewerUserId }: PostCardProps) {
     setLiked(newLiked)
     setReactionCount((c: number) => newLiked ? c + 1 : c - 1)
     try {
-      await fetch(`/api/posts/${post.id}/reactions`, {
+      await fetch(`${BASE_PATH}/api/posts/${post.id}/reactions`, {
         method: newLiked ? 'POST' : 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reactionType: 'LIKE' }),

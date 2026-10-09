@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -26,7 +27,7 @@ export default function NewAssetPage() {
     if (!form.name.trim()) return toast.error('Give the asset a name')
     setBusy(true)
     try {
-      const res = await fetch('/api/assets', {
+      const res = await fetch(`${BASE_PATH}/api/assets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, facilities }),

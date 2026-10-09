@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import { Send, Loader2 } from 'lucide-react'
 import { timeAgo, getInitials } from '@/lib/utils'
@@ -34,7 +35,7 @@ export default function CommentSection({ postId, comments, viewerUserId }: Props
     if (!content.trim()) return
     setIsSending(true)
     try {
-      const res = await fetch(`/api/posts/${postId}/comments`, {
+      const res = await fetch(`${BASE_PATH}/api/posts/${postId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content, parentId }),

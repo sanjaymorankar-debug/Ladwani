@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -16,7 +17,7 @@ export default function MarkDeceasedPanel({ memberId, memberName }: { memberId: 
     if (!confirm(`Record that ${memberName} has passed away? This deactivates any login and cannot be easily undone.`)) return
     setBusy(true)
     try {
-      const res = await fetch(`/api/members/${memberId}/deceased`, {
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/deceased`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

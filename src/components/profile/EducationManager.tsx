@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { GraduationCap, Plus, Trash2 } from 'lucide-react'
@@ -20,7 +21,7 @@ export default function EducationManager({ memberId }: { memberId: string }) {
   const [form, setForm] = useState({ level: '', qualification: '', institution: '', yearCompleted: '' })
 
   const load = () =>
-    fetch(`/api/members/${memberId}`)
+    fetch(`${BASE_PATH}/api/members/${memberId}`)
       .then((r) => r.json())
       .then((d) => setRecords(d.education ?? []))
 
@@ -33,7 +34,7 @@ export default function EducationManager({ memberId }: { memberId: string }) {
     }
     setAdding(true)
     try {
-      const res = await fetch(`/api/members/${memberId}/education`, {
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/education`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, isHighest: records.length === 0 }),
@@ -50,7 +51,7 @@ export default function EducationManager({ memberId }: { memberId: string }) {
   }
 
   const remove = async (id: string) => {
-    await fetch(`/api/members/${memberId}/education/${id}`, { method: 'DELETE' })
+    await fetch(`${BASE_PATH}/api/members/${memberId}/education/${id}`, { method: 'DELETE' })
     setRecords((r) => r.filter((x) => x.id !== id))
   }
 
