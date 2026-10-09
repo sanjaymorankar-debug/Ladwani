@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     }
 
     const user = await prisma.user.findFirst({
-      where: mobile ? { mobile } : { email },
+      where: mobile ? { mobile } : { email: { equals: email, mode: 'insensitive' } },
       include: {
         verificationTokens: {
           where: {

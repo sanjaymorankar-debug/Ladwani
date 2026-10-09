@@ -1,8 +1,8 @@
 name: CI
 
 # Runs on every push and pull request to staging and main. The tests exercise
-# real Prisma queries and constraints, so a MySQL service container matching
-# production (Hostinger MySQL) is provided rather than a mock.
+# real Prisma queries and constraints, so a PostgreSQL service container is
+# provided rather than a mock.
 #
 # Lint is not run: `next lint` is interactive under Next 14 and eslint.config.mjs
 # targets a newer eslint-config-next. Add it back once that config is fixed.
@@ -20,20 +20,21 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      mysql:
-        image: mysql:8.0
+      postgres:
+        image: postgres:16
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: miladwani_test
-        ports: ["3306:3306"]
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: miladwani_test
+        ports: ["5432:5432"]
         options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -proot"
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
 
     env:
-      DATABASE_URL: mysql://root:root@127.0.0.1:3306/miladwani_test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/miladwani_test
       NEXTAUTH_SECRET: ci-only-secret-not-used-in-production
       NEXTAUTH_URL: http://localhost:3000
 
@@ -51,7 +52,7 @@ jobs:
       - name: Write .env.test
         run: |
           cat > .env.test <<'ENV'
-          DATABASE_URL=mysql://root:root@127.0.0.1:3306/miladwani_test
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/miladwani_test
           NEXTAUTH_SECRET=ci-only-secret-not-used-in-production
           NEXTAUTH_URL=http://localhost:3000
           NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -84,13 +85,13 @@ jobs:
       - name: Check every API URL carries BASE_PATH
         run: bash scripts/check-base-path.sh
 
-      # The app was ported from PostgreSQL for shared hosting; a provider
-      # flipped back would fail only once a real query ran.
-      - name: Check the schema still targets MySQL
+      # PostgreSQL is the only supported database. A provider flipped to
+      # anything else would fail only once a real query ran.
+      - name: Check the schema still targets PostgreSQL
         run: |
           set -euo pipefail
-          grep -qE '^\s*provider\s*=\s*"mysql"' prisma/schema.prisma \
-            || { echo "::error::prisma/schema.prisma no longer targets mysql"; exit 1; }
+          grep -qE '^\s*provider\s*=\s*"postgresql"' prisma/schema.prisma \
+            || { echo "::error::prisma/schema.prisma no longer targets postgresql"; exit 1; }
 
       - name: Unit and integration tests
         run: npm test

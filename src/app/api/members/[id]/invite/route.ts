@@ -84,7 +84,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   // An address already tied to a login would produce an account collision at
   // claim time — refuse now, while there's still someone to tell.
-  const emailTaken = await prisma.user.findUnique({ where: { email } })
+  const emailTaken = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } })
   if (emailTaken) {
     return NextResponse.json(
       { message: 'An account already uses that email address.' },

@@ -78,8 +78,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // MySQL has no exclusion-constraint equivalent, so double-booking is
-      // prevented here instead: lock the asset's own row for the rest of
+      // Double-booking is prevented here: lock the asset's own row for the rest of
       // this transaction, so a second, concurrent booking attempt for the
       // same asset blocks on this SELECT until we commit or roll back —
       // only then does it see the row we're about to insert.

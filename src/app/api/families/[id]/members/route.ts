@@ -46,11 +46,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         deletedAt: null,
         OR: [
           body.mobilePrimary ? { mobilePrimary: body.mobilePrimary } : undefined,
-          body.email ? { email: body.email } : undefined,
+          body.email ? { email: { equals: body.email, mode: 'insensitive' } } : undefined,
           body.firstName && body.dateOfBirth
             ? {
-                firstName: { equals: body.firstName },
-                lastName: body.lastName ? { equals: body.lastName } : undefined,
+                firstName: { equals: body.firstName, mode: 'insensitive' },
+                lastName: body.lastName ? { equals: body.lastName, mode: 'insensitive' } : undefined,
                 dateOfBirth: new Date(body.dateOfBirth),
               }
             : undefined,

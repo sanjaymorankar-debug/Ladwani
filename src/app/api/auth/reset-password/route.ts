@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     const identifier = mobile ?? email
 
     const user = await prisma.user.findFirst({
-      where: mobile ? { mobile } : { email },
+      where: mobile ? { mobile } : { email: { equals: email, mode: 'insensitive' } },
       include: { member: { select: { firstName: true } } },
     })
 

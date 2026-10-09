@@ -41,7 +41,8 @@ const LOCK_DURATION_MS = 30 * 60 * 1000
 export async function validateLogin(identifier: string, password: string): Promise<LoginResult> {
   const user = await prisma.user.findFirst({
     where: {
-      OR: [{ email: identifier }, { mobile: identifier }],
+      // Emails compare case-insensitively: Postgres text equality is case-sensitive.
+      OR: [{ email: { equals: identifier, mode: 'insensitive' } }, { mobile: identifier }],
       deletedAt: null,
     },
     include: {

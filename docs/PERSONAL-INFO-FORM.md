@@ -41,9 +41,9 @@ spouse flow also clears it.
 
 ## Database
 
-Migration `prisma/migrations/20261003120000_member_profile_details` (also as
-`database/phpmyadmin/add_member_profile_details.sql` for phpMyAdmin). Additive
-only: three nullable columns on `addresses`, and a new 1:1 table
+Originally the MySQL migration `20261003120000_member_profile_details`; since
+the move to PostgreSQL it is part of the baseline
+`prisma/migrations/20261009120000_init`. Additive only: three nullable columns on `addresses`, and a new 1:1 table
 `member_profile_details`. Existing members have no row and load with every new
 field empty.
 

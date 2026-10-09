@@ -40,5 +40,9 @@ next-env.d.ts
 # Prisma
 prisma/migrations/*.sql.bak
 
+# scripts/migrate-mysql-to-postgres.ts output (may contain member data)
+migration-report-*.json
+fk-backup-*.sql
+
 # Uploads (local dev)
 uploads/

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -322,7 +322,7 @@ model Member {
   nativeDistrict        String?
   nativeState           String?
   nationality           String         @default("Indian")
-  languages             Json?          // JSON array of strings (MySQL has no native arrays)
+  languages             Json?          // JSON array of strings
   maritalStatus         MaritalStatus  @default(UNMARRIED)
   employmentStatus      String?
   occupationCategory    String?
@@ -1087,9 +1087,9 @@ model MatrimonialProfile {
   isVisible  Boolean @default(false)
   about      String? @db.Text
   heightCm   Int?
-  // MySQL has no native array column type (unlike Postgres) — stored as a
-  // JSON array of strings instead. Nullable; application code treats a
-  // missing value as an empty list.
+  // Stored as a JSON array of strings (jsonb) rather than a native text[],
+  // which keeps every list-valued column in this schema on the same type.
+  // Nullable; application code treats a missing value as an empty list.
   languages  Json?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -1477,8 +1477,7 @@ model AssetBlackout {
   @@map("asset_blackouts")
 }
 
-/// Double-booking prevention: MySQL has no equivalent of a Postgres GiST
-/// exclusion constraint, so overlap is enforced in application code —
+/// Double-booking prevention is enforced in application code —
 /// `SELECT ... FOR UPDATE` on the parent Asset row inside the booking
 /// transaction (see src/app/api/assets/[id]/bookings/route.ts) serializes
 /// concurrent attempts for the same asset before the overlap check runs.

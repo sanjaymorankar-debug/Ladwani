@@ -8,99 +8,109 @@
 >
 > Everything after this note is the original manual procedure for
 > `devmiladwani.agtci.com`, kept because test and production are still promoted
-> by hand and the hPanel and database steps are the same wherever it is hosted.
+> by hand and the database steps are the same wherever it is hosted.
 
 # Deploying to devmiladwani.agtci.com
 
-Updated 10 Sep 2026. This codebase now targets **MySQL** (ported from
-PostgreSQL specifically for this deployment — see "What changed" below) and
-this plan assumes shared hosting through Hostinger's **hPanel**, replacing
-whatever is currently live at the domain. No production data needs to be
-preserved.
+Updated 9 Oct 2026. This codebase targets **PostgreSQL** — the final database
+choice for every tier (see "Database" below). The Node.js app itself can still
+run on Hostinger's **hPanel** shared hosting, but **hPanel offers only MySQL**,
+so the PostgreSQL database has to live somewhere else and the app reaches it
+over the network.
 
 ---
 
-## What changed to make MySQL possible
+## Database: PostgreSQL
 
-The app was originally built against PostgreSQL. Two things depended on
-Postgres-only features and needed a real rewrite, not just a config change:
+The app was first built on PostgreSQL, ported to MySQL on 10 Sep 2026 for
+Hostinger shared hosting, and moved back to PostgreSQL on 9 Oct 2026 as the
+final schema. What that means in practice:
 
-- **Double-booking prevention** no longer relies on a database exclusion
-  constraint (MySQL has no equivalent). It's now enforced in application code:
-  the booking transaction runs `SELECT ... FOR UPDATE` on the asset's own row
-  first, which serializes concurrent booking attempts for that asset, then
-  checks for overlapping active bookings before inserting. See
+- **Migration history was reset.** The MySQL migrations cannot be applied to
+  PostgreSQL, so `prisma/migrations/` now holds one PostgreSQL baseline,
+  `20261009120000_init`, containing the whole schema (including everything
+  from the 9 Oct Additional Details and interest-group migrations). A
+  database that was built from the old MySQL migrations is not upgraded in
+  place — build a new PostgreSQL database and, if its rows matter, copy them
+  across with [MIGRATION.md](MIGRATION.md).
+- **Double-booking prevention** stays in application code: the booking
+  transaction runs `SELECT ... FOR UPDATE` on the asset's own row, which
+  serializes concurrent bookings for that asset, then checks for overlaps
+  before inserting. See
   [src/app/api/assets/[id]/bookings/route.ts](src/app/api/assets/%5Bid%5D/bookings/route.ts).
-  The full booking + concurrency test suite (including a genuine simultaneous
-  double-booking attempt) passes against MySQL.
-- **Array columns** (matrimony languages/preferred-locations, asset
-  facilities) are now JSON columns instead of Postgres native arrays.
-- All Prisma migrations were regenerated from scratch as MySQL DDL — the old
-  Postgres migration history doesn't apply and isn't needed since we're not
-  carrying data forward.
+  The concurrency test (a genuine simultaneous double-booking attempt) passes
+  on PostgreSQL.
+- **List-valued columns** (matrimony languages/preferred locations, asset
+  facilities, Additional Details multi-selects) stay as JSON columns, stored
+  as `jsonb`.
+- **Case-insensitive matching** is now explicit. MySQL's collation ignored
+  letter case; PostgreSQL does not. Login and duplicate-email checks, and every
+  name/city search, use Prisma's `mode: 'insensitive'`, pinned by
+  `tests/uat/case-insensitive-matching.test.ts`.
 
-Nothing else in the schema or application logic needed to change. The full
-test suite (143 tests) passes against a local MySQL 8.4 instance.
-
-`MIGRATION.md` (the earlier live-MySQL → Postgres data migration runbook) no
-longer applies now that the target is MySQL and there's no data to carry
-over — ignore it for this deployment.
+The full test suite runs against PostgreSQL 16 in CI.
 
 ---
 
-# Part 1 — Create the MySQL database on Hostinger
+# Part 1 — Create the PostgreSQL database
 
-On shared hosting, **database + user creation has to happen through hPanel**
-— your hosting account's MySQL user doesn't have the `CREATE USER`/`GRANT`
-privilege needed to script this part, so there is no SQL file that can do it
-for you. Everything *after* the database exists (creating tables, seeding
-reference data) is scripted — that part is in Part 3.
+Pick where the database lives:
 
-1. Log in to **hPanel** → your hosting plan → **Databases → MySQL Databases**.
-2. Under **Create a New MySQL Database**, enter a database name, e.g.
-   `miladwani` (Hostinger will prefix it with your account id, giving
-   something like `u123456789_miladwani` — that's normal, use the full
-   prefixed name everywhere below).
-3. Under **Create a New MySQL User**, enter a username, e.g. `miladwani_app`
-   (again prefixed automatically) and generate a strong password — save it
-   somewhere safe, you'll need it for the env vars in Part 2.
-4. Under **Add User to Database**, attach that user to that database with
-   **ALL PRIVILEGES**.
-5. Note the **database host** shown in hPanel — on shared hosting this is
-   almost always `localhost`, because the Node app and MySQL server run on
-   the same box. Confirm it in hPanel rather than assuming.
-6. Optional but recommended: open **phpMyAdmin** (linked from the same
-   Databases page) once, just to confirm you can log into the new database
-   with the new user/password before moving on.
+- **A managed PostgreSQL service** (Supabase, Neon, AWS RDS, DigitalOcean,
+  Render, ...) — the least work. Create a database and user in the provider's
+  dashboard and copy the connection string it gives you. Choose a region close
+  to the app server (India, for Hostinger's Indian data centres).
+- **Your own server** (a VPS, including Hostinger's VPS plans) — install
+  PostgreSQL 14 or newer, then run
+  [scripts/postgres/create-database.sql](scripts/postgres/create-database.sql)
+  as the `postgres` superuser. It creates a `miladwani` database owned by a
+  `miladwani_app` role; change the password in it first.
 
-You now have everything for the connection string:
+Either way you end up with a connection string:
 
 ```
-mysql://<db-user>:<db-password>@localhost:3306/<db-name>
+postgresql://<db-user>:<db-password>@<db-host>:5432/<db-name>?schema=public
 ```
+
+Append `&sslmode=require` if the provider requires TLS and its string doesn't
+already say so.
+
+Before going further, **check the app server can reach the database.** From
+hPanel's SSH terminal (or wherever the app runs):
+
+```bash
+node -e "require('net').connect(5432, '<db-host>').on('connect', () => { console.log('reachable'); process.exit(0) }).on('error', (e) => { console.log(e.message); process.exit(1) })"
+```
+
+If shared hosting blocks the outbound connection, ask the host to allow it,
+use a provider that listens on an allowed port, or move the app to a VPS.
+Also allow the app server's IP in the database's firewall/allow-list if the
+provider has one.
 
 ### Then create the tables — two options
 
-You can build the schema **either** through phpMyAdmin **or** over SSH. Both
-produce an identical database; do one, not both.
+You can build the schema **either** by importing SQL files **or** with the
+Prisma CLI. Both produce an identical database; do one, not both.
 
-**Option A — phpMyAdmin (no command line needed).** Import two ready-made SQL
-files from [scripts/mysql/](scripts/mysql/):
+**Option A — SQL files (psql, pgAdmin, or the provider's SQL editor).** Run
+two ready-made files from [scripts/postgres/](scripts/postgres/), in order,
+against the empty database:
 
-1. Open phpMyAdmin from the same hPanel Databases page.
-2. **Select your database in the left sidebar first.** Both files deliberately
-   omit `CREATE DATABASE`/`USE`, so they import into whichever database is
-   selected — that's what makes them work with Hostinger's prefixed names.
-3. Import [`scripts/mysql/01-schema.sql`](scripts/mysql/01-schema.sql) — 53
-   tables, 81 foreign keys, no rows.
-4. Import [`scripts/mysql/02-reference-data.sql`](scripts/mysql/02-reference-data.sql) —
+```bash
+psql "<connection string without ?schema=public>" -v ON_ERROR_STOP=1 -f scripts/postgres/01-schema.sql
+psql "<connection string without ?schema=public>" -v ON_ERROR_STOP=1 -f scripts/postgres/02-reference-data.sql
+```
+
+1. [`01-schema.sql`](scripts/postgres/01-schema.sql) — every table, enum and
+   foreign key, no rows.
+2. [`02-reference-data.sql`](scripts/postgres/02-reference-data.sql) —
    roles, permissions, relationship types, approval rules, post types, areas,
-   the ₹2,000 fee, and one admin login.
+   interests, the ₹2,000 fee, and one admin login.
 
 Then skip step 3's `migrate deploy` and step 4's `db:seed` in Part 3 — the
-import already did both. Full detail: [scripts/mysql/README.md](scripts/mysql/README.md).
+import already did both. Full detail: [scripts/postgres/README.md](scripts/postgres/README.md).
 
-**Option B — SSH.** Leave the database empty here and let
+**Option B — Prisma CLI.** Leave the database empty here and let
 `npx prisma migrate deploy` + `npm run db:seed` create everything in Part 3.
 
 Either order stays safe: the SQL files record the migration as applied in
@@ -108,16 +118,8 @@ Either order stays safe: the SQL files record the migration as applied in
 error.
 
 > A database built from those two SQL files was verified by running the app's
-> full 143-test suite against it — the schema they produce is not
+> full test suite against it — the schema they produce is not
 > hand-maintained, it's dumped from the same Prisma migration the CLI uses.
-
-> If you ever deploy this somewhere with real root/admin MySQL access instead
-> (a VPS, a managed MySQL provider) rather than Hostinger shared hosting,
-> [scripts/mysql/create-database.sql](scripts/mysql/create-database.sql) does
-> the equivalent of steps 2–4 above as a runnable script. It does **not**
-> work on Hostinger shared hosting itself — your hosting account's MySQL user
-> lacks the `CREATE USER`/`GRANT` privilege the script needs, which is
-> exactly why the panel wizard exists.
 
 ---
 
@@ -129,7 +131,7 @@ block below is what to actually set for this deployment.
 
 ```bash
 # Database — from Part 1
-DATABASE_URL="mysql://<db-user>:<db-password>@localhost:3306/<db-name>"
+DATABASE_URL="postgresql://<db-user>:<db-password>@<db-host>:5432/<db-name>?schema=public"
 
 # NextAuth — generate a FRESH secret, never reuse the dev one
 NEXTAUTH_SECRET="<run: openssl rand -base64 32>"
@@ -184,10 +186,10 @@ Push this codebase as its own branch and merge it via PR instead:
 cd D:\Claude_development\ladwani\app
 git remote add origin https://github.com/sanjaymorankar-debug/miladwani.git
 git fetch origin
-git push -u origin master:mysql-deploy
+git push -u origin master:postgres-deploy
 ```
 
-Open a PR from `mysql-deploy` into `main` on GitHub, review it, and merge —
+Open a PR from `postgres-deploy` into `main` on GitHub, review it, and merge —
 that becomes the new `main` without ever forcing anything.
 
 ## 2. Pull it onto the server and configure the Node.js app
@@ -217,12 +219,12 @@ npx prisma migrate deploy   # creates every table from the committed migration
 npm run build                # runs `prisma generate` first, see package.json
 ```
 
-`migrate deploy` applies the single MySQL baseline migration
-(`prisma/migrations/20260910163143_init/`) and any later ones, without
+`migrate deploy` applies the PostgreSQL baseline migration
+(`prisma/migrations/20261009120000_init/`) and any later ones, without
 prompting. It's the only `migrate` command safe to run against a server —
 never `migrate dev` or `db push` in production.
 
-## 4. Seed reference data (first deploy only — skip if you used phpMyAdmin)
+## 4. Seed reference data (first deploy only — skip if you imported the SQL files)
 
 ```bash
 npm run db:seed
@@ -281,9 +283,11 @@ gateway (Razorpay, Cashfree, etc.) and I'll wire it.
 - [ ] **Publish DKIM** for `agtci.com` (SPF, DMARC and MX are already
       correct). Without it, verification codes land in spam and members can't
       sign in.
-- [ ] Back up the database on a schedule (hPanel has a MySQL backup/export
-      tool), and separately back up `UPLOAD_DIR` — photos live on disk, not
-      in the database.
+- [ ] Back up the database on a schedule — turn on the managed provider's
+      automated backups, or on your own server run
+      `pg_dump -Fc "<connection string>" > miladwani-$(date +%F).dump` from
+      cron and copy the file off the server — and separately back up
+      `UPLOAD_DIR`: photos live on disk, not in the database.
 - [ ] Delete `AGENTS.md` / `CLAUDE.md` — they instruct AI tools to read
       Next.js docs at a path that doesn't exist in the installed version.
 - [ ] Rotate the admin password and any credential that has appeared in chat
@@ -317,7 +321,8 @@ Work happens on feature branches. Open a PR into `staging`; CI (`.github/workflo
 
 ## Update 9 Oct 2026 — Additional Details and interest groups
 
-Two additive migrations (`20261009100000_member_additional_details`, then
-`20261009110000_interest_groups`), new reference data in `npm run db:seed`, a
-new `CRON_SECRET` env var and a daily cron call for the group digest. Full
-steps, rollback and assumptions: **`docs/ADDITIONAL-DETAILS.md` §5**.
+New tables and columns (originally the MySQL migrations
+`20261009100000_member_additional_details` and `20261009110000_interest_groups`,
+now part of the PostgreSQL baseline `20261009120000_init`), new reference data
+in `npm run db:seed`, a new `CRON_SECRET` env var and a daily cron call for the
+group digest. Full steps and assumptions: **`docs/ADDITIONAL-DETAILS.md` §5**.

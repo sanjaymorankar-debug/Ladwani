@@ -148,7 +148,7 @@ export async function findBloodDonors(bloodGroup: string, city: string, viewerMe
     where: {
       id: { in: Array.from(answered), ...(viewerMemberId ? { not: viewerMemberId } : {}) },
       bloodGroup, status: 'ACTIVE', deletedAt: null, userId: { not: null },
-      currentCity: { contains: city.trim() },
+      currentCity: { contains: city.trim(), mode: 'insensitive' },
     },
     select: { id: true, firstName: true, lastName: true, currentCity: true, dateOfBirth: true },
     take: 50,

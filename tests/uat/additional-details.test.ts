@@ -23,7 +23,7 @@ import {
 } from './extended-fixtures'
 
 // Additional Details (Step 2 + rules 1–8, 11): every section through the real
-// API routes and a real MySQL database.
+// API routes and a real PostgreSQL database.
 
 const as = (p: XdPerson) => actAs({ userId: p.userId!, roles: p.roles, memberId: p.memberId })
 const put = (memberId: string, section: string, body: unknown, headers: Record<string, string> = {}) =>

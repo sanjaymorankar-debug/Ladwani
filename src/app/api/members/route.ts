@@ -18,8 +18,8 @@ export async function GET(req: NextRequest) {
   const where: any = { status: 'ACTIVE', deletedAt: null }
   if (q) {
     where.OR = [
-      { firstName: { contains: q } },
-      { lastName: { contains: q } },
+      { firstName: { contains: q, mode: 'insensitive' } },
+      { lastName: { contains: q, mode: 'insensitive' } },
     ]
   }
   if (gender) where.gender = gender

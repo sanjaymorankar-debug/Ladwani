@@ -58,7 +58,7 @@ and members can maintain full profiles. Roughly **32 of 52 sections are complete
 | 41 | Profile page UX | 🟡 | Sections with independent save ✅; **not tabbed** as the spec describes |
 | 42 | Mobile UX | 🟡 | Layout is responsive (Tailwind) but **not verified on mobile viewports** |
 | 43 | Don't break existing modules | ⚪ | Community feed, areas, family tree, matrimony, notifications, admin, operator, audit — all preserved ✅. **Asset registration, asset booking, online payment, community fees and community services never existed in this codebase** — see below |
-| 44 | Migration strategy | 🟡 | Script + `MIGRATION.md` runbook written; **not executed** (no network path to the live MySQL host) |
+| 44 | Migration strategy | 🟡 | PostgreSQL is the final database (9 Oct 2026). `scripts/migrate-mysql-to-postgres.ts` + `MIGRATION.md` copy every table; tested end to end against a MariaDB copy of the old MySQL schema, **not executed** against the live MySQL host |
 | 45 | Test users | ✅ | All 5 roles incl. Asset Owner |
 | 46 | Acceptance: authentication | ✅ | Register→verify→login→refresh→protected page→logout verified in browser |
 | 47 | Acceptance: Karta | 🟡 | Register→family→Karta→add members→tree→edit ✅. Family photo upload ❌; approve→verified tested via API, not clicked through |

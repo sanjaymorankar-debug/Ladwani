@@ -49,6 +49,10 @@ npm run db:migrate     # Run migrations
 npm run db:seed        # Seed initial data
 ```
 
+To build the database from plain SQL instead (psql, pgAdmin, or a hosted
+provider's SQL editor), see [`scripts/postgres/README.md`](scripts/postgres/README.md).
+Moving rows from the earlier MySQL database: [`MIGRATION.md`](MIGRATION.md).
+
 ### 6. Start Development Server
 
 ```bash

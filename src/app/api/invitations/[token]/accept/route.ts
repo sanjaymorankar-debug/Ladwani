@@ -59,7 +59,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
       const member = await tx.member.findUniqueOrThrow({ where: { id: invitation.memberId } })
       if (member.userId) throw new Error('INVITATION_UNAVAILABLE')
 
-      const emailTaken = await tx.user.findUnique({ where: { email } })
+      const emailTaken = await tx.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } })
       if (emailTaken) throw new Error('EMAIL_TAKEN')
 
       if (mobile) {

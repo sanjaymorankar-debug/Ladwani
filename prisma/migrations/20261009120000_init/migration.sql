@@ -1,0 +1,1792 @@
+-- PostgreSQL baseline: the whole schema as of 9 Oct 2026, generated with
+-- `prisma migrate diff --from-empty --to-schema-datamodel`. It replaces the
+-- earlier MySQL migration history (init, member_invitations_and_join_direction,
+-- member_languages, member_profile_details, member_additional_details,
+-- interest_groups), which cannot be applied to PostgreSQL.
+
+-- CreateEnum
+CREATE TYPE "UserStatus" AS ENUM ('PENDING', 'ACTIVE', 'SUSPENDED', 'BLOCKED', 'DEACTIVATED');
+
+-- CreateEnum
+CREATE TYPE "FamilyStatus" AS ENUM ('PENDING', 'ACTIVE', 'INACTIVE', 'MERGED', 'ARCHIVED');
+
+-- CreateEnum
+CREATE TYPE "VerificationStatus" AS ENUM ('UNVERIFIED', 'VERIFIED', 'REJECTED');
+
+-- CreateEnum
+CREATE TYPE "Gender" AS ENUM ('MALE', 'FEMALE', 'OTHER', 'NOT_STATED');
+
+-- CreateEnum
+CREATE TYPE "MaritalStatus" AS ENUM ('UNMARRIED', 'MARRIED', 'WIDOWED', 'DIVORCED', 'SEPARATED', 'NOT_STATED');
+
+-- CreateEnum
+CREATE TYPE "MemberStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'DECEASED', 'SUSPENDED');
+
+-- CreateEnum
+CREATE TYPE "GroupStatus" AS ENUM ('DRAFT', 'PENDING_APPROVAL', 'ACTIVE', 'REJECTED', 'INACTIVE');
+
+-- CreateEnum
+CREATE TYPE "PostStatus" AS ENUM ('DRAFT', 'PENDING_APPROVAL', 'PUBLISHED', 'REJECTED', 'HIDDEN', 'REMOVED', 'FLAGGED');
+
+-- CreateEnum
+CREATE TYPE "AssetStatus" AS ENUM ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'SUSPENDED');
+
+-- CreateEnum
+CREATE TYPE "BookingStatus" AS ENUM ('PENDING_PAYMENT', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'REJECTED', 'EXPIRED');
+
+-- CreateEnum
+CREATE TYPE "PaymentStatus" AS ENUM ('CREATED', 'PENDING', 'PAID', 'FAILED', 'CANCELLED', 'REFUNDED');
+
+-- CreateEnum
+CREATE TYPE "FeeInvoiceStatus" AS ENUM ('PENDING', 'PAID', 'WAIVED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "ApprovalStatus" AS ENUM ('DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'RETURNED', 'ESCALATED');
+
+-- CreateTable
+CREATE TABLE "users" (
+    "id" TEXT NOT NULL,
+    "email" TEXT,
+    "mobile" TEXT,
+    "passwordHash" TEXT NOT NULL,
+    "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+    "mobileVerified" BOOLEAN NOT NULL DEFAULT false,
+    "status" "UserStatus" NOT NULL DEFAULT 'PENDING',
+    "joinIntent" TEXT,
+    "lastLoginAt" TIMESTAMP(3),
+    "lastLoginIp" TEXT,
+    "failedAttempts" INTEGER NOT NULL DEFAULT 0,
+    "lockedUntil" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "roles" (
+    "id" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "description" TEXT,
+    "isSystem" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "roles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "permissions" (
+    "id" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "module" TEXT NOT NULL,
+
+    CONSTRAINT "permissions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "role_permissions" (
+    "roleId" TEXT NOT NULL,
+    "permissionId" TEXT NOT NULL,
+
+    CONSTRAINT "role_permissions_pkey" PRIMARY KEY ("roleId","permissionId")
+);
+
+-- CreateTable
+CREATE TABLE "user_roles" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "roleId" TEXT NOT NULL,
+    "familyId" TEXT,
+    "areaId" TEXT,
+    "grantedBy" TEXT,
+    "grantedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3),
+
+    CONSTRAINT "user_roles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "verification_tokens" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "usedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "verification_tokens_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "refresh_tokens" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "deviceInfo" JSONB,
+    "ipAddress" TEXT,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "revokedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "refresh_tokens_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "consent_records" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "consentType" TEXT NOT NULL,
+    "granted" BOOLEAN NOT NULL,
+    "version" TEXT,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "grantedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "revokedAt" TIMESTAMP(3),
+    "memberId" TEXT,
+
+    CONSTRAINT "consent_records_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "families" (
+    "id" TEXT NOT NULL,
+    "registrationNumber" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "surname" TEXT,
+    "description" TEXT,
+    "kuladevata" TEXT,
+    "kuladevi" TEXT,
+    "gotra" TEXT,
+    "traditionalOccupation" TEXT,
+    "nativeVillage" TEXT,
+    "nativeDistrict" TEXT,
+    "nativeState" TEXT,
+    "nativeCountry" TEXT NOT NULL DEFAULT 'India',
+    "kartaMemberId" TEXT,
+    "familyPhotoId" TEXT,
+    "status" "FamilyStatus" NOT NULL DEFAULT 'PENDING',
+    "verificationStatus" "VerificationStatus" NOT NULL DEFAULT 'UNVERIFIED',
+    "verifiedBy" TEXT,
+    "verifiedAt" TIMESTAMP(3),
+    "communityId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" TEXT,
+    "updatedBy" TEXT,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "families_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "family_join_requests" (
+    "id" TEXT NOT NULL,
+    "familyId" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "relatedToMemberId" TEXT,
+    "relationshipTypeCode" TEXT,
+    "direction" TEXT NOT NULL DEFAULT 'MEMBER_REQUEST',
+    "requestedBy" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "respondedBy" TEXT,
+    "respondedAt" TIMESTAMP(3),
+    "responseNote" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "family_join_requests_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_invitations" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "email" TEXT,
+    "mobile" TEXT,
+    "tokenHash" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "invitedBy" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "acceptedAt" TIMESTAMP(3),
+    "acceptedBy" TEXT,
+    "revokedAt" TIMESTAMP(3),
+    "revokedBy" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "member_invitations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "family_members" (
+    "id" TEXT NOT NULL,
+    "familyId" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "isKarta" BOOLEAN NOT NULL DEFAULT false,
+    "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "joinedBy" TEXT,
+    "leftAt" TIMESTAMP(3),
+    "leftReason" TEXT,
+
+    CONSTRAINT "family_members_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "members" (
+    "id" TEXT NOT NULL,
+    "memberNumber" TEXT NOT NULL,
+    "userId" TEXT,
+    "firstName" TEXT NOT NULL,
+    "middleName" TEXT,
+    "lastName" TEXT,
+    "gender" "Gender" NOT NULL DEFAULT 'NOT_STATED',
+    "dateOfBirth" TIMESTAMP(3),
+    "dateOfBirthApprox" BOOLEAN NOT NULL DEFAULT false,
+    "bloodGroup" TEXT,
+    "heightCm" INTEGER,
+    "weightKg" INTEGER,
+    "bodyType" TEXT,
+    "physicalDisability" TEXT,
+    "mobilePrimary" TEXT,
+    "mobileAlternate" TEXT,
+    "email" TEXT,
+    "profilePhotoId" TEXT,
+    "biography" TEXT,
+    "currentCity" TEXT,
+    "currentState" TEXT,
+    "currentCountry" TEXT,
+    "nativeVillage" TEXT,
+    "nativeDistrict" TEXT,
+    "nativeState" TEXT,
+    "nationality" TEXT NOT NULL DEFAULT 'Indian',
+    "languages" JSONB,
+    "maritalStatus" "MaritalStatus" NOT NULL DEFAULT 'UNMARRIED',
+    "employmentStatus" TEXT,
+    "occupationCategory" TEXT,
+    "status" "MemberStatus" NOT NULL DEFAULT 'ACTIVE',
+    "deceasedAt" TIMESTAMP(3),
+    "deceasedPlace" TEXT,
+    "deceasedNotes" TEXT,
+    "verificationStatus" "VerificationStatus" NOT NULL DEFAULT 'UNVERIFIED',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" TEXT,
+    "updatedBy" TEXT,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "members_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "relationship_types" (
+    "id" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "inverseCode" TEXT,
+    "genderApplicable" TEXT,
+    "isSpouse" BOOLEAN NOT NULL DEFAULT false,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "relationship_types_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_relationships" (
+    "id" TEXT NOT NULL,
+    "fromMemberId" TEXT NOT NULL,
+    "toMemberId" TEXT NOT NULL,
+    "relationshipTypeId" TEXT NOT NULL,
+    "familyId" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" TEXT,
+
+    CONSTRAINT "member_relationships_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "marital_status_history" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "status" "MaritalStatus" NOT NULL,
+    "effectiveDate" TIMESTAMP(3),
+    "notes" TEXT,
+    "changedBy" TEXT,
+    "approvalId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "marital_status_history_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "marriage_records" (
+    "id" TEXT NOT NULL,
+    "memberId1" TEXT NOT NULL,
+    "memberId2" TEXT,
+    "externalSpouseName" TEXT,
+    "externalSpouseInfo" JSONB,
+    "marriageDate" TIMESTAMP(3),
+    "marriagePlace" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'MARRIED',
+    "dissolutionDate" TIMESTAMP(3),
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" TEXT,
+
+    CONSTRAINT "marriage_records_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "education_records" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "level" TEXT,
+    "qualification" TEXT,
+    "specialization" TEXT,
+    "institution" TEXT,
+    "yearCompleted" INTEGER,
+    "isHighest" BOOLEAN NOT NULL DEFAULT false,
+    "isOngoing" BOOLEAN NOT NULL DEFAULT false,
+    "marksType" TEXT,
+    "marksValue" TEXT,
+    "marksScale" INTEGER,
+    "boardUniversity" TEXT,
+    "marksheetFileId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "education_records_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "employment_records" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "employmentType" TEXT,
+    "employerName" TEXT,
+    "designation" TEXT,
+    "industry" TEXT,
+    "city" TEXT,
+    "country" TEXT,
+    "incomeRangeId" TEXT,
+    "startDate" TIMESTAMP(3),
+    "endDate" TIMESTAMP(3),
+    "isCurrent" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "employment_records_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "businesses" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "businessName" TEXT,
+    "businessType" TEXT,
+    "industry" TEXT,
+    "city" TEXT,
+    "country" TEXT,
+    "description" TEXT,
+    "website" TEXT,
+    "establishedYear" INTEGER,
+    "incomeRangeId" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "contact" TEXT,
+    "showInDirectory" BOOLEAN DEFAULT false,
+    "supportNeeds" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "businesses_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "skills" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "category" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "skills_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_skills" (
+    "memberId" TEXT NOT NULL,
+    "skillId" TEXT NOT NULL,
+    "level" TEXT,
+
+    CONSTRAINT "member_skills_pkey" PRIMARY KEY ("memberId","skillId")
+);
+
+-- CreateTable
+CREATE TABLE "income_ranges" (
+    "id" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "minValue" BIGINT,
+    "maxValue" BIGINT,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+
+    CONSTRAINT "income_ranges_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "addresses" (
+    "id" TEXT NOT NULL,
+    "addressableType" TEXT NOT NULL,
+    "familyId" TEXT,
+    "memberId" TEXT,
+    "addressType" TEXT NOT NULL,
+    "line1" TEXT,
+    "line2" TEXT,
+    "city" TEXT,
+    "district" TEXT,
+    "state" TEXT,
+    "country" TEXT NOT NULL DEFAULT 'India',
+    "pincode" TEXT,
+    "taluka" TEXT,
+    "latitude" DOUBLE PRECISION,
+    "longitude" DOUBLE PRECISION,
+    "isPrimary" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "addresses_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_profile_details" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "educationLevel" TEXT,
+    "educationOther" TEXT,
+    "educationStream" TEXT,
+    "educationInstitution" TEXT,
+    "annualIncomeRange" TEXT,
+    "isEarning" BOOLEAN NOT NULL DEFAULT false,
+    "isPursuingEducation" BOOLEAN NOT NULL DEFAULT false,
+    "currentCourse" TEXT,
+    "currentInstitution" TEXT,
+    "expectedCompletionYear" INTEGER,
+    "earningType" TEXT,
+    "companyName" TEXT,
+    "designation" TEXT,
+    "jobSector" TEXT,
+    "businessName" TEXT,
+    "businessType" TEXT,
+    "readyForMarriage" BOOLEAN NOT NULL DEFAULT false,
+    "lookingForMarriage" BOOLEAN NOT NULL DEFAULT false,
+    "marriageHeightCm" INTEGER,
+    "motherTongue" TEXT,
+    "nativePlace" TEXT,
+    "partnerExpectations" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "member_profile_details_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_section_settings" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "sectionKey" TEXT NOT NULL,
+    "answer" TEXT,
+    "visibility" TEXT,
+    "enteredByUserId" TEXT,
+    "entryNote" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "member_section_settings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_additional_details" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "insuranceNeedsHelp" BOOLEAN,
+    "insuranceHelpNote" TEXT,
+    "doctorName" TEXT,
+    "doctorSpeciality" TEXT,
+    "doctorClinic" TEXT,
+    "doctorCity" TEXT,
+    "doctorContact" TEXT,
+    "doctorNeedsHelp" BOOLEAN,
+    "adviserName" TEXT,
+    "adviserType" TEXT,
+    "adviserContact" TEXT,
+    "adviserNeedsGuidance" BOOLEAN,
+    "hasExistingLoans" BOOLEAN,
+    "existingLoanTypes" JSONB,
+    "otherBankingNeeds" JSONB,
+    "houseOwnership" TEXT,
+    "houseType" TEXT,
+    "houseWantsToBuy" BOOLEAN,
+    "eduNeedsSupport" BOOLEAN,
+    "eduSupportTypes" JSONB,
+    "eduSupportAmountBand" TEXT,
+    "eduSupportNote" TEXT,
+    "careerLookingFor" JSONB,
+    "careerSkills" JSONB,
+    "careerPreferredCity" TEXT,
+    "careerExperienceBand" TEXT,
+    "careerCanOffer" JSONB,
+    "careerOfferField" TEXT,
+    "careerSupportNeeds" JSONB,
+    "teachSubjects" TEXT,
+    "teachMode" TEXT,
+    "teachFeeMode" TEXT,
+    "guidanceFields" JSONB,
+    "volunteerReady" BOOLEAN,
+    "volunteerHoursBand" TEXT,
+    "willingToDonateBlood" BOOLEAN,
+    "lastDonatedMonth" TEXT,
+    "wellnessActivities" JSONB,
+    "wellnessWants" JSONB,
+    "seniorLivesWith" TEXT,
+    "seniorNeeds" JSONB,
+    "seniorEmergencyMemberId" TEXT,
+    "studentClassCourse" TEXT,
+    "studentCareerInterest" TEXT,
+    "studentNeeds" JSONB,
+    "studentExamName" TEXT,
+    "womenInterests" JSONB,
+    "womenNeeds" JSONB,
+    "govDocNeeds" JSONB,
+    "housingLookingTo" JSONB,
+    "housingCity" TEXT,
+    "housingBudgetBand" TEXT,
+    "relocatingCity" TEXT,
+    "relocatingWantsContacts" BOOLEAN,
+    "travelInterests" JSONB,
+    "travelCanHost" BOOLEAN,
+    "motherTongue" TEXT,
+    "cultureInterests" JSONB,
+    "openToCityFriends" BOOLEAN,
+    "openToMulGaon" BOOLEAN,
+    "openToProfession" BOOLEAN,
+    "marriageSupportNeeds" JSONB,
+    "emergencyContactMemberId" TEXT,
+    "canHelpEmergency" BOOLEAN,
+    "emergencyHelpTypes" JSONB,
+    "autoAddToGroups" BOOLEAN DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "member_additional_details_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_insurances" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "insuranceType" TEXT,
+    "insurerName" TEXT,
+    "sumInsuredBand" TEXT,
+    "renewalMonth" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "member_insurances_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_vehicles" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "vehicleType" TEXT,
+    "make" TEXT,
+    "model" TEXT,
+    "year" INTEGER,
+    "fuelType" TEXT,
+    "lastServiceMonth" TEXT,
+    "nextServiceDueMonth" TEXT,
+    "preferredGarage" TEXT,
+    "needsServicingSupport" BOOLEAN,
+    "servicingSupportNote" TEXT,
+    "registrationNumber" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "member_vehicles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_loan_needs" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "loanType" TEXT,
+    "amountBand" TEXT,
+    "purpose" TEXT,
+    "neededByMonth" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "member_loan_needs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_farm_holdings" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "districtAreaId" TEXT,
+    "district" TEXT,
+    "taluka" TEXT,
+    "village" TEXT,
+    "areaValue" DOUBLE PRECISION,
+    "areaUnit" TEXT,
+    "ownership" TEXT,
+    "irrigated" BOOLEAN,
+    "mainCrops" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "member_farm_holdings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_sports" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "interestId" TEXT,
+    "level" TEXT,
+    "needsCoachingSupport" BOOLEAN,
+    "supportTypes" JSONB,
+    "supportNote" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "member_sports_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_sport_achievements" (
+    "id" TEXT NOT NULL,
+    "sportId" TEXT NOT NULL,
+    "eventName" TEXT,
+    "year" INTEGER,
+    "medal" TEXT,
+    "certificateFileId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "member_sport_achievements_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_hobbies" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "interestId" TEXT NOT NULL,
+    "level" TEXT,
+    "detail" TEXT,
+    "canTeach" BOOLEAN,
+    "needsSupport" BOOLEAN,
+    "supportTypes" JSONB,
+    "supportNote" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "member_hobbies_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "interests" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "category" TEXT,
+    "isSport" BOOLEAN DEFAULT false,
+    "isChildSafe" BOOLEAN DEFAULT false,
+    "status" TEXT DEFAULT 'APPROVED',
+    "mergedIntoId" TEXT,
+    "suggestedByMemberId" TEXT,
+    "reviewedBy" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "sortOrder" INTEGER DEFAULT 0,
+    "isActive" BOOLEAN DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "interests_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "option_masters" (
+    "id" TEXT NOT NULL,
+    "listKey" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "sortOrder" INTEGER DEFAULT 0,
+    "isActive" BOOLEAN DEFAULT true,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "option_masters_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "support_requests" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "sourceKey" TEXT NOT NULL,
+    "category" TEXT NOT NULL,
+    "district" TEXT,
+    "note" TEXT,
+    "status" TEXT DEFAULT 'OPEN',
+    "createdByUserId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "withdrawnAt" TIMESTAMP(3),
+    "closedAt" TIMESTAMP(3),
+    "closedBy" TEXT,
+
+    CONSTRAINT "support_requests_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_files" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "purpose" TEXT NOT NULL,
+    "storageKey" TEXT NOT NULL,
+    "originalFilename" TEXT,
+    "mimeType" TEXT,
+    "sizeBytes" INTEGER,
+    "uploadedBy" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "member_files_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "contact_requests" (
+    "id" TEXT NOT NULL,
+    "purpose" TEXT NOT NULL,
+    "fromMemberId" TEXT NOT NULL,
+    "toMemberId" TEXT NOT NULL,
+    "message" TEXT,
+    "status" TEXT DEFAULT 'PENDING',
+    "respondedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "contact_requests_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "post_poll_options" (
+    "id" TEXT NOT NULL,
+    "postId" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "sortOrder" INTEGER DEFAULT 0,
+
+    CONSTRAINT "post_poll_options_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "post_poll_votes" (
+    "id" TEXT NOT NULL,
+    "postId" TEXT NOT NULL,
+    "optionId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "post_poll_votes_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "post_rsvps" (
+    "postId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "response" TEXT,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "post_rsvps_pkey" PRIMARY KEY ("postId","userId")
+);
+
+-- CreateTable
+CREATE TABLE "matrimonial_profiles" (
+    "id" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "isVisible" BOOLEAN NOT NULL DEFAULT false,
+    "about" TEXT,
+    "heightCm" INTEGER,
+    "languages" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" TEXT,
+
+    CONSTRAINT "matrimonial_profiles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "matrimonial_preferences" (
+    "id" TEXT NOT NULL,
+    "matrimonialProfileId" TEXT NOT NULL,
+    "minAge" INTEGER,
+    "maxAge" INTEGER,
+    "preferredGender" "Gender",
+    "preferredLocations" JSONB,
+    "educationPreference" TEXT,
+    "occupationPreference" TEXT,
+    "incomeRangeId" TEXT,
+    "maritalStatusPref" JSONB,
+    "otherPreferences" JSONB,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "matrimonial_preferences_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "matrimonial_interests" (
+    "id" TEXT NOT NULL,
+    "fromMemberId" TEXT NOT NULL,
+    "toMemberId" TEXT NOT NULL,
+    "message" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "statusChangedAt" TIMESTAMP(3),
+    "statusNote" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "matrimonial_interests_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "matrimonial_saves" (
+    "memberId" TEXT NOT NULL,
+    "savedMemberId" TEXT NOT NULL,
+    "savedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "matrimonial_saves_pkey" PRIMARY KEY ("memberId","savedMemberId")
+);
+
+-- CreateTable
+CREATE TABLE "areas" (
+    "id" TEXT NOT NULL,
+    "parentId" TEXT,
+    "name" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "code" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "areas_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "member_areas" (
+    "memberId" TEXT NOT NULL,
+    "areaId" TEXT NOT NULL,
+    "isPrimary" BOOLEAN NOT NULL DEFAULT false,
+
+    CONSTRAINT "member_areas_pkey" PRIMARY KEY ("memberId","areaId")
+);
+
+-- CreateTable
+CREATE TABLE "family_areas" (
+    "familyId" TEXT NOT NULL,
+    "areaId" TEXT NOT NULL,
+    "isPrimary" BOOLEAN NOT NULL DEFAULT false,
+
+    CONSTRAINT "family_areas_pkey" PRIMARY KEY ("familyId","areaId")
+);
+
+-- CreateTable
+CREATE TABLE "community_groups" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "code" TEXT,
+    "groupType" TEXT NOT NULL DEFAULT 'MANDAL',
+    "description" TEXT,
+    "areaId" TEXT,
+    "convenerMemberId" TEXT,
+    "meetingSchedule" TEXT,
+    "maxMembers" INTEGER DEFAULT 25,
+    "status" "GroupStatus" NOT NULL DEFAULT 'PENDING_APPROVAL',
+    "reviewedBy" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "reviewNote" TEXT,
+    "lastRosterReviewAt" TIMESTAMP(3),
+    "lastRosterReviewBy" TEXT,
+    "rosterReviewIntervalDays" INTEGER NOT NULL DEFAULT 180,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" TEXT,
+    "deletedAt" TIMESTAMP(3),
+    "groupKey" TEXT,
+    "autoKey" TEXT,
+    "interestId" TEXT,
+    "parentGroupId" TEXT,
+    "district" TEXT,
+    "isChildSafe" BOOLEAN DEFAULT false,
+    "rules" TEXT,
+
+    CONSTRAINT "community_groups_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "community_group_members" (
+    "id" TEXT NOT NULL,
+    "groupId" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "roleInGroup" TEXT NOT NULL DEFAULT 'MEMBER',
+    "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "addedBy" TEXT,
+    "leftAt" TIMESTAMP(3),
+    "leftReason" TEXT,
+    "autoJoined" BOOLEAN DEFAULT false,
+    "notifyMode" TEXT DEFAULT 'DAILY_DIGEST',
+    "isMuted" BOOLEAN DEFAULT false,
+    "rulesAcceptedAt" TIMESTAMP(3),
+    "lastDigestAt" TIMESTAMP(3),
+
+    CONSTRAINT "community_group_members_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "post_types" (
+    "id" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "icon" TEXT,
+    "requiresApproval" BOOLEAN NOT NULL DEFAULT false,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+
+    CONSTRAINT "post_types_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "posts" (
+    "id" TEXT NOT NULL,
+    "authorId" TEXT NOT NULL,
+    "postTypeId" TEXT NOT NULL,
+    "title" TEXT,
+    "content" TEXT,
+    "visibility" TEXT NOT NULL DEFAULT 'COMMUNITY',
+    "targetAreaId" TEXT,
+    "status" "PostStatus" NOT NULL DEFAULT 'PENDING_APPROVAL',
+    "reviewedBy" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "reviewNote" TEXT,
+    "isPinned" BOOLEAN NOT NULL DEFAULT false,
+    "isAnnouncement" BOOLEAN NOT NULL DEFAULT false,
+    "eventDate" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+    "groupId" TEXT,
+    "groupPostKind" TEXT,
+    "linkUrl" TEXT,
+    "isSolved" BOOLEAN DEFAULT false,
+    "solvedAt" TIMESTAMP(3),
+    "solvedCommentId" TEXT,
+
+    CONSTRAINT "posts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "comments" (
+    "id" TEXT NOT NULL,
+    "postId" TEXT NOT NULL,
+    "authorId" TEXT NOT NULL,
+    "parentId" TEXT,
+    "content" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "comments_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "reactions" (
+    "id" TEXT NOT NULL,
+    "postId" TEXT,
+    "commentId" TEXT,
+    "userId" TEXT NOT NULL,
+    "reactionType" TEXT NOT NULL DEFAULT 'LIKE',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "reactions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "reports" (
+    "id" TEXT NOT NULL,
+    "reportableType" TEXT NOT NULL,
+    "reportableId" TEXT NOT NULL,
+    "reporterId" TEXT NOT NULL,
+    "reason" TEXT NOT NULL,
+    "description" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "resolvedBy" TEXT,
+    "resolutionNote" TEXT,
+    "resolvedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "reports_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "assets" (
+    "id" TEXT NOT NULL,
+    "ownerMemberId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "assetType" TEXT NOT NULL,
+    "description" TEXT,
+    "addressLine" TEXT,
+    "city" TEXT,
+    "district" TEXT,
+    "state" TEXT,
+    "pincode" TEXT,
+    "capacity" INTEGER,
+    "facilities" JSONB,
+    "bookingMode" TEXT NOT NULL DEFAULT 'DAILY',
+    "ratePerDay" INTEGER,
+    "ratePerHour" INTEGER,
+    "status" "AssetStatus" NOT NULL DEFAULT 'DRAFT',
+    "reviewedBy" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "reviewNote" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "assets_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "asset_blackouts" (
+    "id" TEXT NOT NULL,
+    "assetId" TEXT NOT NULL,
+    "startAt" TIMESTAMP(3) NOT NULL,
+    "endAt" TIMESTAMP(3) NOT NULL,
+    "reason" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "asset_blackouts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "bookings" (
+    "id" TEXT NOT NULL,
+    "reference" TEXT NOT NULL,
+    "assetId" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "bookedByUserId" TEXT NOT NULL,
+    "startAt" TIMESTAMP(3) NOT NULL,
+    "endAt" TIMESTAMP(3) NOT NULL,
+    "status" "BookingStatus" NOT NULL DEFAULT 'PENDING_PAYMENT',
+    "amountPaise" INTEGER NOT NULL,
+    "guestCount" INTEGER,
+    "notes" TEXT,
+    "cancelledAt" TIMESTAMP(3),
+    "cancelReason" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "bookings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "payments" (
+    "id" TEXT NOT NULL,
+    "reference" TEXT NOT NULL,
+    "purpose" TEXT NOT NULL,
+    "bookingId" TEXT,
+    "feeInvoiceId" TEXT,
+    "memberId" TEXT NOT NULL,
+    "paidByUserId" TEXT NOT NULL,
+    "amountPaise" INTEGER NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'INR',
+    "status" "PaymentStatus" NOT NULL DEFAULT 'CREATED',
+    "gateway" TEXT NOT NULL DEFAULT 'MOCK',
+    "gatewayOrderId" TEXT,
+    "gatewayPaymentId" TEXT,
+    "failureReason" TEXT,
+    "paidAt" TIMESTAMP(3),
+    "refundedPaise" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "payments_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "fee_types" (
+    "id" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "description" TEXT,
+    "amountPaise" INTEGER NOT NULL,
+    "appliesTo" TEXT NOT NULL DEFAULT 'FAMILY_KARTA',
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "fee_types_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "fee_invoices" (
+    "id" TEXT NOT NULL,
+    "reference" TEXT NOT NULL,
+    "feeTypeId" TEXT NOT NULL,
+    "familyId" TEXT,
+    "memberId" TEXT NOT NULL,
+    "amountPaise" INTEGER NOT NULL,
+    "status" "FeeInvoiceStatus" NOT NULL DEFAULT 'PENDING',
+    "dueDate" TIMESTAMP(3),
+    "paidAt" TIMESTAMP(3),
+    "waivedBy" TEXT,
+    "waiverReason" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "fee_invoices_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "photos" (
+    "id" TEXT NOT NULL,
+    "ownerType" TEXT NOT NULL,
+    "memberId" TEXT,
+    "familyId" TEXT,
+    "postId" TEXT,
+    "assetId" TEXT,
+    "uploadedBy" TEXT NOT NULL,
+    "storageKey" TEXT NOT NULL,
+    "thumbnailKey" TEXT,
+    "optimizedKey" TEXT,
+    "originalFilename" TEXT,
+    "mimeType" TEXT,
+    "fileSizeBytes" BIGINT,
+    "width" INTEGER,
+    "height" INTEGER,
+    "isProfilePhoto" BOOLEAN NOT NULL DEFAULT false,
+    "caption" TEXT,
+    "visibility" TEXT NOT NULL DEFAULT 'PRIVATE',
+    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "photos_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "approval_rules" (
+    "id" TEXT NOT NULL,
+    "actionCode" TEXT NOT NULL,
+    "requiresApproval" BOOLEAN NOT NULL DEFAULT true,
+    "approverRole" TEXT,
+    "autoApproveRole" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "approval_rules_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "approvals" (
+    "id" TEXT NOT NULL,
+    "actionCode" TEXT NOT NULL,
+    "entityType" TEXT,
+    "entityId" TEXT,
+    "fieldName" TEXT,
+    "oldValue" JSONB,
+    "newValue" JSONB,
+    "status" "ApprovalStatus" NOT NULL DEFAULT 'SUBMITTED',
+    "submittedBy" TEXT NOT NULL,
+    "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "reviewedBy" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "reviewNote" TEXT,
+    "reason" TEXT,
+    "escalatedTo" TEXT,
+    "escalatedAt" TIMESTAMP(3),
+    "escalationNote" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "approvals_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "audit_logs" (
+    "id" TEXT NOT NULL,
+    "actorId" TEXT NOT NULL,
+    "actorRole" TEXT,
+    "action" TEXT NOT NULL,
+    "entityType" TEXT,
+    "entityId" TEXT,
+    "fieldName" TEXT,
+    "oldValue" JSONB,
+    "newValue" JSONB,
+    "approvalId" TEXT,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "metadata" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "audit_logs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "notifications" (
+    "id" TEXT NOT NULL,
+    "recipientId" TEXT NOT NULL,
+    "senderId" TEXT,
+    "type" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "body" TEXT,
+    "data" JSONB,
+    "isRead" BOOLEAN NOT NULL DEFAULT false,
+    "readAt" TIMESTAMP(3),
+    "emailSent" BOOLEAN NOT NULL DEFAULT false,
+    "smsSent" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "notifications_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "settings" (
+    "id" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "value" JSONB NOT NULL,
+    "description" TEXT,
+    "updatedBy" TEXT,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "settings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "field_visibility_defaults" (
+    "entityType" TEXT NOT NULL,
+    "fieldName" TEXT NOT NULL,
+    "defaultVisibility" TEXT NOT NULL,
+    "isUserConfigurable" BOOLEAN NOT NULL DEFAULT true,
+
+    CONSTRAINT "field_visibility_defaults_pkey" PRIMARY KEY ("entityType","fieldName")
+);
+
+-- CreateTable
+CREATE TABLE "member_field_visibility" (
+    "memberId" TEXT NOT NULL,
+    "fieldName" TEXT NOT NULL,
+    "visibility" TEXT NOT NULL,
+
+    CONSTRAINT "member_field_visibility_pkey" PRIMARY KEY ("memberId","fieldName")
+);
+
+-- CreateTable
+CREATE TABLE "blocked_users" (
+    "blockerId" TEXT NOT NULL,
+    "blockedId" TEXT NOT NULL,
+    "reason" TEXT,
+    "blockedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "blocked_users_pkey" PRIMARY KEY ("blockerId","blockedId")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_mobile_key" ON "users"("mobile");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "roles_code_key" ON "roles"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "permissions_code_key" ON "permissions"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "refresh_tokens_tokenHash_key" ON "refresh_tokens"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "consent_records_memberId_consentType_idx" ON "consent_records"("memberId", "consentType");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "families_registrationNumber_key" ON "families"("registrationNumber");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "family_join_requests_familyId_memberId_status_direction_key" ON "family_join_requests"("familyId", "memberId", "status", "direction");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "member_invitations_tokenHash_key" ON "member_invitations"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "member_invitations_memberId_status_idx" ON "member_invitations"("memberId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "family_members_familyId_memberId_key" ON "family_members"("familyId", "memberId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "members_memberNumber_key" ON "members"("memberNumber");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "members_userId_key" ON "members"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "members_profilePhotoId_key" ON "members"("profilePhotoId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "relationship_types_code_key" ON "relationship_types"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "member_relationships_fromMemberId_toMemberId_relationshipTy_key" ON "member_relationships"("fromMemberId", "toMemberId", "relationshipTypeId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "skills_name_key" ON "skills"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "member_profile_details_memberId_key" ON "member_profile_details"("memberId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "member_section_settings_memberId_sectionKey_key" ON "member_section_settings"("memberId", "sectionKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "member_additional_details_memberId_key" ON "member_additional_details"("memberId");
+
+-- CreateIndex
+CREATE INDEX "member_insurances_memberId_idx" ON "member_insurances"("memberId");
+
+-- CreateIndex
+CREATE INDEX "member_vehicles_memberId_idx" ON "member_vehicles"("memberId");
+
+-- CreateIndex
+CREATE INDEX "member_loan_needs_memberId_idx" ON "member_loan_needs"("memberId");
+
+-- CreateIndex
+CREATE INDEX "member_farm_holdings_memberId_idx" ON "member_farm_holdings"("memberId");
+
+-- CreateIndex
+CREATE INDEX "member_sports_memberId_idx" ON "member_sports"("memberId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "member_hobbies_memberId_interestId_key" ON "member_hobbies"("memberId", "interestId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "interests_slug_key" ON "interests"("slug");
+
+-- CreateIndex
+CREATE INDEX "interests_status_idx" ON "interests"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "option_masters_listKey_value_key" ON "option_masters"("listKey", "value");
+
+-- CreateIndex
+CREATE INDEX "support_requests_memberId_sourceKey_status_idx" ON "support_requests"("memberId", "sourceKey", "status");
+
+-- CreateIndex
+CREATE INDEX "support_requests_category_status_idx" ON "support_requests"("category", "status");
+
+-- CreateIndex
+CREATE INDEX "member_files_memberId_idx" ON "member_files"("memberId");
+
+-- CreateIndex
+CREATE INDEX "contact_requests_toMemberId_status_idx" ON "contact_requests"("toMemberId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "post_poll_votes_postId_userId_key" ON "post_poll_votes"("postId", "userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "matrimonial_profiles_memberId_key" ON "matrimonial_profiles"("memberId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "matrimonial_preferences_matrimonialProfileId_key" ON "matrimonial_preferences"("matrimonialProfileId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "community_groups_code_key" ON "community_groups"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "community_groups_autoKey_key" ON "community_groups"("autoKey");
+
+-- CreateIndex
+CREATE INDEX "community_groups_status_isActive_idx" ON "community_groups"("status", "isActive");
+
+-- CreateIndex
+CREATE INDEX "community_groups_groupType_parentGroupId_idx" ON "community_groups"("groupType", "parentGroupId");
+
+-- CreateIndex
+CREATE INDEX "community_group_members_memberId_idx" ON "community_group_members"("memberId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "community_group_members_groupId_memberId_key" ON "community_group_members"("groupId", "memberId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "post_types_code_key" ON "post_types"("code");
+
+-- CreateIndex
+CREATE INDEX "posts_groupId_status_idx" ON "posts"("groupId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "reactions_postId_userId_key" ON "reactions"("postId", "userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "reactions_commentId_userId_key" ON "reactions"("commentId", "userId");
+
+-- CreateIndex
+CREATE INDEX "assets_status_isActive_idx" ON "assets"("status", "isActive");
+
+-- CreateIndex
+CREATE INDEX "asset_blackouts_assetId_startAt_endAt_idx" ON "asset_blackouts"("assetId", "startAt", "endAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "bookings_reference_key" ON "bookings"("reference");
+
+-- CreateIndex
+CREATE INDEX "bookings_assetId_startAt_endAt_idx" ON "bookings"("assetId", "startAt", "endAt");
+
+-- CreateIndex
+CREATE INDEX "bookings_memberId_idx" ON "bookings"("memberId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "payments_reference_key" ON "payments"("reference");
+
+-- CreateIndex
+CREATE INDEX "payments_memberId_idx" ON "payments"("memberId");
+
+-- CreateIndex
+CREATE INDEX "payments_status_idx" ON "payments"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "fee_types_code_key" ON "fee_types"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "fee_invoices_reference_key" ON "fee_invoices"("reference");
+
+-- CreateIndex
+CREATE INDEX "fee_invoices_memberId_status_idx" ON "fee_invoices"("memberId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "approval_rules_actionCode_key" ON "approval_rules"("actionCode");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "settings_key_key" ON "settings"("key");
+
+-- AddForeignKey
+ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_permissionId_fkey" FOREIGN KEY ("permissionId") REFERENCES "permissions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "families"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_areaId_fkey" FOREIGN KEY ("areaId") REFERENCES "areas"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "verification_tokens" ADD CONSTRAINT "verification_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "consent_records" ADD CONSTRAINT "consent_records_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "families" ADD CONSTRAINT "families_kartaMemberId_fkey" FOREIGN KEY ("kartaMemberId") REFERENCES "members"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "family_join_requests" ADD CONSTRAINT "family_join_requests_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "families"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "family_join_requests" ADD CONSTRAINT "family_join_requests_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_invitations" ADD CONSTRAINT "member_invitations_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "family_members" ADD CONSTRAINT "family_members_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "families"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "family_members" ADD CONSTRAINT "family_members_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "members" ADD CONSTRAINT "members_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "members" ADD CONSTRAINT "members_profilePhotoId_fkey" FOREIGN KEY ("profilePhotoId") REFERENCES "photos"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_relationships" ADD CONSTRAINT "member_relationships_fromMemberId_fkey" FOREIGN KEY ("fromMemberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_relationships" ADD CONSTRAINT "member_relationships_toMemberId_fkey" FOREIGN KEY ("toMemberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_relationships" ADD CONSTRAINT "member_relationships_relationshipTypeId_fkey" FOREIGN KEY ("relationshipTypeId") REFERENCES "relationship_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "marital_status_history" ADD CONSTRAINT "marital_status_history_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "marital_status_history" ADD CONSTRAINT "marital_status_history_approvalId_fkey" FOREIGN KEY ("approvalId") REFERENCES "approvals"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "marriage_records" ADD CONSTRAINT "marriage_records_memberId1_fkey" FOREIGN KEY ("memberId1") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "marriage_records" ADD CONSTRAINT "marriage_records_memberId2_fkey" FOREIGN KEY ("memberId2") REFERENCES "members"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "education_records" ADD CONSTRAINT "education_records_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "employment_records" ADD CONSTRAINT "employment_records_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "employment_records" ADD CONSTRAINT "employment_records_incomeRangeId_fkey" FOREIGN KEY ("incomeRangeId") REFERENCES "income_ranges"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "businesses" ADD CONSTRAINT "businesses_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "businesses" ADD CONSTRAINT "businesses_incomeRangeId_fkey" FOREIGN KEY ("incomeRangeId") REFERENCES "income_ranges"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_skills" ADD CONSTRAINT "member_skills_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_skills" ADD CONSTRAINT "member_skills_skillId_fkey" FOREIGN KEY ("skillId") REFERENCES "skills"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "addresses" ADD CONSTRAINT "addresses_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "families"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "addresses" ADD CONSTRAINT "addresses_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_profile_details" ADD CONSTRAINT "member_profile_details_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_section_settings" ADD CONSTRAINT "member_section_settings_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_additional_details" ADD CONSTRAINT "member_additional_details_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_insurances" ADD CONSTRAINT "member_insurances_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_vehicles" ADD CONSTRAINT "member_vehicles_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_loan_needs" ADD CONSTRAINT "member_loan_needs_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_farm_holdings" ADD CONSTRAINT "member_farm_holdings_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_sports" ADD CONSTRAINT "member_sports_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_sports" ADD CONSTRAINT "member_sports_interestId_fkey" FOREIGN KEY ("interestId") REFERENCES "interests"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_sport_achievements" ADD CONSTRAINT "member_sport_achievements_sportId_fkey" FOREIGN KEY ("sportId") REFERENCES "member_sports"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_hobbies" ADD CONSTRAINT "member_hobbies_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_hobbies" ADD CONSTRAINT "member_hobbies_interestId_fkey" FOREIGN KEY ("interestId") REFERENCES "interests"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "support_requests" ADD CONSTRAINT "support_requests_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_files" ADD CONSTRAINT "member_files_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "contact_requests" ADD CONSTRAINT "contact_requests_fromMemberId_fkey" FOREIGN KEY ("fromMemberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "contact_requests" ADD CONSTRAINT "contact_requests_toMemberId_fkey" FOREIGN KEY ("toMemberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "post_poll_options" ADD CONSTRAINT "post_poll_options_postId_fkey" FOREIGN KEY ("postId") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "post_poll_votes" ADD CONSTRAINT "post_poll_votes_postId_fkey" FOREIGN KEY ("postId") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "post_poll_votes" ADD CONSTRAINT "post_poll_votes_optionId_fkey" FOREIGN KEY ("optionId") REFERENCES "post_poll_options"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "post_rsvps" ADD CONSTRAINT "post_rsvps_postId_fkey" FOREIGN KEY ("postId") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "matrimonial_profiles" ADD CONSTRAINT "matrimonial_profiles_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "matrimonial_preferences" ADD CONSTRAINT "matrimonial_preferences_matrimonialProfileId_fkey" FOREIGN KEY ("matrimonialProfileId") REFERENCES "matrimonial_profiles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "matrimonial_preferences" ADD CONSTRAINT "matrimonial_preferences_incomeRangeId_fkey" FOREIGN KEY ("incomeRangeId") REFERENCES "income_ranges"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "matrimonial_interests" ADD CONSTRAINT "matrimonial_interests_fromMemberId_fkey" FOREIGN KEY ("fromMemberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "matrimonial_interests" ADD CONSTRAINT "matrimonial_interests_toMemberId_fkey" FOREIGN KEY ("toMemberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "matrimonial_saves" ADD CONSTRAINT "matrimonial_saves_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "matrimonial_saves" ADD CONSTRAINT "matrimonial_saves_savedMemberId_fkey" FOREIGN KEY ("savedMemberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "areas" ADD CONSTRAINT "areas_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "areas"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_areas" ADD CONSTRAINT "member_areas_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_areas" ADD CONSTRAINT "member_areas_areaId_fkey" FOREIGN KEY ("areaId") REFERENCES "areas"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "family_areas" ADD CONSTRAINT "family_areas_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "families"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "family_areas" ADD CONSTRAINT "family_areas_areaId_fkey" FOREIGN KEY ("areaId") REFERENCES "areas"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "community_groups" ADD CONSTRAINT "community_groups_areaId_fkey" FOREIGN KEY ("areaId") REFERENCES "areas"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "community_groups" ADD CONSTRAINT "community_groups_convenerMemberId_fkey" FOREIGN KEY ("convenerMemberId") REFERENCES "members"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "community_groups" ADD CONSTRAINT "community_groups_interestId_fkey" FOREIGN KEY ("interestId") REFERENCES "interests"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "community_groups" ADD CONSTRAINT "community_groups_parentGroupId_fkey" FOREIGN KEY ("parentGroupId") REFERENCES "community_groups"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "community_group_members" ADD CONSTRAINT "community_group_members_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "community_groups"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "community_group_members" ADD CONSTRAINT "community_group_members_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "posts" ADD CONSTRAINT "posts_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "posts" ADD CONSTRAINT "posts_postTypeId_fkey" FOREIGN KEY ("postTypeId") REFERENCES "post_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "posts" ADD CONSTRAINT "posts_targetAreaId_fkey" FOREIGN KEY ("targetAreaId") REFERENCES "areas"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "posts" ADD CONSTRAINT "posts_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "community_groups"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "comments" ADD CONSTRAINT "comments_postId_fkey" FOREIGN KEY ("postId") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "comments" ADD CONSTRAINT "comments_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "comments" ADD CONSTRAINT "comments_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "comments"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reactions" ADD CONSTRAINT "reactions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reactions" ADD CONSTRAINT "reactions_postId_fkey" FOREIGN KEY ("postId") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reactions" ADD CONSTRAINT "reactions_commentId_fkey" FOREIGN KEY ("commentId") REFERENCES "comments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reports" ADD CONSTRAINT "reports_reporterId_fkey" FOREIGN KEY ("reporterId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "assets" ADD CONSTRAINT "assets_ownerMemberId_fkey" FOREIGN KEY ("ownerMemberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "asset_blackouts" ADD CONSTRAINT "asset_blackouts_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "assets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "assets"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payments" ADD CONSTRAINT "payments_bookingId_fkey" FOREIGN KEY ("bookingId") REFERENCES "bookings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payments" ADD CONSTRAINT "payments_feeInvoiceId_fkey" FOREIGN KEY ("feeInvoiceId") REFERENCES "fee_invoices"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payments" ADD CONSTRAINT "payments_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fee_invoices" ADD CONSTRAINT "fee_invoices_feeTypeId_fkey" FOREIGN KEY ("feeTypeId") REFERENCES "fee_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fee_invoices" ADD CONSTRAINT "fee_invoices_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "families"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fee_invoices" ADD CONSTRAINT "fee_invoices_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "photos" ADD CONSTRAINT "photos_uploadedBy_fkey" FOREIGN KEY ("uploadedBy") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "photos" ADD CONSTRAINT "photos_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "photos" ADD CONSTRAINT "photos_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "families"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "photos" ADD CONSTRAINT "photos_postId_fkey" FOREIGN KEY ("postId") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "photos" ADD CONSTRAINT "photos_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "assets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "approvals" ADD CONSTRAINT "approvals_submittedBy_fkey" FOREIGN KEY ("submittedBy") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "approvals" ADD CONSTRAINT "approvals_reviewedBy_fkey" FOREIGN KEY ("reviewedBy") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_recipientId_fkey" FOREIGN KEY ("recipientId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_senderId_fkey" FOREIGN KEY ("senderId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member_field_visibility" ADD CONSTRAINT "member_field_visibility_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "blocked_users" ADD CONSTRAINT "blocked_users_blockerId_fkey" FOREIGN KEY ("blockerId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "blocked_users" ADD CONSTRAINT "blocked_users_blockedId_fkey" FOREIGN KEY ("blockedId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+

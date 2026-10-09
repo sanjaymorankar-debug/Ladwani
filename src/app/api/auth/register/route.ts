@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     const mobile = data.mobile || null
 
     // Email is the primary identifier, so it's always checked.
-    const existingEmail = await prisma.user.findUnique({ where: { email: data.email } })
+    const existingEmail = await prisma.user.findFirst({ where: { email: { equals: data.email, mode: 'insensitive' } } })
     if (existingEmail) {
       return NextResponse.json({ message: 'An account with this email already exists.' }, { status: 409 })
     }
