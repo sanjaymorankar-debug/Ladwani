@@ -67,15 +67,15 @@ describe('Registration join-intent (spec §2, §7)', () => {
     expect(res.status).toBe(400)
   })
 
-  it('accepts a signup with no mobile number (mobile is optional)', async () => {
+  // Owner's decision (F01): mobile is mandatory at sign-up. Updated with the
+  // owner's approval; this test used to check that mobile was optional.
+  it('refuses a signup with no mobile number (mobile is mandatory)', async () => {
     const res = await postRegister(req({
       ...baseBody, email: 'nomobile@example.test', joinIntent: 'JOIN_EXISTING',
     }))
-    expect(res.status).toBe(201)
-    const user = await prisma.user.findUniqueOrThrow({ where: { email: 'nomobile@example.test' } })
-    expect(user.mobile).toBeNull()
-    // ...and can sign in with just the email.
-    expect((await validateLogin('nomobile@example.test', baseBody.password)).ok).toBe(true)
+    expect(res.status).toBe(400)
+    expect((await res.json()).message).toMatch(/mobile/i)
+    expect(await prisma.user.findUnique({ where: { email: 'nomobile@example.test' } })).toBeNull()
   })
 
   it('rejects an unrecognised join choice', async () => {
@@ -118,7 +118,7 @@ describe('Registration join-intent (spec §2, §7)', () => {
   })
 
   it('stores the JOIN_EXISTING choice with the same MEMBER-only role', async () => {
-    const res = await postRegister(req({ ...baseBody, email: EMAIL_JOINER, joinIntent: 'JOIN_EXISTING' }))
+    const res = await postRegister(req({ ...baseBody, email: EMAIL_JOINER, mobile: MOBILE_JOINER, joinIntent: 'JOIN_EXISTING' }))
     expect(res.status).toBe(201)
 
     const user = await prisma.user.findUniqueOrThrow({

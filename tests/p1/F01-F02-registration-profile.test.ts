@@ -24,6 +24,8 @@ const created: string[] = []
 const body = (over: Record<string, unknown> = {}) => ({
   firstName: 'Ravi', lastName: 'Ladwani', email: `p1reg-${Math.random().toString(36).slice(2, 8)}@p0.example.test`,
   password: 'StrongPass123', joinIntent: 'JOIN_EXISTING', gender: 'MALE', dateOfBirth: '1995-03-10',
+  // F01: mobile is mandatory at sign-up (owner's decision); a fresh valid number each time.
+  mobile: `9${String(Math.floor(Math.random() * 1e9)).padStart(9, '0')}`,
   mulGaonAreaId: geo.village, ...over,
 })
 async function signUp(over: Record<string, unknown> = {}) {
@@ -67,6 +69,14 @@ describe('F01 User self-registration', () => {
     expect((await signUp({ mulGaonAreaId: undefined })).res.status).toBe(400)
     expect((await signUp({ mulGaonAreaId: geo.district })).res.status).toBe(400)
     expect((await signUp({ mulGaonAreaId: 'no-such-area' })).res.status).toBe(400)
+  })
+
+  it('F01 mobile is mandatory at sign-up (owner\'s decision) and must be a valid 10-digit Indian number', async () => {
+    for (const mobile of [undefined, '', '12345', '5876512345']) {
+      const { res } = await signUp({ mobile })
+      expect(res.status).toBe(400)
+      expect((await res.json()).message).toMatch(/mobile/i)
+    }
   })
 
   it('F01 mobile and email are unique — one account per person', async () => {

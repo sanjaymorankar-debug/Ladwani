@@ -53,6 +53,8 @@ describe('With email verification switched ON', () => {
         method: 'POST',
         body: JSON.stringify({
           firstName: 'Verify', lastName: 'Mode', email: EMAIL,
+          // F01: mobile is mandatory at sign-up (owner's decision).
+          mobile: '9990000077',
           password: 'TestPass123', joinIntent: 'JOIN_EXISTING',
           // P1 (F01): mandatory at sign-up.
           gender: 'MALE', dateOfBirth: '1990-05-01', mulGaonAreaId: 'area-mh-vil-loni-kalbhor',

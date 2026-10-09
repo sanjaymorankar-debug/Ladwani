@@ -21,8 +21,12 @@ export const claimInvitationSchema = z.object({
   path: ['confirmPassword'],
 })
 
-/** F01: mobile is mandatory in the workbook; existing accounts made it optional. One switch decides. */
-export const registrationRequiresMobile = process.env.NEXT_PUBLIC_REGISTRATION_REQUIRE_MOBILE === 'true'
+/**
+ * F01: mobile is mandatory at sign-up (workbook; owner's decision). Setting
+ * NEXT_PUBLIC_REGISTRATION_REQUIRE_MOBILE=false switches back to optional.
+ * Existing accounts without a mobile are not affected and still sign in.
+ */
+export const registrationRequiresMobile = process.env.NEXT_PUBLIC_REGISTRATION_REQUIRE_MOBILE !== 'false'
 
 /** Whole years between a date of birth and today (rule 6: age is never typed). */
 export function ageOn(dob: Date, today = new Date()) {
@@ -35,11 +39,11 @@ export function ageOn(dob: Date, today = new Date()) {
 export const registerSchema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
   lastName: z.string().min(1, 'Last name is required'),
-  // Email is the primary account identifier. Mobile stays supported (existing
-  // accounts sign in with it, and it's useful contact info) but is optional.
+  // Email is the primary account identifier; mobile is also required at
+  // sign-up unless switched off (see registrationRequiresMobile).
   email: z.string().min(1, 'Email address is required').email('Invalid email address'),
   mobile: registrationRequiresMobile
-    ? z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number')
+    ? z.string({ required_error: 'Mobile number is required' }).regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number')
     : z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number').optional().or(z.literal('')),
   // F01: gender, date of birth and Mul Gaon are captured at sign-up.
   gender: z.enum(['MALE', 'FEMALE', 'OTHER'], { errorMap: () => ({ message: 'Select your gender' }) }),

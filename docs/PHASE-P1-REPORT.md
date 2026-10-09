@@ -155,6 +155,17 @@ The browser run against the production build covered:
 - SMS still uses the LOG driver (OP-10), so OTP and alerts go by email and in-app.
 
 ## 8. Decisions needed
-1. **Mobile mandatory at sign-up?** The workbook says yes; the earlier email-first design says no. One switch: `NEXT_PUBLIC_REGISTRATION_REQUIRE_MOBILE=true`.
+1. ~~**Mobile mandatory at sign-up?**~~ — decided: mandatory (§9).
 2. **Address changes by verified members**: the workbook F08 says they save instantly; the existing §28 rule sends them to a single reviewer. Currently kept for ACTIVE members. Remove the gate?
 3. **Accounts that pre-date P1** are ACTIVE without dual approval. Leave them, or ask them to submit ID proof (status → DRAFT)? The latter would rewrite data, so it needs your yes.
+
+## 9. Follow-up: mobile mandatory at sign-up (your decision)
+- **Rule now:** self-registration needs a valid 10-digit Indian mobile number (starting 6–9), unique per account, as well as the email. A missing number gets "Mobile number is required"; the form shows the field as required.
+- **Switch:** `NEXT_PUBLIC_REGISTRATION_REQUIRE_MOBILE` now defaults to on (`src/lib/validators.ts`). Setting it to `false` makes the mobile optional again. `.env.example` updated.
+- **Not changed:** login (email or mobile, as before); existing accounts without a mobile keep working and are not asked for one; claiming a Karta-made profile through an invitation (F17) keeps the mobile optional.
+- **No migration, no data change.**
+- **Existing tests updated with your approval** (they predate this PR):
+  - `tests/registration-intent.test.ts` › "accepts a signup with no mobile number (mobile is optional)" checked the old rule. It is now "refuses a signup with no mobile number (mobile is mandatory)": 400, the message names the mobile, and no account is created.
+  - `tests/registration-intent.test.ts` › "stores the JOIN_EXISTING choice…" and `tests/verification-mode.test.ts` › "creates the account PENDING…" only failed because their sign-up had no mobile. A mobile number was added; everything else they check is unchanged.
+- **My own P1 tests** now sign up with a mobile. New test: `F01 mobile is mandatory at sign-up` (missing, empty, too short and an invalid first digit are each refused).
+- Tests: **410 passed**, twice in a row on a fresh database; typecheck clean.

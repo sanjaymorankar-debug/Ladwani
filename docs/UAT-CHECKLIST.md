@@ -13,7 +13,7 @@ Tick each line and note anything unexpected. The automated test for each flow is
 - [ ] F33 A District team member sees only their district in Team Directory; a plain member is sent away.
 
 ## P1 — Registration and approval
-- [ ] F01 Register with gender, DOB (18+) and Mul Gaon; email code; the account is DRAFT.
+- [ ] F01 Register with gender, DOB (18+), Mul Gaon and a mobile number (required); email code; the account is DRAFT. Leaving the mobile empty is refused.
 - [ ] F02 Fill the profile until 100% (addresses, social status, education).
 - [ ] F03 Upload an ID proof and self-signed copy (Aadhaar: last 4 digits only); accept the declaration with an emailed code.
 - [ ] F04/F05 Two different Pune Operators each see only their own task and decide with the checklist.
