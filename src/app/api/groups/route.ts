@@ -23,7 +23,9 @@ export async function GET(req: NextRequest) {
   const mine = url.searchParams.get('mine') === 'true'
   const areaId = url.searchParams.get('areaId')
 
-  const where: any = { deletedAt: null }
+  // Interest groups (auto-created from Additional Details) are listed at
+  // /api/interest-groups; this list stays the mandal/community-body directory.
+  const where: any = { deletedAt: null, groupType: { not: 'INTEREST' } }
   if (mine) {
     if (!memberId) return NextResponse.json({ groups: [] })
     where.convenerMemberId = memberId

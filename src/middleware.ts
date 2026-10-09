@@ -30,7 +30,9 @@ export default withAuth(
           // account at all — the single-use token in the URL is the
           // credential, checked server-side by the route itself.
           pathname.startsWith('/claim/') ||
-          pathname.startsWith('/api/invitations/')
+          pathname.startsWith('/api/invitations/') ||
+          // Scheduled jobs carry no session; each checks CRON_SECRET itself.
+          pathname.startsWith('/api/cron/')
         ) return true
         return !!token
       },

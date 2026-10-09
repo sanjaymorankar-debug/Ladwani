@@ -12,7 +12,7 @@ export default async function PostDetailPage({ params }: { params: { id: string 
   if (!session) return null
 
   const post = await prisma.post.findUnique({
-    where: { id: params.id, status: 'PUBLISHED', deletedAt: null },
+    where: { id: params.id, status: 'PUBLISHED', deletedAt: null, groupId: null },
     include: {
       author: { include: { member: { select: { id: true, firstName: true, lastName: true } } } },
       postType: { select: { label: true, icon: true } },

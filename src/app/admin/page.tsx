@@ -2,6 +2,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getTeamScope } from '@/lib/additional-details/access'
+import { groupReport, supportReport } from '@/lib/community-connect'
+import { GroupStats, SupportCounts } from '@/components/connect/CommunitySupportView'
 import {
   Users, Building2, Heart, Bell, ShieldCheck,
   CheckCircle2, Clock, AlertTriangle, TrendingUp, UserCheck
@@ -29,6 +32,10 @@ export default async function AdminDashboardPage() {
     prisma.post.count({ where: { status: 'PUBLISHED', deletedAt: null } }),
     prisma.family.count({ where: { status: 'PENDING' } }),
   ])
+
+  // Additional Details reports — counts only, scoped to this user's role.
+  const scope = await getTeamScope(session)
+  const [support, groups] = await Promise.all([supportReport(scope), groupReport()])
 
   const statCards = [
     { label: 'Total Families', value: totalFamilies, icon: Building2, color: 'bg-orange-50 text-orange-600', sub: `${pendingFamilies} pending` },
@@ -69,6 +76,13 @@ export default async function AdminDashboardPage() {
             <div className="text-xs text-gray-400 mt-0.5">{s.sub}</div>
           </div>
         ))}
+      </div>
+
+      {/* Community support & interest groups (counts only) */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900">Community support &amp; interest groups</h2>
+        <SupportCounts support={support} />
+        <GroupStats groups={groups} />
       </div>
 
       {/* Quick actions */}
@@ -118,6 +132,8 @@ export default async function AdminDashboardPage() {
                 { href: '/admin/users', label: 'User Management' },
                 { href: '/admin/roles', label: 'Roles & Permissions' },
                 { href: '/admin/audit-logs', label: 'Audit Logs' },
+                { href: '/admin/interests', label: 'Hobby Master & Approvals' },
+                { href: '/admin/config/options', label: 'Additional Details Dropdowns' },
                 { href: '/admin/settings', label: 'System Settings' },
               ].map((a) => (
                 <a key={a.href} href={a.href} className="flex items-center justify-between text-sm py-2 text-blue-600 hover:text-blue-700 border-b border-gray-50 last:border-0">

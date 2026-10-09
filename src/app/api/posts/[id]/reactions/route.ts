@@ -2,11 +2,14 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getPostAccess } from '@/lib/interest-groups'
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const { reactionType = 'LIKE' } = await req.json()
+  const { allowed } = await getPostAccess(session, params.id)
+  if (!allowed) return NextResponse.json({ message: 'Post not found' }, { status: 404 })
 
   try {
     await prisma.reaction.create({

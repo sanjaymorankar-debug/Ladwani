@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   Home, Users, Heart, Bell, Search,
   Settings, LogOut, ChevronLeft, ChevronRight,
-  Building2, Newspaper, UserCircle, ShieldCheck, Receipt, UsersRound
+  Building2, Newspaper, UserCircle, ShieldCheck, Receipt, UsersRound, Sparkles, Droplet, HeartHandshake
 } from 'lucide-react'
 import { signOut, useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
@@ -24,6 +24,8 @@ const nav = [
   { href: '/matrimony', icon: Heart, label: 'Matrimony' },
   { href: '/assets', icon: Building2, label: 'Assets & Booking' },
   { href: '/groups', icon: UsersRound, label: 'Community Groups' },
+  { href: '/interest-groups', icon: Sparkles, label: 'Interest Groups' },
+  { href: '/blood-donors', icon: Droplet, label: 'Blood Donors' },
   { href: '/fees', icon: Receipt, label: 'Fees' },
   { href: '/community', icon: Newspaper, label: 'Community' },
   { href: '/search', icon: Search, label: 'Search' },
@@ -37,6 +39,7 @@ export default function Sidebar() {
   const { data: session } = useSession()
   const isAdmin = (session?.user as any)?.roles?.includes('ADMIN')
   const isOperator = (session?.user as any)?.roles?.includes('OPERATOR')
+  const isTeam = ['DISTRICT_TEAM', 'STATE_TEAM', 'NATIONAL_TEAM'].some((r) => (session?.user as any)?.roles?.includes(r))
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href)
 
@@ -72,6 +75,14 @@ export default function Sidebar() {
             {!collapsed && <span className="truncate">{item.label}</span>}
           </Link>
         ))}
+        {(isAdmin || isOperator || isTeam) && (
+          <Link href="/community-support" title={collapsed ? 'Community Support' : undefined}
+            className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+              isActive('/community-support') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
+            <HeartHandshake className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>Community Support</span>}
+          </Link>
+        )}
         {(isAdmin || isOperator) && (
           <Link href="/admin" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors mt-2">
             <ShieldCheck className="w-5 h-5 flex-shrink-0" />

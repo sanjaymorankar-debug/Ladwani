@@ -2,10 +2,13 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getPostAccess } from '@/lib/interest-groups'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  const { allowed } = await getPostAccess(session, params.id)
+  if (!allowed) return NextResponse.json({ message: 'Post not found' }, { status: 404 })
 
   const comments = await prisma.comment.findMany({
     where: { postId: params.id, status: 'ACTIVE', deletedAt: null, parentId: null },
@@ -34,6 +37,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const post = await prisma.post.findUnique({ where: { id: params.id, status: 'PUBLISHED' } })
   if (!post) return NextResponse.json({ message: 'Post not found' }, { status: 404 })
+  if (post.groupId && !(await getPostAccess(session, post.id)).allowed) {
+    return NextResponse.json({ message: 'Post not found' }, { status: 404 })
+  }
 
   const comment = await prisma.comment.create({
     data: {

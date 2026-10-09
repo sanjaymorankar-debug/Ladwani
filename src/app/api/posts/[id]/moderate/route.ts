@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getPostAccess } from '@/lib/interest-groups'
 
 /** Operator/Admin approve or reject a submitted post. */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -9,7 +10,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
   const roles = ((session.user as any).roles ?? []) as string[]
-  if (!roles.includes('ADMIN') && !roles.includes('OPERATOR')) {
+  // Staff moderate everything; an interest group's moderators moderate the
+  // posts in their own group through this same flow.
+  if (!roles.includes('ADMIN') && !roles.includes('OPERATOR') && !(await getPostAccess(session, params.id)).isModerator) {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
   }
 
@@ -47,10 +50,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       },
     })
 
+    // Reports on this post are settled by the decision.
+    await tx.report.updateMany({
+      where: { reportableType: 'post', reportableId: post.id, status: 'PENDING' },
+      data: { status: 'RESOLVED', resolvedBy: session.user!.id as string, resolvedAt: new Date(), resolutionNote: body.note ?? null },
+    })
+
     await tx.auditLog.create({
       data: {
         actorId: session.user!.id as string,
-        actorRole: roles[0],
+        actorRole: roles[0] ?? 'GROUP_MODERATOR',
         action: `post.${action}`,
         entityType: 'post',
         entityId: post.id,

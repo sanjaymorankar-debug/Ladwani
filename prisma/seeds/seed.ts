@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { hash } from 'bcryptjs'
+import { INTEREST_SEED } from '../../src/lib/interest-master'
 
 const prisma = new PrismaClient()
 
@@ -242,6 +243,40 @@ async function main() {
     create: { actionCode: 'group.create', requiresApproval: true, approverRole: 'OPERATOR' },
   })
   console.log('✅ Fee types + asset/group approval rules created')
+
+  // ── Additional Details: community teams, districts, hobby master ──
+  // District / State / National teams are scoped to an Area through
+  // user_roles.areaId (the same column Operators use). District team members
+  // see named support requests for their district; State and National teams
+  // see counts only.
+  for (const [code, label] of [
+    ['DISTRICT_TEAM', 'District team'],
+    ['STATE_TEAM', 'State team'],
+    ['NATIONAL_TEAM', 'National team'],
+  ]) {
+    await prisma.role.upsert({ where: { code }, update: {}, create: { code, label, isSystem: true } })
+  }
+  for (const d of ['Pune', 'Mumbai', 'Nagpur', 'Satara', 'Kolhapur', 'Nashik', 'Aurangabad', 'Solapur', 'Sangli', 'Ahmednagar']) {
+    const id = `area-dist-${d.toLowerCase()}`
+    await prisma.area.upsert({ where: { id }, update: {}, create: { id, name: d, type: 'DISTRICT', parentId: maharashtra.id } })
+  }
+  for (const [i, it] of INTEREST_SEED.entries()) {
+    await prisma.interest.upsert({
+      where: { slug: it.slug },
+      update: {},
+      create: { ...it, status: 'APPROVED', sortOrder: i },
+    })
+  }
+  for (const pt of [
+    { code: 'GROUP_POST', label: 'Group post', icon: '💬' },
+    { code: 'GROUP_QUESTION', label: 'Problem / need help', icon: '🙋' },
+    { code: 'GROUP_KNOWLEDGE', label: 'Knowledge', icon: '📘' },
+    { code: 'GROUP_EVENT', label: 'Event / meet-up', icon: '📅' },
+    { code: 'GROUP_POLL', label: 'Poll', icon: '📊' },
+  ]) {
+    await prisma.postType.upsert({ where: { code: pt.code }, update: {}, create: pt })
+  }
+  console.log('✅ Community teams, districts, hobby master and group post types created')
 
   // ── Test Accounts (dev/test only - obviously fake data) ─────────
   // These share one published password, so they must never exist on a
