@@ -88,6 +88,13 @@ export default function Sidebar() {
             {!collapsed && <span>Team Directory</span>}
           </Link>
         )}
+        {hasTeamView && (
+          <Link href="/reports" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+            isActive('/reports') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
+            <Activity className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>Reports</span>}
+          </Link>
+        )}
         {isOperator && (
           <Link href="/admin/verification" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
             isActive('/admin/verification') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>

@@ -39,6 +39,7 @@ export function p5Fixtures(prefix: string) {
     await prisma.matrimonialInterest.deleteMany({ where: { OR: [{ fromMemberId: { in: members } }, { toMemberId: { in: members } }] } })
     await prisma.matrimonialProfile.deleteMany({ where: { memberId: { in: members } } })
     await prisma.memberProfileDetail.deleteMany({ where: { memberId: { in: members } } })
+    await prisma.dataDeletionRequest.deleteMany({ where: { userId: { in: users } } })
     await base.cleanup()
   }
   return { ...base, cleanup }

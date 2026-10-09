@@ -1676,3 +1676,22 @@ model FriendListMember {
   @@index([friendMemberId])
   @@map("friend_list_members")
 }
+
+/// F40 — a user's request to delete their account. An Admin processes it:
+/// the person is anonymised (the node stays so family trees are not broken),
+/// contact data, documents and photos are erased, the login is closed.
+model DataDeletionRequest {
+  id          String    @id @default(cuid())
+  userId      String
+  memberId    String?
+  reason      String?   @db.Text
+  status      String    @default("PENDING") // PENDING, COMPLETED, REJECTED, CANCELLED
+  processedBy String?
+  processedAt DateTime?
+  note        String?   @db.Text
+  createdAt   DateTime  @default(now())
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@map("data_deletion_requests")
+}

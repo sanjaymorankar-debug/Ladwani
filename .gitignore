@@ -44,3 +44,4 @@ prisma/migrations/*.sql.bak
 uploads/
 # Files written by the test suite (UPLOAD_DIR=./uploads-test in .env.test)
 uploads-test/
+scripts/.backup.env

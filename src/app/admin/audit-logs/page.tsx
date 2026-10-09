@@ -5,17 +5,27 @@ import { prisma } from '@/lib/prisma'
 import { FileText } from 'lucide-react'
 import { formatDate, timeAgo } from '@/lib/utils'
 
-export default async function AuditLogsPage() {
+export default async function AuditLogsPage({ searchParams = {} }: { searchParams?: Record<string, string | undefined> }) {
   const session = await getServerSession(authOptions)
   const roles = (session?.user as any)?.roles as string[] ?? []
   if (!roles.includes('ADMIN')) redirect('/dashboard')
 
+  // F40: search the log — action, entity, actor, dates; "ID proof" shows every upload / view.
+  const sp = searchParams
+  const where: any = {}
+  if (sp.action) where.action = { contains: sp.action }
+  if (sp.idProof === '1') where.entityType = 'id_proof'
+  else if (sp.entityType) where.entityType = sp.entityType
+  if (sp.entityId) where.entityId = sp.entityId
+  if (sp.actor) where.actor = { OR: [{ email: { contains: sp.actor } }, { member: { OR: [{ firstName: { contains: sp.actor } }, { lastName: { contains: sp.actor } }] } }] }
+  if (sp.from || sp.to) where.createdAt = { ...(sp.from ? { gte: new Date(sp.from) } : {}), ...(sp.to ? { lte: new Date(`${sp.to}T23:59:59`) } : {}) }
   const logs = await prisma.auditLog.findMany({
+    where,
     include: {
-      actor: { include: { member: { select: { firstName: true, lastName: true } } } },
+      actor: { select: { email: true, member: { select: { firstName: true, lastName: true } } } },
     },
     orderBy: { createdAt: 'desc' },
-    take: 100,
+    take: 200,
   })
 
   const ACTION_COLOR: Record<string, string> = {
@@ -34,6 +44,18 @@ export default async function AuditLogsPage() {
         </h1>
         <p className="text-gray-500 text-sm">Immutable record of all significant platform actions</p>
       </div>
+
+      <form className="card grid sm:grid-cols-6 gap-2 text-sm" method="get">
+        <input name="action" defaultValue={sp.action ?? ''} placeholder="Action (e.g. member.)" className="form-input" />
+        <input name="entityType" defaultValue={sp.entityType ?? ''} placeholder="Entity type" className="form-input" />
+        <input name="actor" defaultValue={sp.actor ?? ''} placeholder="Actor name / email" className="form-input" />
+        <input name="from" type="date" defaultValue={sp.from ?? ''} className="form-input" />
+        <input name="to" type="date" defaultValue={sp.to ?? ''} className="form-input" />
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1 text-xs"><input type="checkbox" name="idProof" value="1" defaultChecked={sp.idProof === '1'} /> ID proof only</label>
+          <button className="btn-secondary text-xs" type="submit">Filter</button>
+        </div>
+      </form>
 
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
