@@ -7,12 +7,14 @@ interface Photo {
   id: string
   isProfilePhoto: boolean
   visibility: string
+  audienceListId?: string | null
   thumbnailKey: string | null
 }
 
 const VISIBILITY_OPTIONS = [
   { value: 'PRIVATE', label: 'Only me' },
   { value: 'SAME_FAMILY', label: 'My family' },
+  { value: 'FRIENDS', label: 'My friends' },
   { value: 'REGISTERED_MEMBERS', label: 'Community members' },
   { value: 'MATRIMONY_ONLY', label: 'Matrimony viewers' },
   { value: 'PUBLIC_COMMUNITY', label: 'Public' },
@@ -38,6 +40,9 @@ export default function PhotoManager({ memberId }: { memberId: string }) {
   const [photos, setPhotos] = useState<Photo[]>([])
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  // F34: one of my friend lists can be the audience too.
+  const [lists, setLists] = useState<{ id: string; name: string }[]>([])
+  useEffect(() => { fetch('/api/friends').then((r) => (r.ok ? r.json() : null)).then((d) => d && setLists(d.lists ?? [])).catch(() => {}) }, [])
 
   const load = () =>
     fetch(`/api/members/${memberId}/photos`)
@@ -76,11 +81,12 @@ export default function PhotoManager({ memberId }: { memberId: string }) {
     load()
   }
 
-  const setVisibility = async (photoId: string, visibility: string) => {
+  const setVisibility = async (photoId: string, value: string) => {
+    const [visibility, audienceListId] = value.split(':')
     await fetch(`/api/members/${memberId}/photos/${photoId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ visibility }),
+      body: JSON.stringify({ visibility, audienceListId: audienceListId || undefined }),
     })
     load()
   }
@@ -107,11 +113,12 @@ export default function PhotoManager({ memberId }: { memberId: string }) {
               )}
             </div>
             <select
-              value={p.visibility}
+              value={p.visibility === 'FRIEND_LIST' ? `FRIEND_LIST:${p.audienceListId}` : p.visibility}
               onChange={(e) => setVisibility(p.id, e.target.value)}
               className="form-input text-xs py-1"
             >
               {VISIBILITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              {lists.map((l) => <option key={l.id} value={`FRIEND_LIST:${l.id}`}>List: {l.name}</option>)}
             </select>
             <div className="flex gap-1">
               {!p.isProfilePhoto && (

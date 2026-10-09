@@ -156,6 +156,9 @@ export async function afterMemberExpired(memberId: string, actorId: string, acti
   // F31: an expired person's organisation posts and body seats fall vacant.
   const { onMemberExpired } = await import('@/lib/organisations')
   await onMemberExpired(memberId, actorId)
+  // F12: removed from friend lists.
+  const { removeAllFriendships } = await import('@/lib/friends')
+  await removeAllFriendships(memberId)
   const member = await prisma.member.findUnique({ where: { id: memberId }, select: { firstName: true, lastName: true } })
   const memberships = await prisma.familyMember.findMany({
     where: { memberId, leftAt: null }, select: { familyId: true, isKarta: true, family: { select: { name: true } } },

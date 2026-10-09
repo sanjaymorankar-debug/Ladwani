@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { MATRIMONY_ELIGIBLE_STATUSES, withdrawMatrimonyOnMarriage } from '@/lib/matrimony'
 import { redactMemberForViewer } from '@/lib/visibility'
 import { getMemberAccess } from '@/lib/member-auth'
 import { validatePhysical } from '@/lib/validators'
@@ -225,6 +226,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         updatedBy: userId,
       },
     })
+
+    // F37: a status that cannot be listed (e.g. Separated) takes the listing down.
+    if (updated.maritalStatus !== member.maritalStatus && !MATRIMONY_ELIGIBLE_STATUSES.includes(updated.maritalStatus)) {
+      await withdrawMatrimonyOnMarriage(tx, [params.id])
+    }
 
     // F23: divorced / widowed marks the marriage link but keeps its history.
     if (member.maritalStatus === 'MARRIED' && ['DIVORCED', 'WIDOWED'].includes(updated.maritalStatus)) {

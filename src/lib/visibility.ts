@@ -1,6 +1,7 @@
 import { Session } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { operatorHasOpenTaskFor } from '@/lib/verification'
+import { areFriends, inFriendList } from '@/lib/friends'
 
 /**
  * Full (unredacted) view of a member: Admin always; an Operator only while
@@ -25,10 +26,13 @@ export async function hasStaffView(session: Session | null, memberId: string): P
  * which covers the cases spec explicitly worries about (exact address,
  * private photos).
  */
+export const PHOTO_VISIBILITIES = ['PRIVATE', 'SAME_FAMILY', 'FRIENDS', 'FRIEND_LIST', 'REGISTERED_MEMBERS', 'SAME_AREA', 'MATRIMONY_ONLY', 'PUBLIC_COMMUNITY', 'ADMIN_OPERATOR']
+
 export async function canViewByVisibility(
   session: Session | null,
   ownerMemberId: string,
-  visibility: string
+  visibility: string,
+  audienceListId?: string | null
 ): Promise<boolean> {
   if (!session?.user?.id) return false
 
@@ -53,8 +57,13 @@ export async function canViewByVisibility(
     return !!shared
   }
 
-  // REGISTERED_MEMBERS, PUBLIC_COMMUNITY, MATRIMONY_ONLY, SAME_AREA
-  return true
+  // F34: friends, or one of the owner's friend lists.
+  if (visibility === 'FRIENDS') return areFriends(ownerMemberId, viewerMemberId)
+  if (visibility === 'FRIEND_LIST') return !!audienceListId && inFriendList(audienceListId, ownerMemberId, viewerMemberId)
+
+  // REGISTERED_MEMBERS, PUBLIC_COMMUNITY, MATRIMONY_ONLY, SAME_AREA. Anything
+  // else (a mistyped value) is treated as private, never as public.
+  return ['REGISTERED_MEMBERS', 'PUBLIC_COMMUNITY', 'MATRIMONY_ONLY', 'SAME_AREA'].includes(visibility)
 }
 
 /** field key (as used by MemberFieldVisibility/the privacy page) -> Member columns it gates. Conservative fallback when nothing is configured. */

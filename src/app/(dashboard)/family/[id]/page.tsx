@@ -13,6 +13,7 @@ import ChangeKartaPanel from '@/components/family/ChangeKartaPanel'
 import FamilyPhoto from '@/components/family/FamilyPhoto'
 import MemberManageActions from '@/components/family/MemberManageActions'
 import NewbornPanel from '@/components/family/NewbornPanel'
+import FamilyAlbum from '@/components/family/FamilyAlbum'
 import JoinFamilyPanel from '@/components/family/JoinFamilyPanel'
 
 export default async function FamilyDetailPage({ params }: { params: { id: string } }) {
@@ -198,6 +199,7 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
       {isKarta && <TreeLinksInbox familyId={family.id} />}
 
       {isKarta && <NewbornPanel familyId={family.id} fathers={adults('MALE')} mothers={adults('FEMALE')} />}
+      {isMember && <FamilyAlbum familyId={family.id} canManage={isKarta} />}
 
       {isKarta && <ChangeKartaPanel familyId={family.id} candidates={kartaCandidates} />}
 

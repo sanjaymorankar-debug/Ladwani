@@ -717,18 +717,22 @@ model MemberProfileDetail {
 // ─────────────────────────────────────────────────────────────────
 
 model MatrimonialProfile {
-  id        String   @id @default(cuid())
-  memberId  String   @unique
-  isVisible Boolean  @default(false)
-  about     String?  @db.Text
-  heightCm  Int?
+  id                String   @id @default(cuid())
+  memberId          String   @unique
+  isVisible         Boolean  @default(false)
+  about             String?  @db.Text
+  heightCm          Int?
   // MySQL has no native array column type (unlike Postgres) — stored as a
   // JSON array of strings instead. Nullable; application code treats a
   // missing value as an empty list.
-  languages Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?
+  languages         Json?
+  /// F37 extra details.
+  expectations      String?  @db.Text
+  horoscope         String?  @db.Text
+  contactPreference String? // SELF, KARTA, BOTH — who is contacted once an interest is accepted
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdBy         String?
 
   member      Member                 @relation(fields: [memberId], references: [id])
   preferences MatrimonialPreference?
@@ -765,6 +769,8 @@ model MatrimonialInterest {
   status          String    @default("PENDING") // PENDING, ACCEPTED, DECLINED, WITHDRAWN
   statusChangedAt DateTime?
   statusNote      String?
+  /// F38: the user who answered — the person, or the Karta on their behalf.
+  respondedBy     String?
   createdAt       DateTime  @default(now())
 
   fromMember Member @relation("InterestFrom", fields: [fromMemberId], references: [id])
@@ -922,6 +928,11 @@ model Post {
   content        String?    @db.Text
   visibility     String     @default("COMMUNITY") // LOCAL_AREA, CITY, STATE, COMMUNITY, PRIVATE
   targetAreaId   String?
+  /// F36 audience: COMMUNITY (everyone, as before), FAMILY, FRIEND_LIST,
+  /// ORGANISATION (audienceId = the id), DISTRICT / STATE (audienceId = area),
+  /// NATIONAL. District / State / National posts are moderated by that body.
+  audienceType   String     @default("COMMUNITY")
+  audienceId     String?
   // Community posts are held for moderation by default — nothing reaches the
   // feed until an Operator or Admin approves it.
   status         PostStatus @default(PENDING_APPROVAL)
@@ -942,6 +953,7 @@ model Post {
   reactions Reaction[]
   photos    Photo[]
 
+  @@index([audienceType, audienceId])
   @@map("posts")
 }
 
@@ -1007,6 +1019,7 @@ model Report {
 
   reporter User @relation(fields: [reporterId], references: [id])
 
+  @@index([reportableType, reportableId])
   @@map("reports")
 }
 
@@ -1229,7 +1242,9 @@ model Photo {
   height           Int?
   isProfilePhoto   Boolean  @default(false)
   caption          String?
-  visibility       String   @default("PRIVATE") // PRIVATE, SAME_FAMILY, REGISTERED_MEMBERS, SAME_AREA, MATRIMONY_ONLY, PUBLIC_COMMUNITY, ADMIN_OPERATOR
+  visibility       String   @default("PRIVATE") // PRIVATE, SAME_FAMILY, FRIENDS, FRIEND_LIST, REGISTERED_MEMBERS, SAME_AREA, MATRIMONY_ONLY, PUBLIC_COMMUNITY, ADMIN_OPERATOR
+  /// F34: with visibility FRIEND_LIST, the uploader's friend list that may see it.
+  audienceListId   String?
   status           String   @default("ACTIVE") // ACTIVE, FLAGGED, REMOVED
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -1623,4 +1638,41 @@ model BodySeat {
   @@index([toOrganisationId, status])
   @@index([memberId, status])
   @@map("body_seats")
+}
+
+/// F35 — a friend request and, once accepted, the friendship (both ways).
+model Friendship {
+  id                String    @id @default(cuid())
+  requesterMemberId String
+  addresseeMemberId String
+  status            String    @default("PENDING") // PENDING, ACCEPTED, DECLINED, CANCELLED
+  respondedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([requesterMemberId, addresseeMemberId])
+  @@index([addresseeMemberId, status])
+  @@map("friendships")
+}
+
+/// F35 — a named list of the owner's friends ("School friends").
+model FriendList {
+  id            String   @id @default(cuid())
+  ownerMemberId String
+  name          String
+  createdAt     DateTime @default(now())
+
+  @@unique([ownerMemberId, name])
+  @@map("friend_lists")
+}
+
+model FriendListMember {
+  id             String   @id @default(cuid())
+  listId         String
+  friendMemberId String
+  addedAt        DateTime @default(now())
+
+  @@unique([listId, friendMemberId])
+  @@index([friendMemberId])
+  @@map("friend_list_members")
 }

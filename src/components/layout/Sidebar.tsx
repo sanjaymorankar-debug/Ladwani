@@ -25,6 +25,7 @@ const nav = [
   { href: '/assets', icon: Building2, label: 'Assets & Booking' },
   { href: '/groups', icon: UsersRound, label: 'Community Groups' },
   { href: '/organisations', icon: Landmark, label: 'Organisations' },
+  { href: '/friends', icon: UserCircle, label: 'Friends' },
   { href: '/fees', icon: Receipt, label: 'Fees' },
   { href: '/community', icon: Newspaper, label: 'Community' },
   { href: '/search', icon: Search, label: 'Search' },
@@ -92,6 +93,13 @@ export default function Sidebar() {
             isActive('/admin/verification') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
             <ClipboardCheck className="w-5 h-5 flex-shrink-0" />
             {!collapsed && <span>My Verification Tasks</span>}
+          </Link>
+        )}
+        {(isOperator || isAdmin) && (
+          <Link href="/admin/moderation" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+            isActive('/admin/moderation') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
+            <ShieldCheck className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>Reported Content</span>}
           </Link>
         )}
         {hasMonitor && (

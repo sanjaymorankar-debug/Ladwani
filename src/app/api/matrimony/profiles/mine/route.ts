@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { bureauEligibility } from '@/lib/bureau'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -13,5 +14,7 @@ export async function GET() {
   })
 
   const profile = user?.member?.matrimonialProfile ?? null
-  return NextResponse.json({ profile })
+  // F37: the toggle is offered only when the member is eligible; the reason otherwise.
+  const eligibility = user?.member ? await bureauEligibility(user.member.id) : { ok: false, reason: 'Complete your profile first.' }
+  return NextResponse.json({ profile, eligibility })
 }
