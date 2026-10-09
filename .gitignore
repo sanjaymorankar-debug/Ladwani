@@ -42,3 +42,6 @@ prisma/migrations/*.sql.bak
 
 # Uploads (local dev)
 uploads/
+
+# MySQL -> PostgreSQL data migration reports (primary keys of real rows)
+migration-report-*.json
