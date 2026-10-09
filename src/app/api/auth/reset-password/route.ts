@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server'
+import { ssoConfig } from '@/lib/bkesari-sso'
 import { hash, compare } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, passwordResetEmailTemplate } from '@/lib/email'
 
 export async function POST(req: Request) {
+  // With central login enforced, passwords live at bkesari.com only.
+  const sso = ssoConfig()
+  if (sso?.enforce) {
+    return NextResponse.json({ message: 'Change your password at bkesari.com.', reset: `${sso.hubUrl}/auth/forgot` }, { status: 403 })
+  }
   try {
     const { mobile, email, otp, newPassword, step } = await req.json()
     const identifier = mobile ?? email

@@ -19,6 +19,7 @@ const MESSAGES: Record<LoginErrorCode, string> = {
   ACCOUNT_SUSPENDED: 'Your account has been temporarily suspended. Please contact the community administrator.',
   ACCOUNT_LOCKED: 'Too many failed attempts. Your account is temporarily locked. Please try again later.',
   ACCOUNT_PENDING: 'Please verify your account before continuing.',
+  SSO_REQUIRED: 'Sign in with your bkesari account instead.',
 }
 
 export async function POST(req: NextRequest) {

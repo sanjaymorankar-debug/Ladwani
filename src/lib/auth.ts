@@ -3,12 +3,15 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { compare, hash } from 'bcryptjs'
 import { prisma } from './prisma'
 import { requireAccountVerification } from './auth-config'
+import { ssoConfig, readSsoToken, introspect, entitled } from './bkesari-sso'
+import { provisionFromSso } from './bkesari-sso-server'
 
 export type LoginErrorCode =
   | 'INVALID_CREDENTIALS'
   | 'ACCOUNT_SUSPENDED'
   | 'ACCOUNT_LOCKED'
   | 'ACCOUNT_PENDING'
+  | 'SSO_REQUIRED'
 
 export interface AuthorizedUser {
   id: string
@@ -39,6 +42,8 @@ const LOCK_DURATION_MS = 30 * 60 * 1000
  * already knew the password.
  */
 export async function validateLogin(identifier: string, password: string): Promise<LoginResult> {
+  // With central login enforced, LadWani's own passwords are not used at all.
+  if (ssoConfig()?.enforce) return { ok: false, code: 'SSO_REQUIRED' }
   const user = await prisma.user.findFirst({
     where: {
       OR: [{ email: identifier }, { mobile: identifier }],
@@ -115,6 +120,9 @@ export const authOptions: NextAuthOptions = {
         token.roles = (user as any).roles
         token.memberId = (user as any).memberId
         token.status = (user as any).status
+        // Set only for a session bridged from the central login; the
+        // middleware ends this session when the central one ends.
+        token.ssoSub = (user as any).ssoSub ?? null
       } else if (trigger === 'update' && token.id) {
         // Lets the client call useSession().update() to pick up a role/status
         // change (e.g. just became Karta) without forcing a full re-login —
@@ -160,6 +168,22 @@ export const authOptions: NextAuthOptions = {
           throw new Error(result.code)
         }
         return result.user
+      },
+    }),
+    // Central login (bkesari.com). Takes no credentials from the form: it
+    // reads the central session cookie that came with the request and asks
+    // the central service who it belongs to. Inert unless configured.
+    CredentialsProvider({
+      id: 'bkesari-sso',
+      name: 'bkesari',
+      credentials: {},
+      async authorize(_credentials, req) {
+        const cfg = ssoConfig()
+        if (!cfg) return null
+        const token = readSsoToken((req?.headers as any)?.cookie, cfg.cookieNames)
+        const identity = await introspect(token, cfg, { fresh: true })
+        if (!identity || !entitled(identity)) return null
+        return provisionFromSso(identity)
       },
     }),
   ],
