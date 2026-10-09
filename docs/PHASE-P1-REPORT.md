@@ -156,7 +156,7 @@ The browser run against the production build covered:
 
 ## 8. Decisions needed
 1. ~~**Mobile mandatory at sign-up?**~~ — decided: mandatory (§9).
-2. **Address changes by verified members**: the workbook F08 says they save instantly; the existing §28 rule sends them to a single reviewer. Currently kept for ACTIVE members. Remove the gate?
+2. ~~**Address changes by verified members**~~ — decided: they save instantly (§10).
 3. **Accounts that pre-date P1** are ACTIVE without dual approval. Leave them, or ask them to submit ID proof (status → DRAFT)? The latter would rewrite data, so it needs your yes.
 
 ## 9. Follow-up: mobile mandatory at sign-up (your decision)
@@ -169,3 +169,11 @@ The browser run against the production build covered:
   - `tests/registration-intent.test.ts` › "stores the JOIN_EXISTING choice…" and `tests/verification-mode.test.ts` › "creates the account PENDING…" only failed because their sign-up had no mobile. A mobile number was added; everything else they check is unchanged.
 - **My own P1 tests** now sign up with a mobile. New test: `F01 mobile is mandatory at sign-up` (missing, empty, too short and an invalid first digit are each refused).
 - Tests: **410 passed**, twice in a row on a fresh database; typecheck clean.
+
+## 10. Follow-up: address changes save instantly for verified members (your decision)
+- **Rule now:** an ACTIVE member's change to an address already on record saves at once, as the workbook F08 says. It no longer goes to an Operator (§28). Name, date of birth, gender, Mul Gaon and ID proof still go through the two-Operator re-approval.
+- **How:** migration `20261009210000_address_changes_instant` switches off the approval rule `member.address.change` (phpMyAdmin: `database/phpmyadmin/set_address_changes_instant.sql`, verified: the rule is off and `prisma migrate status` reports up to date). Rollback: its `down.sql` switches the rule back on (verified). The seed default for new databases is now off too.
+- **Requests already waiting:** they stay in the queue and can still be decided. When the member next changes that same address directly, their waiting request is closed (marked rejected, "Superseded: the address was changed directly"), so a reviewer can never apply an older address over a newer one. Nothing else is changed in existing data.
+- **Existing test updated with your approval** (it predates this PR): `tests/uat/personal-info-form.test.ts` › `TC-PIF-014`. Its first half (first entry saves directly; re-saving the same address does nothing) is unchanged. Its second half expected the moved address to wait for an Operator; it now expects it to save instantly with no review request.
+- **New tests** in `tests/p1/F08-sensitive-changes.test.ts`: an ACTIVE member's address change saves at once with no review request; a request left waiting from before is closed by the next direct change.
+- Tests: **412 passed**, twice in a row on a fresh database; typecheck clean.

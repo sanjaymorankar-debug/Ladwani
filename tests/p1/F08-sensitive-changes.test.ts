@@ -6,6 +6,7 @@ vi.mock('@/lib/email', () => ({ sendEmail: vi.fn().mockResolvedValue({ messageId
 import { prisma } from '@/lib/prisma'
 import { p1Fixtures, actAs, json, idProofForm, type Person } from './fixtures'
 import { PATCH as patchMember } from '@/app/api/members/[id]/route'
+import { EMPTY_ADDRESS } from '@/lib/profile-details'
 import { PUT as putMulGaon } from '@/app/api/members/[id]/mul-gaon/route'
 import { POST as uploadProof } from '@/app/api/verification/id-proof/route'
 import { POST as decide } from '@/app/api/verification/tasks/[id]/route'
@@ -138,5 +139,37 @@ describe('F08 edge rules', () => {
     expect((await member(t)).firstName).toBe('Corrected')
     const log = await prisma.auditLog.findFirstOrThrow({ where: { entityId: t.memberId, action: 'member.profile.update', actorId: admin.userId } })
     expect(log.oldValue).toMatchObject({ firstName: 'admined' })
+  })
+})
+
+describe("F08 Address changes by verified members save instantly (owner's decision)", () => {
+  let p: Person
+  const home = { ...EMPTY_ADDRESS, line1: '12 MG Road', city: 'Pune', district: 'Pune', state: 'Maharashtra', pincode: '411001' }
+  const addr = () => prisma.address.findFirstOrThrow({ where: { memberId: p.memberId, addressType: 'CURRENT' } })
+  const setGate = (on: boolean) => prisma.approvalRule.update({ where: { actionCode: 'member.address.change' }, data: { requiresApproval: on } })
+  beforeAll(async () => { p = await fx.applicant('addr', geo.village, { status: 'ACTIVE' }) })
+  afterAll(async () => {
+    await setGate(false)
+    await prisma.approval.deleteMany({ where: { actionCode: 'member.address.change', entityId: p.memberId } })
+    await prisma.address.deleteMany({ where: { memberId: p.memberId } })
+  })
+
+  it('F08 an ACTIVE member changes an address already on record: it saves at once, with no review request', async () => {
+    expect((await (await patch(p, { currentAddress: home })).json()).addressStatus).toBe('applied')
+    const res = await patch(p, { currentAddress: { ...home, line1: '7 FC Road', pincode: '411004' } })
+    expect(res.status).toBe(200)
+    expect((await res.json()).addressStatus).toBe('applied')
+    expect(await addr()).toMatchObject({ line1: '7 FC Road', pincode: '411004' })
+    expect(await prisma.approval.count({ where: { actionCode: 'member.address.change', entityId: p.memberId } })).toBe(0)
+  })
+
+  it('F08 a request left waiting from before is closed by the next direct change, so it can never overwrite the newer address', async () => {
+    await setGate(true) // as before this decision
+    expect((await (await patch(p, { currentAddress: { ...home, line1: 'Old request' } })).json()).addressStatus).toBe('pending')
+    await setGate(false)
+    expect((await (await patch(p, { currentAddress: { ...home, line1: 'Newest' } })).json()).addressStatus).toBe('applied')
+    const old = await prisma.approval.findFirstOrThrow({ where: { actionCode: 'member.address.change', entityId: p.memberId } })
+    expect(old).toMatchObject({ status: 'REJECTED', reviewNote: expect.stringMatching(/Superseded/) })
+    expect((await addr()).line1).toBe('Newest')
   })
 })

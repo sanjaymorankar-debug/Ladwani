@@ -5,7 +5,6 @@ vi.mock('next-auth', () => ({ getServerSession: vi.fn() }))
 import { prisma } from '@/lib/prisma'
 import { PATCH as patchMember } from '@/app/api/members/[id]/route'
 import { GET as getProfileDetails } from '@/app/api/members/[id]/profile-details/route'
-import { PATCH as patchApproval } from '@/app/api/approvals/[id]/route'
 import { EMPTY_PROFILE_DETAILS, EMPTY_ADDRESS } from '@/lib/profile-details'
 import { account, actAs, jsonReq } from './helpers'
 
@@ -217,7 +216,7 @@ describe('TC-PIF — personal information form', () => {
     })
   })
 
-  it('TC-PIF-014 address with geo-tag: first entry saves directly; a change is queued for review', async () => {
+  it('TC-PIF-014 address with geo-tag: first entry saves directly; a change saves instantly too (F08, owner\'s decision)', async () => {
     await asSelf('MEMBER-02')
     const first = {
       ...EMPTY_ADDRESS, line1: '4 Shivaji Road', line2: 'Kothrud', city: 'Pune', taluka: 'Haveli',
@@ -234,17 +233,12 @@ describe('TC-PIF — personal information form', () => {
     // Re-saving the same address is a no-op, not a review request.
     expect((await (await patch(unmarriedId, { currentAddress: first })).json()).addressStatus).toBe('unchanged')
 
-    // Moving the pin is a change, gated like any address change (§28).
+    // Moving the pin is a change. Updated with the owner's approval: address
+    // changes by verified members now save instantly (workbook F08) instead of
+    // going to a reviewer (§28), so no review request is created.
     const moved = await patch(unmarriedId, { currentAddress: { ...first, latitude: 18.51, longitude: 73.81 } })
-    expect((await moved.json()).addressStatus).toBe('pending')
-    const approval = await prisma.approval.findFirstOrThrow({
-      where: { actionCode: 'member.address.change', entityId: unmarriedId, status: 'SUBMITTED' },
-    })
-
-    const operator = await account('OPERATOR-01')
-    actAs({ userId: operator.userId, roles: operator.roles, memberId: operator.memberId })
-    const approved = await patchApproval(jsonReq('http://x', 'PATCH', { action: 'approve' }) as any, { params: { id: approval.id } })
-    expect(approved.status).toBe(200)
+    expect((await moved.json()).addressStatus).toBe('applied')
+    expect(await prisma.approval.count({ where: { actionCode: 'member.address.change', entityId: unmarriedId } })).toBe(0)
     expect(await prisma.address.findFirstOrThrow({ where: { memberId: unmarriedId, addressType: 'CURRENT' } }))
       .toMatchObject({ latitude: 18.51, longitude: 73.81, taluka: 'Haveli' })
   })

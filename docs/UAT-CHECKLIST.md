@@ -19,7 +19,7 @@ Tick each line and note anything unexpected. The automated test for each flow is
 - [ ] F04/F05 Two different Pune Operators each see only their own task and decide with the checklist.
 - [ ] F06 Both approve → ACTIVE. One sends back → correction → resubmit → new round.
 - [ ] F07 The Admin's Approval Monitor shows both decisions; reassign and reopen work.
-- [ ] F08 An ACTIVE member's name or DOB change waits for two Operators; the old value stays live.
+- [ ] F08 An ACTIVE member's name or DOB change waits for two Operators; the old value stays live. An address change saves at once.
 
 ## P2 — Family and Karta
 - [ ] F09 Create a family (Mul Gaon picker; duplicate warning on the same surname + Mul Gaon + Gotra).

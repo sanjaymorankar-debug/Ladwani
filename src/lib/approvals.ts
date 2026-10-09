@@ -332,9 +332,12 @@ export type AddressChangeResult =
   | { status: 'already_pending' }
 
 /**
- * Saves a member's CURRENT or NATIVE address the way §28 requires: first-time
- * entry is direct; changing an address already on record is queued for
- * review unless staff make the change; a pending request blocks a second.
+ * Saves a member's CURRENT or NATIVE address. First-time entry is direct.
+ * Changing an address already on record is queued for review only while the
+ * approval rule 'member.address.change' requires it (§28); since the owner's
+ * F08 decision it is off, so changes save instantly. A pending request blocks
+ * a second; a direct save closes a request still waiting for the same
+ * address, so a reviewer can never apply an older address over a newer one.
  * Shared by the address editor and the Edit Profile form.
  */
 export async function submitAddressChange(
@@ -361,5 +364,9 @@ export async function submitAddressChange(
     return { status: 'pending' }
   }
 
+  await tx.approval.updateMany({
+    where: { actionCode: 'member.address.change', entityId: memberId, fieldName: payload.addressType, status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'ESCALATED'] } },
+    data: { status: 'REJECTED', reviewedBy: submittedBy, reviewedAt: new Date(), reviewNote: 'Superseded: the address was changed directly.' },
+  })
   return { status: 'applied', address: await applyAddressChange(tx, memberId, payload) }
 }
