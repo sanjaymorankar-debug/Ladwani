@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { calculateAge } from '@/lib/utils'
 import { areaChain, chainText } from '@/lib/locations'
 import { maskIdNumber } from '@/lib/secure-files'
-import { decideTask, CHECKLIST_ITEMS, UNDECIDED, mulGaonOf } from '@/lib/verification'
+import { decideTask, checklistFor, UNDECIDED, mulGaonOf } from '@/lib/verification'
 
 /**
  * F05 — one task, for the Operator it is assigned to and nobody else (an
@@ -46,12 +46,28 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const proofs = await prisma.idProof.findMany({ where: { id: { in: Array.from(proofIds) } } })
   const canOpenFiles = !task.supersededAt && UNDECIDED.includes(task.status)
 
+  // F26: an organisation registration — the subject above is the applicant.
+  let organisation = null
+  if (task.organisationId) {
+    const org = await prisma.organisation.findUniqueOrThrow({ where: { id: task.organisationId } })
+    const officers = await prisma.organisationMember.findMany({ where: { organisationId: org.id, designation: { in: ['PRESIDENT', 'SECRETARY', 'TREASURER'] }, status: { in: ['ACTIVE', 'INVITED'] } } })
+    const names = new Map((await prisma.member.findMany({ where: { id: { in: officers.map((o) => o.memberId) } }, select: { id: true, firstName: true, lastName: true, memberNumber: true } }))
+      .map((m) => [m.id, `${[m.firstName, m.lastName].filter(Boolean).join(' ')} (${m.memberNumber})`]))
+    organisation = {
+      id: org.id, name: org.name, registrationNumber: org.registrationNumber, addressLine: org.addressLine, purpose: org.purpose,
+      district: org.areaId ? chainText(await areaChain(org.areaId)) : null,
+      officers: officers.map((o) => ({ designation: o.designation, name: names.get(o.memberId) ?? '', accepted: o.status === 'ACTIVE' })),
+      certificate: canOpenFiles && org.certificateKey ? `/api/organisations/${org.id}/certificate` : null,
+    }
+  }
+
   return NextResponse.json({
     task: {
       id: task.id, kind: task.kind, status: task.status, round: task.round, dueAt: task.dueAt,
       checklist: task.checklist, remarks: task.remarks, decidedAt: task.decidedAt, superseded: !!task.supersededAt,
     },
-    checklistItems: CHECKLIST_ITEMS,
+    checklistItems: checklistFor(task.kind),
+    organisation,
     subject: {
       memberNumber: member.memberNumber,
       firstName: member.firstName, middleName: member.middleName, lastName: member.lastName,

@@ -24,9 +24,9 @@ export default function VerificationQueuePage() {
   const row = (t: any) => (
     <Link key={t.id} href={`/admin/verification/${t.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 text-sm">
       <span>
-        <span className="font-medium text-gray-900">{t.subjectName}</span>
+        <span className="font-medium text-gray-900">{t.organisationName ?? t.subjectName}</span>
         <span className="text-gray-400 ml-2">{t.memberNumber}</span>
-        <span className="ml-2 badge-gray">{t.kind === 'REGISTRATION' ? 'Registration' : 'Profile change'}</span>
+        <span className="ml-2 badge-gray">{t.kind === 'REGISTRATION' ? 'Registration' : t.kind === 'ORGANISATION' ? 'Organisation' : 'Profile change'}</span>
       </span>
       <span className="text-xs text-gray-500">
         {['OPEN', 'ESCALATED'].includes(t.status) ? `Due ${new Date(t.dueAt).toLocaleDateString()}` : `${t.status.replace('_', ' ').toLowerCase()} ${new Date(t.decidedAt).toLocaleDateString()}`}

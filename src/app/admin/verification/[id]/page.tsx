@@ -47,8 +47,30 @@ export default function VerificationTaskPage() {
     <div className="max-w-3xl mx-auto space-y-5">
       <div className="flex items-center gap-3">
         <Link href="/admin/verification" className="btn-ghost p-2"><ArrowLeft className="w-4 h-4" /></Link>
-        <h1 className="text-xl font-bold text-gray-900">{task.kind === 'REGISTRATION' ? 'Registration' : 'Profile change'} — {s.firstName} {s.lastName}</h1>
+        <h1 className="text-xl font-bold text-gray-900">
+          {task.kind === 'ORGANISATION' ? `Organisation — ${data.organisation?.name}` : `${task.kind === 'REGISTRATION' ? 'Registration' : 'Profile change'} — ${s.firstName} ${s.lastName}`}
+        </h1>
       </div>
+
+      {data.organisation && (
+        <div className="card grid sm:grid-cols-2 gap-2 text-sm">
+          {field('Organisation', data.organisation.name)}
+          {field('Registration no.', data.organisation.registrationNumber)}
+          {field('District', data.organisation.district ? [data.organisation.district.district, data.organisation.district.state].filter(Boolean).join(', ') : null)}
+          {field('Address', data.organisation.addressLine)}
+          <div className="sm:col-span-2">{field('Purpose', data.organisation.purpose)}</div>
+          <div className="sm:col-span-2">
+            <p className="text-gray-500">Office bearers</p>
+            {data.organisation.officers.map((o: any) => (
+              <p key={o.designation}>{o.designation.toLowerCase()}: <strong>{o.name}</strong> {o.accepted ? '' : <span className="text-amber-600">(not yet accepted)</span>}</p>
+            ))}
+          </div>
+          {data.organisation.certificate && (
+            <a href={data.organisation.certificate} target="_blank" rel="noreferrer" className="text-saffron-600">Open registration certificate</a>
+          )}
+          <p className="sm:col-span-2 text-xs text-gray-400">Applicant below.</p>
+        </div>
+      )}
 
       <div className="card grid sm:grid-cols-2 gap-2 text-sm">
         {field('Person ID', s.memberNumber)}
@@ -77,7 +99,7 @@ export default function VerificationTaskPage() {
         </div>
       )}
 
-      <div className="card text-sm space-y-2">
+      {!data.organisation && <div className="card text-sm space-y-2">
         <h2 className="font-semibold">ID proof</h2>
         {data.idProofs.map((p: any) => (
           <div key={p.id} className="flex items-center justify-between">
@@ -89,7 +111,7 @@ export default function VerificationTaskPage() {
           </div>
         ))}
         <p className="text-xs text-gray-400">Every time a proof is opened it is recorded in the audit log.</p>
-      </div>
+      </div>}
 
       <div className="card space-y-3">
         <h2 className="font-semibold">Verification checklist</h2>

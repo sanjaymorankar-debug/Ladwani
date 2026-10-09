@@ -115,14 +115,17 @@ model RolePermission {
 }
 
 model UserRole {
-  id        String    @id @default(cuid())
-  userId    String
-  roleId    String
-  familyId  String? // scoped Karta role
-  areaId    String? // scoped role: OPERATOR / DISTRICT_TEAM -> a DISTRICT area, STATE_TEAM -> a STATE area (src/lib/scope.ts)
-  grantedBy String?
-  grantedAt DateTime  @default(now())
-  expiresAt DateTime?
+  id         String    @id @default(cuid())
+  userId     String
+  roleId     String
+  familyId   String? // scoped Karta role
+  areaId     String? // scoped role: OPERATOR / DISTRICT_TEAM -> a DISTRICT area, STATE_TEAM -> a STATE area (src/lib/scope.ts)
+  grantedBy  String?
+  grantedAt  DateTime  @default(now())
+  expiresAt  DateTime?
+  /// F30 / F31: a data-view role that comes from a seat on a LadWani body;
+  /// removed automatically when the seat ends.
+  bodySeatId String?
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   role   Role    @relation(fields: [roleId], references: [id])
@@ -1426,10 +1429,12 @@ model IdProof {
 /// same slot; the latest row per slot is the live one.
 model ApprovalTask {
   id              String    @id @default(cuid())
-  kind            String // REGISTRATION, PROFILE_CHANGE
+  kind            String // REGISTRATION, PROFILE_CHANGE, ORGANISATION
   subjectUserId   String
   subjectMemberId String
   changeRequestId String?
+  /// F26: an organisation registration goes through the same two-operator round.
+  organisationId  String?
   round           Int       @default(1)
   slot            Int // 1 or 2
   operatorUserId  String? // null = no eligible operator; Admin must assign
@@ -1542,4 +1547,80 @@ model TreeLinkRequest {
   @@index([toFamilyId, status])
   @@index([fromFamilyId, status])
   @@map("tree_link_requests")
+}
+
+/// F26–F31 — a social organisation, or a LadWani body (District > State >
+/// National). Each has exactly one President, Secretary and Treasurer plus
+/// Members. A body is unique per area (bodyKey). Separate from the existing
+/// community groups (mandals), which are left as they are.
+model Organisation {
+  id                 String    @id @default(cuid())
+  kind               String    @default("LOCAL") // LOCAL, DISTRICT_BODY, STATE_BODY, NATIONAL_BODY
+  name               String
+  registrationNumber String?
+  addressLine        String?   @db.Text
+  areaId             String? // LOCAL / DISTRICT_BODY: a district; STATE_BODY: a state; NATIONAL_BODY: the country
+  purpose            String?   @db.Text
+  certificateKey     String? // encrypted file (secure-files)
+  certificateMime    String?
+  status             String    @default("PENDING_APPROVAL") // PENDING_APPROVAL, CORRECTION_REQUIRED, REJECTED, ACTIVE, INACTIVE
+  approvedAt         DateTime?
+  decisionNote       String?   @db.Text
+  applicantUserId    String?
+  bodyKey            String?   @unique // "<kind>:<areaId>" for LadWani bodies
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([kind, status])
+  @@index([areaId])
+  @@map("organisations")
+}
+
+/// Membership and designation. officeGuard is a STORED generated column (see
+/// the migration): the designation while ACTIVE and not MEMBER, so the unique
+/// index allows one President / Secretary / Treasurer per organisation.
+model OrganisationMember {
+  id                 String    @id @default(cuid())
+  organisationId     String
+  memberId           String
+  designation        String    @default("MEMBER") // PRESIDENT, SECRETARY, TREASURER, MEMBER
+  pendingDesignation String? // F27 handover awaiting the new holder's acceptance
+  status             String    @default("ACTIVE") // INVITED, REQUESTED, ACTIVE, DECLINED, ENDED
+  termStart          DateTime?
+  termEnd            DateTime?
+  seatId             String? // body membership that came from a nomination (F28–F30)
+  invitedBy          String?
+  joinedAt           DateTime?
+  endedAt            DateTime?
+  endReason          String?
+  officeGuard        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([organisationId, memberId])
+  @@unique([organisationId, officeGuard])
+  @@index([memberId, status])
+  @@map("organisation_members")
+}
+
+/// F28–F31 — a nomination from one unit to the next body up, and the seat it
+/// becomes. At most two open seats per nominating unit.
+model BodySeat {
+  id                 String    @id @default(cuid())
+  fromOrganisationId String
+  toOrganisationId   String
+  memberId           String
+  status             String    @default("NOMINATED") // NOMINATED, ACCEPTED, CONFIRMED, DECLINED, REJECTED, ENDED
+  nominatedBy        String
+  acceptedAt         DateTime?
+  confirmedBy        String?
+  confirmedAt        DateTime?
+  endedAt            DateTime?
+  endReason          String?
+  createdAt          DateTime  @default(now())
+
+  @@index([fromOrganisationId, status])
+  @@index([toOrganisationId, status])
+  @@index([memberId, status])
+  @@map("body_seats")
 }

@@ -16,7 +16,12 @@ const LEVELS = [
   { label: 'Village / City', types: ['VILLAGE', 'CITY'] },
 ]
 
-export default function AreaCascadePicker({ onChange, idPrefix = 'area' }: { onChange: (areaId: string) => void; idPrefix?: string }) {
+export default function AreaCascadePicker({ onChange, idPrefix = 'area', upTo }: {
+  onChange: (areaId: string) => void; idPrefix?: string
+  /** Stop at the district (F26 organisations): State › District only. */
+  upTo?: 'DISTRICT'
+}) {
+  const levels = upTo === 'DISTRICT' ? LEVELS.slice(0, 2).map((l, i) => (i === 1 ? { ...l, types: ['DISTRICT'] } : l)) : LEVELS
   const [options, setOptions] = useState<AreaOption[][]>([[], [], [], []])
   const [chosen, setChosen] = useState<string[]>(['', '', '', ''])
 
@@ -25,7 +30,7 @@ export default function AreaCascadePicker({ onChange, idPrefix = 'area' }: { onC
       .then((r) => r.json())
       .then((d) => setOptions((prev) => {
         const next = [...prev]
-        next[level] = (d.areas ?? []).filter((a: AreaOption) => LEVELS[level].types.includes(a.type))
+        next[level] = (d.areas ?? []).filter((a: AreaOption) => levels[level].types.includes(a.type))
         for (let i = level + 1; i < next.length; i++) next[i] = []
         return next
       }))
@@ -37,18 +42,18 @@ export default function AreaCascadePicker({ onChange, idPrefix = 'area' }: { onC
     setChosen(next)
     const picked = options[level].find((o) => o.id === id)
     // A city can stand in for the lower levels.
-    if (picked && (picked.type === 'VILLAGE' || picked.type === 'CITY')) {
+    if (picked && (picked.type === 'VILLAGE' || picked.type === 'CITY' || (upTo === 'DISTRICT' && picked.type === 'DISTRICT'))) {
       onChange(id)
       setOptions((prev) => prev.map((o, i) => (i > level ? [] : o)))
       return
     }
     onChange('')
-    if (id && level < LEVELS.length - 1) load(level + 1, id)
+    if (id && level < levels.length - 1) load(level + 1, id)
   }
 
   return (
     <div className="grid grid-cols-2 gap-3">
-      {LEVELS.map((lvl, i) => (
+      {levels.map((lvl, i) => (
         <div key={lvl.label}>
           <label htmlFor={`${idPrefix}-${i}`} className="form-label">{lvl.label}</label>
           <select id={`${idPrefix}-${i}`} className="form-input" value={chosen[i]} disabled={i > 0 && !options[i].length}

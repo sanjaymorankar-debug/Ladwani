@@ -6,7 +6,7 @@ import {
   Home, Users, Heart, Bell, Search,
   Settings, LogOut, ChevronLeft, ChevronRight,
   Building2, Newspaper, UserCircle, ShieldCheck, Receipt, UsersRound,
-  BadgeCheck, ClipboardCheck, Activity
+  BadgeCheck, ClipboardCheck, Activity, Landmark,
 } from 'lucide-react'
 import { signOut, useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
@@ -24,6 +24,7 @@ const nav = [
   { href: '/matrimony', icon: Heart, label: 'Matrimony' },
   { href: '/assets', icon: Building2, label: 'Assets & Booking' },
   { href: '/groups', icon: UsersRound, label: 'Community Groups' },
+  { href: '/organisations', icon: Landmark, label: 'Organisations' },
   { href: '/fees', icon: Receipt, label: 'Fees' },
   { href: '/community', icon: Newspaper, label: 'Community' },
   { href: '/search', icon: Search, label: 'Search' },

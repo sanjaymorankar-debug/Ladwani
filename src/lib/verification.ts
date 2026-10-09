@@ -21,7 +21,7 @@ import { districtOf, areaChain, chainText } from '@/lib/locations'
  *
  * A "live" row is one with supersededAt = null; there is exactly one per slot.
  */
-export const KIND = { REGISTRATION: 'REGISTRATION', PROFILE_CHANGE: 'PROFILE_CHANGE' } as const
+export const KIND = { REGISTRATION: 'REGISTRATION', PROFILE_CHANGE: 'PROFILE_CHANGE', ORGANISATION: 'ORGANISATION' } as const
 export type TaskKind = (typeof KIND)[keyof typeof KIND]
 export const DECISIONS = ['APPROVED', 'REJECTED', 'SENT_BACK'] as const
 export type Decision = (typeof DECISIONS)[number]
@@ -32,6 +32,16 @@ export const CHECKLIST_ITEMS = [
   { key: 'address', label: 'Address / Mul Gaon is plausible and matches' },
   { key: 'photo', label: 'Photo matches the person on the ID proof' },
 ] as const
+
+/** F26: what an Operator checks for an organisation. */
+export const ORG_CHECKLIST_ITEMS = [
+  { key: 'name', label: 'Name and registration number match the certificate' },
+  { key: 'certificate', label: 'Certificate looks genuine and current' },
+  { key: 'address', label: 'Address and district are plausible' },
+  { key: 'officers', label: 'Office bearers are genuine community members' },
+] as const
+
+export const checklistFor = (kind: string) => (kind === KIND.ORGANISATION ? ORG_CHECKLIST_ITEMS : CHECKLIST_ITEMS)
 
 /** F06: SLA in days — Setting `approval.sla_days`, default 7. */
 export async function slaDays(): Promise<number> {
@@ -45,6 +55,15 @@ const dueFrom = async (from = new Date()) => new Date(from.getTime() + (await sl
 export async function mulGaonOf(memberId: string) {
   const row = await prisma.memberArea.findFirst({ where: { memberId, isPrimary: true }, select: { areaId: true } })
   return row?.areaId ?? null
+}
+
+/** F26: everyone named in the organisation (office bearers and members) may not verify it. */
+async function organisationUserIds(organisationId: string) {
+  const rows = await prisma.organisationMember.findMany({
+    where: { organisationId }, select: { memberId: true },
+  })
+  const users = await prisma.member.findMany({ where: { id: { in: rows.map((r) => r.memberId) }, userId: { not: null } }, select: { userId: true } })
+  return users.map((u) => u.userId!)
 }
 
 /** F04: the subject and every account holder in any family the subject belongs to. */
@@ -106,7 +125,7 @@ async function districtTeamUserIds(districtId: string | null) {
   return Array.from(new Set(rows.map((r) => r.userId)))
 }
 
-const taskLabel = (kind: string) => (kind === KIND.REGISTRATION ? 'registration' : 'profile change')
+const taskLabel = (kind: string) => (kind === KIND.REGISTRATION ? 'registration' : kind === KIND.ORGANISATION ? 'organisation' : 'profile change')
 
 async function alertOperator(operatorUserId: string, taskId: string, kind: string) {
   // The alert names the task only — never the other operator (F05).
@@ -123,13 +142,17 @@ interface RoundKey {
   subjectUserId: string
   subjectMemberId: string
   changeRequestId?: string | null
+  organisationId?: string | null
   round: number
 }
 
 /** F04: open both slots of a round. `preferred` carries the previous round's operators (F06 "both tasks reopen"). */
 export async function createRound(key: RoundKey, preferred: (string | null)[] = []) {
-  const districtId = await districtOf(await mulGaonOf(key.subjectMemberId))
+  // An organisation is verified in its own district; a person in their Mul Gaon's.
+  const org = key.organisationId ? await prisma.organisation.findUnique({ where: { id: key.organisationId }, select: { areaId: true } }) : null
+  const districtId = await districtOf(org ? org.areaId : await mulGaonOf(key.subjectMemberId))
   const exclude = await conflictedUserIds(key.subjectUserId, key.subjectMemberId)
+  if (key.organisationId) for (const id of await organisationUserIds(key.organisationId)) exclude.add(id)
   const candidates = await eligibleOperators(districtId, exclude)
   const chosen: (string | null)[] = []
   for (const p of preferred) if (p && candidates.includes(p) && !chosen.includes(p) && chosen.length < 2) chosen.push(p)
@@ -141,7 +164,7 @@ export async function createRound(key: RoundKey, preferred: (string | null)[] = 
     prisma.approvalTask.create({
       data: {
         kind: key.kind, subjectUserId: key.subjectUserId, subjectMemberId: key.subjectMemberId,
-        changeRequestId: key.changeRequestId ?? null, round: key.round, slot: i + 1,
+        changeRequestId: key.changeRequestId ?? null, organisationId: key.organisationId ?? null, round: key.round, slot: i + 1,
         operatorUserId, districtAreaId: districtId, dueAt,
       },
     })))
@@ -164,15 +187,15 @@ export async function liveTasks(key: Omit<RoundKey, 'subjectMemberId'>) {
   return prisma.approvalTask.findMany({
     where: {
       kind: key.kind, subjectUserId: key.subjectUserId, round: key.round,
-      changeRequestId: key.changeRequestId ?? null, supersededAt: null,
+      changeRequestId: key.changeRequestId ?? null, organisationId: key.organisationId ?? null, supersededAt: null,
     },
     orderBy: { slot: 'asc' },
   })
 }
 
-export async function currentRound(kind: TaskKind, subjectUserId: string, changeRequestId: string | null = null) {
+export async function currentRound(kind: TaskKind, subjectUserId: string, changeRequestId: string | null = null, organisationId: string | null = null) {
   const agg = await prisma.approvalTask.aggregate({
-    where: { kind, subjectUserId, changeRequestId }, _max: { round: true },
+    where: { kind, subjectUserId, changeRequestId, organisationId }, _max: { round: true },
   })
   return agg._max.round ?? 0
 }
@@ -201,7 +224,7 @@ export async function decideTask(
 
   const decision = String(input.decision ?? '') as Decision
   if (!DECISIONS.includes(decision)) return { ok: false, status: 400, message: 'Choose Approve, Reject or Send back' }
-  const checklist = Object.fromEntries(CHECKLIST_ITEMS.map((c) => [c.key, !!(input.checklist as any)?.[c.key]]))
+  const checklist = Object.fromEntries(checklistFor(task.kind).map((c) => [c.key, !!(input.checklist as any)?.[c.key]]))
   const remarks = typeof input.remarks === 'string' ? input.remarks.trim() : ''
   if (decision === 'APPROVED' && !Object.values(checklist).every(Boolean)) {
     return { ok: false, status: 400, message: 'Tick every checklist item before approving' }
@@ -230,15 +253,21 @@ export async function decideTask(
 // ── F06: final outcome ───────────────────────────────────────────
 
 export async function evaluateOutcome(task: {
-  kind: string; subjectUserId: string; round: number; changeRequestId: string | null
+  kind: string; subjectUserId: string; round: number; changeRequestId: string | null; organisationId?: string | null
 }): Promise<string> {
-  const live = await liveTasks({ kind: task.kind as TaskKind, subjectUserId: task.subjectUserId, round: task.round, changeRequestId: task.changeRequestId })
+  const live = await liveTasks({ kind: task.kind as TaskKind, subjectUserId: task.subjectUserId, round: task.round, changeRequestId: task.changeRequestId, organisationId: task.organisationId })
   if (live.length < 2 || live.some((t) => !DECISIONS.includes(t.status as Decision))) return 'PENDING'
 
   const outcome: Decision = live.some((t) => t.status === 'REJECTED') ? 'REJECTED'
     : live.some((t) => t.status === 'SENT_BACK') ? 'SENT_BACK' : 'APPROVED'
   // Combined reason, operator names withheld.
   const note = live.filter((t) => t.status !== 'APPROVED' && t.remarks).map((t) => `• ${t.remarks}`).join('\n') || null
+
+  if (task.kind === KIND.ORGANISATION && task.organisationId) {
+    const { organisationOutcome } = await import('@/lib/organisations')
+    await organisationOutcome(task.organisationId, outcome, note, task.round)
+    return outcome
+  }
 
   if (task.kind === KIND.REGISTRATION) {
     const status = outcome === 'APPROVED' ? 'ACTIVE' : outcome === 'REJECTED' ? 'REJECTED' : 'CORRECTION_REQUIRED'
@@ -299,7 +328,7 @@ export async function escalateOverdueTasks(now = new Date()) {
     const marked = await prisma.approvalTask.updateMany({ where: { id: task.id, status: 'OPEN' }, data: { status: 'ESCALATED' } })
     if (marked.count !== 1) continue
 
-    const others = await liveTasks({ kind: task.kind as TaskKind, subjectUserId: task.subjectUserId, round: task.round, changeRequestId: task.changeRequestId })
+    const others = await liveTasks({ kind: task.kind as TaskKind, subjectUserId: task.subjectUserId, round: task.round, changeRequestId: task.changeRequestId, organisationId: task.organisationId })
     const exclude = await conflictedUserIds(task.subjectUserId, task.subjectMemberId)
     for (const t of others) if (t.operatorUserId) exclude.add(t.operatorUserId)
     const [replacement] = await eligibleOperators(task.districtAreaId, exclude)
@@ -310,7 +339,7 @@ export async function escalateOverdueTasks(now = new Date()) {
         return tx.approvalTask.create({
           data: {
             kind: task.kind, subjectUserId: task.subjectUserId, subjectMemberId: task.subjectMemberId,
-            changeRequestId: task.changeRequestId, round: task.round, slot: task.slot,
+            changeRequestId: task.changeRequestId, organisationId: task.organisationId, round: task.round, slot: task.slot,
             operatorUserId: replacement, districtAreaId: task.districtAreaId, dueAt: await dueFrom(now),
           },
         })
@@ -348,7 +377,7 @@ export async function reassignTask(taskId: string, newOperatorId: string, actorI
     where: { id: newOperatorId, status: 'ACTIVE', deletedAt: null, userRoles: { some: { role: { code: 'OPERATOR' } } } },
   })
   if (!operator) return { ok: false, status: 400, message: 'Choose an active Operator' }
-  const others = await liveTasks({ kind: task.kind as TaskKind, subjectUserId: task.subjectUserId, round: task.round, changeRequestId: task.changeRequestId })
+  const others = await liveTasks({ kind: task.kind as TaskKind, subjectUserId: task.subjectUserId, round: task.round, changeRequestId: task.changeRequestId, organisationId: task.organisationId })
   if (others.some((t) => t.id !== task.id && t.operatorUserId === newOperatorId)) {
     return { ok: false, status: 400, message: 'The two tasks must go to two different Operators' }
   }
@@ -361,7 +390,7 @@ export async function reassignTask(taskId: string, newOperatorId: string, actorI
     return tx.approvalTask.create({
       data: {
         kind: task.kind, subjectUserId: task.subjectUserId, subjectMemberId: task.subjectMemberId,
-        changeRequestId: task.changeRequestId, round: task.round, slot: task.slot,
+        changeRequestId: task.changeRequestId, organisationId: task.organisationId, round: task.round, slot: task.slot,
         operatorUserId: newOperatorId, districtAreaId: task.districtAreaId, dueAt: await dueFrom(),
       },
     })
@@ -390,6 +419,12 @@ export async function reopenTask(taskId: string, actorId: string, req?: Request)
 
   const fresh = await prisma.$transaction(async (tx) => {
     await tx.approvalTask.update({ where: { id: task.id }, data: { supersededAt: new Date() } })
+    if (task.kind === KIND.ORGANISATION && task.organisationId) {
+      await tx.organisation.updateMany({
+        where: { id: task.organisationId, status: { in: ['ACTIVE', 'REJECTED', 'CORRECTION_REQUIRED', 'PENDING_APPROVAL'] } },
+        data: { status: 'PENDING_APPROVAL', approvedAt: null, decisionNote: null },
+      })
+    }
     if (task.kind === KIND.REGISTRATION) {
       await tx.user.updateMany({
         where: { id: task.subjectUserId, status: { in: ['ACTIVE', 'REJECTED', 'CORRECTION_REQUIRED'] } },
@@ -399,7 +434,7 @@ export async function reopenTask(taskId: string, actorId: string, req?: Request)
     return tx.approvalTask.create({
       data: {
         kind: task.kind, subjectUserId: task.subjectUserId, subjectMemberId: task.subjectMemberId,
-        changeRequestId: task.changeRequestId, round: task.round, slot: task.slot,
+        changeRequestId: task.changeRequestId, organisationId: task.organisationId, round: task.round, slot: task.slot,
         operatorUserId: task.operatorUserId, districtAreaId: task.districtAreaId, dueAt: await dueFrom(),
       },
     })
