@@ -12,7 +12,8 @@ export default async function CommunityFeedPage() {
 
   const [posts, postTypes] = await Promise.all([
     prisma.post.findMany({
-      where: { status: 'PUBLISHED', deletedAt: null },
+      // Interest-group posts stay inside their group.
+      where: { status: 'PUBLISHED', deletedAt: null, groupId: null },
       include: {
         author: { include: { member: { select: { firstName: true, lastName: true } } } },
         postType: { select: { label: true, icon: true, code: true } },
@@ -21,7 +22,7 @@ export default async function CommunityFeedPage() {
       orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
       take: 30,
     }),
-    prisma.postType.findMany({ where: { isActive: true }, orderBy: { code: 'asc' } }),
+    prisma.postType.findMany({ where: { isActive: true, NOT: { code: { startsWith: 'GROUP_' } } }, orderBy: { code: 'asc' } }),
   ])
 
   return (

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
     prisma.member.findMany({
       where,
       include: {
-        education: { where: { isHighest: true }, take: 1 },
+        education: { where: { isHighest: true }, take: 1, select: EDUCATION_CORE_SELECT },
         families: { include: { family: { select: { name: true } } }, take: 1 },
       },
       take: 30,

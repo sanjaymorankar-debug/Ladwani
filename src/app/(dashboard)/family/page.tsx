@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Users, TreePine, MapPin, Plus, Edit, ChevronRight, CheckCircle2 } from 'lucide-react'
 import { calculateAge, genderLabel, maritalLabel, MARITAL_STATUS_LABELS, GENDER_LABELS } from '@/lib/utils'
 import PendingFamilyInvitations from '@/components/family/PendingFamilyInvitations'
+import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 export default async function FamilyPage() {
   const session = await getServerSession(authOptions)
@@ -22,7 +23,7 @@ export default async function FamilyPage() {
                   members: {
                     where: { leftAt: null },
                     include: {
-                      member: { include: { education: { where: { isHighest: true }, take: 1 } } },
+                      member: { include: { education: { where: { isHighest: true }, take: 1, select: EDUCATION_CORE_SELECT } } },
                     },
                     orderBy: { joinedAt: 'asc' },
                   },

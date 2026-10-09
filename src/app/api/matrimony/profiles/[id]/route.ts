@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { isEligibleForMatrimony, matrimonyIneligibleReason } from '@/lib/matrimony'
+import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -13,7 +14,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     include: {
       member: {
         include: {
-          education: { where: { isHighest: true }, take: 1 },
+          education: { where: { isHighest: true }, take: 1, select: EDUCATION_CORE_SELECT },
           employment: { where: { isCurrent: true }, take: 1, include: { incomeRange: { select: { label: true } } } },
           families: { include: { family: { select: { name: true, nativeVillage: true } } }, take: 1 },
         },

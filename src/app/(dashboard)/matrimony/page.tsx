@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Heart, Search, Filter, MapPin, GraduationCap, Briefcase } from 'lucide-react'
 import { calculateAge, genderLabel, maritalLabel, GENDER_LABELS } from '@/lib/utils'
 import SendInterestButton from '@/components/matrimony/SendInterestButton'
+import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 export default async function MatrimonyPage() {
   const session = await getServerSession(authOptions)
@@ -16,7 +17,7 @@ export default async function MatrimonyPage() {
       include: {
         member: {
           include: {
-            education: { where: { isHighest: true }, take: 1 },
+            education: { where: { isHighest: true }, take: 1, select: EDUCATION_CORE_SELECT },
             employment: { where: { isCurrent: true }, take: 1 },
           },
         },

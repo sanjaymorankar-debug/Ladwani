@@ -11,7 +11,8 @@ export default async function ModerationPage() {
   if (!roles.includes('ADMIN') && !roles.includes('OPERATOR')) redirect('/dashboard')
 
   const posts = await prisma.post.findMany({
-    where: { status: 'PENDING_APPROVAL', deletedAt: null },
+    // FLAGGED = reported by members (interest-group posts); same approve/hide flow.
+    where: { status: { in: ['PENDING_APPROVAL', 'FLAGGED'] }, deletedAt: null },
     include: {
       postType: { select: { label: true, icon: true } },
       author: { select: { member: { select: { firstName: true, lastName: true } } } },

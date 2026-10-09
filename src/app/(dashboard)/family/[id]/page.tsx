@@ -9,6 +9,7 @@ import { formatDate, calculateAge, GENDER_LABELS, MARITAL_STATUS_LABELS } from '
 import JoinRequestsInbox from '@/components/family/JoinRequestsInbox'
 import ChangeKartaPanel from '@/components/family/ChangeKartaPanel'
 import FamilyPhoto from '@/components/family/FamilyPhoto'
+import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 export default async function FamilyDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -24,7 +25,7 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
         include: {
           member: {
             include: {
-              education: { where: { isHighest: true }, take: 1 },
+              education: { where: { isHighest: true }, take: 1, select: EDUCATION_CORE_SELECT },
             },
           },
         },

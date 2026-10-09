@@ -300,3 +300,12 @@ will be as soon as real families start registering.
 | `main` | `devmiladwani.agtci.com` (current live site) |
 
 Work happens on feature branches. Open a PR into `staging`; CI (`.github/workflows/ci.yml`) must pass before merging. Test on staging, then promote with a PR from `staging` into `main`. Don't commit directly to `staging` or `main`.
+
+---
+
+## Update 9 Oct 2026 — Additional Details and interest groups
+
+Two additive migrations (`20261009100000_member_additional_details`, then
+`20261009110000_interest_groups`), new reference data in `npm run db:seed`, a
+new `CRON_SECRET` env var and a daily cron call for the group digest. Full
+steps, rollback and assumptions: **`docs/ADDITIONAL-DETAILS.md` §5**.

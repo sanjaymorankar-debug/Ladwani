@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Loader2, Shield, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDate } from '@/lib/utils'
+import TeamRolesPanel from '@/components/admin/TeamRolesPanel'
 
 const ROLES = ['MEMBER', 'KARTA', 'OPERATOR', 'ADMIN']
 const STATUSES = ['ACTIVE', 'PENDING', 'SUSPENDED', 'BLOCKED']
@@ -134,6 +135,8 @@ export default function UserDetailPage() {
           })}
         </div>
       </div>
+
+      <TeamRolesPanel userId={String(params.id)} user={user} onChange={setUser} />
 
       <div className="card space-y-3">
         <h3 className="font-semibold text-gray-900 flex items-center gap-2">
