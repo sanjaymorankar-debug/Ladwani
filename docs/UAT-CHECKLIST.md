@@ -50,7 +50,7 @@ Tick each line and note anything unexpected. The automated test for each flow is
 ## P5 — Social and bureau
 - [ ] F34 Family album photo with "Family" visibility; an outsider cannot open it; three reports hide it.
 - [ ] F35 Find a friend by Gotra; request / accept; make a list; removing the friend removes them from the list.
-- [ ] F36 Post to your family (instant) and to your district (waits for the District body President).
+- [ ] F36 Post to your family (instant), to your district (waits for the District body President) and to the whole community (waits for an Operator or Admin).
 - [ ] F37 Bureau: a 20-year-old man cannot list; a member who is not earning cannot list; a Divorced or Widowed earning member can (OP-08), a Separated one cannot; turning the listing on tells the Karta.
 - [ ] F38 Search by district / Gotra (same-Gotra flagged); interest → accept (also by the Karta) → contact shown.
 

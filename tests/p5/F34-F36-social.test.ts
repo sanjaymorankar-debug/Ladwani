@@ -220,6 +220,18 @@ describe('F36 Posts to groups', () => {
     await prisma.organisation.delete({ where: { id: body.id } })
   })
 
+  it('F36 community-wide posts keep Operator moderation (owner\'s decision): pending until an Operator or Admin approves', async () => {
+    const { postId } = await (await post(a, { audienceType: 'COMMUNITY' })).json()
+    expect((await prisma.post.findUniqueOrThrow({ where: { id: postId } })).status).toBe('PENDING_APPROVAL')
+    expect(await sees(b, postId)).toBe(false)
+    actAs(b)
+    expect((await moderate(json('http://x', 'PATCH', { action: 'approve' }), { params: { id: postId } })).status).toBe(403)
+    actAs(op)
+    expect((await moderate(json('http://x', 'PATCH', { action: 'approve' }), { params: { id: postId } })).status).toBe(200)
+    expect(await sees(b, postId)).toBe(true)
+    await prisma.post.update({ where: { id: postId }, data: { deletedAt: new Date() } })
+  })
+
   it('F36 the author edits and deletes their own post; editing a moderated post sends it back for approval', async () => {
     const { postId } = await (await post(a, { audienceType: 'COMMUNITY' })).json()
     actAs(admin)

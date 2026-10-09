@@ -40,7 +40,7 @@ Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as P0�
 - **Other:** an index on `reports`, and two settings.
 
 ### c) Role differences
-- Community-wide posts stay with Operators and Admins (as before); the workbook does not name a moderator for them.
+- Community-wide posts stay with Operators and Admins (as before); the workbook does not name a moderator for them. **Confirmed by your decision (§11).**
 - Reported items are reviewed by Operators and Admins. Body officers can also review reported posts addressed to their body.
 
 ### d) Open points
@@ -114,7 +114,9 @@ Settings to review:
 
 ## 8. Decisions needed
 1. ~~**OP-08**~~ — decided: Widowed and Divorced members may list (§10).
-2. **Community-wide posts:** keep Operator moderation for every member post to the whole community, or publish them at once (the workbook only requires moderation for District / State / National posts)?
+2. ~~**Community-wide posts**~~ — decided: keep Operator moderation (§11).
+
+No P5 decisions remain open.
 
 ## 9. Follow-up: workbook bureau rules switched on (your decision)
 - **Migration** `20261009200000_bureau_workbook_rules_on` (phpMyAdmin: `set_bureau_workbook_rules_on.sql`) sets `bureau.workbook_rules` = true. The code also treats a missing setting as on. Rollback: `down.sql` sets it back to false.
@@ -135,3 +137,8 @@ Settings to review:
 - **Code:** `src/lib/bureau.ts` `bureauEligibility` now uses the same eligible-status list as the search filter (`MATRIMONY_ELIGIBLE_STATUSES`) in both modes. The reason shown for Married / Separated is the existing one from `src/lib/matrimony.ts`.
 - **No migration, no data change.** Divorced or Widowed members who had already switched their listing on (and are earning) reappear in search.
 - **Tests:** my own P5 test that encoded the old assumption ("Divorced is refused") was replaced with a test named for F37 / OP-08. It checks that Divorced and Widowed members are refused until earning, then list and appear in search, and that Married and Separated members are refused with a reason. No existing UAT test depended on the old rule. **407 passed**, twice in a row on a fresh database; typecheck clean.
+
+## 11. Follow-up: community-wide posts keep Operator moderation (your decision)
+- **Rule:** a member's post to the whole community waits as "Pending approval" until an Operator or Admin approves it, as it did before this PR. District / State / National posts go to the body's President as in F36. Family, friend-list and organisation posts publish at once.
+- **No code, migration or data change.** This was already the behaviour.
+- **Test added** to lock the decision in: `F36 community-wide posts keep Operator moderation` in `tests/p5/F34-F36-social.test.ts`. A member's community post is pending and hidden from others; another member cannot approve it (403); an Operator approves it and it appears. **408 passed**, twice in a row on a fresh database.
