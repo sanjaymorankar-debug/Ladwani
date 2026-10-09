@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { genderedCode } from '@/lib/relations'
 import { generateMemberNumber } from '@/lib/utils'
 import { canManageFamily, canViewFamily } from '@/lib/family-auth'
 import { requireActiveAccount } from '@/lib/account-state'
@@ -148,7 +149,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         })
         // Inverse relationship
         if (relType.inverseCode) {
-          const inverseType = await tx.relationshipType.findUnique({ where: { code: relType.inverseCode } })
+          // The inverse describes the relative, so it takes the relative's gender (a daughter's "mother" link is not "son").
+          const relativeGender = (await tx.member.findUnique({ where: { id: body.relatedToMemberId }, select: { gender: true } }))?.gender
+          const inverseType = await tx.relationshipType.findUnique({ where: { code: genderedCode(relType.inverseCode, relativeGender) } })
           if (inverseType) {
             await tx.memberRelationship.create({
               data: {

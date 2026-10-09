@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { genderedCode } from '@/lib/relations'
 import { canManageFamily } from '@/lib/family-auth'
 import { roleGenderError, joinRequestExpired } from '@/lib/family-rules'
 import { recordAudit } from '@/lib/audit'
@@ -102,7 +103,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string; re
               },
             })
             if (relType.inverseCode) {
-              const inverseType = await tx.relationshipType.findUnique({ where: { code: relType.inverseCode } })
+              const relativeGender = (await tx.member.findUnique({ where: { id: relativeTo }, select: { gender: true } }))?.gender
+              const inverseType = await tx.relationshipType.findUnique({ where: { code: genderedCode(relType.inverseCode, relativeGender) } })
               if (inverseType) {
                 await tx.memberRelationship.upsert({
                   where: { fromMemberId_toMemberId_relationshipTypeId: { fromMemberId: relativeTo, toMemberId: joinRequest.memberId, relationshipTypeId: inverseType.id } },

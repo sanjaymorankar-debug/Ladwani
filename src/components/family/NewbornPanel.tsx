@@ -10,7 +10,8 @@ export default function NewbornPanel({ familyId, fathers, mothers }: {
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ fatherId: fathers[0]?.id ?? '', motherId: mothers[0]?.id ?? '', firstName: '', gender: 'MALE', dateOfBirth: '' })
+  // No preselected parents: the first man and woman listed are often not a couple.
+  const [form, setForm] = useState({ fatherId: '', motherId: '', firstName: '', gender: 'MALE', dateOfBirth: '' })
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }))
 
   const save = async () => {
@@ -30,11 +31,13 @@ export default function NewbornPanel({ familyId, fathers, mothers }: {
         <div className="grid sm:grid-cols-2 gap-2 mt-3 text-sm">
           <label className="form-label">Father
             <select className="form-input" value={form.fatherId} onChange={(e) => set('fatherId', e.target.value)}>
+              <option value="">Choose…</option>
               {fathers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </label>
           <label className="form-label">Mother
             <select className="form-input" value={form.motherId} onChange={(e) => set('motherId', e.target.value)}>
+              <option value="">Choose…</option>
               {mothers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </label>
@@ -51,7 +54,7 @@ export default function NewbornPanel({ familyId, fathers, mothers }: {
           </label>
           <div className="sm:col-span-2 flex items-center justify-between">
             <p className="text-xs text-gray-500">Recorded with your consent as parent / Karta. No login or ID proof for a child.</p>
-            <button type="button" className="btn-primary text-sm" disabled={!form.dateOfBirth} onClick={save}>Add</button>
+            <button type="button" className="btn-primary text-sm" disabled={!form.dateOfBirth || !form.fatherId || !form.motherId} onClick={save}>Add</button>
           </div>
         </div>
       )}

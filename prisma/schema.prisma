@@ -252,6 +252,8 @@ model FamilyJoinRequest {
   ///                    their family; that person decides (§11, §49). A Karta
   ///                    can never add an existing account-holder unilaterally.
   direction            String    @default("MEMBER_REQUEST")
+  /// MEMBER (a person asked) or MARRIAGE (F23: created when a spouse is linked).
+  origin               String    @default("MEMBER")
   requestedBy          String
   status               String    @default("PENDING") // PENDING, APPROVED, REJECTED
   respondedBy          String?
@@ -298,26 +300,26 @@ model MemberInvitation {
 }
 
 model FamilyMember {
-  id         String    @id @default(cuid())
-  familyId   String
-  memberId   String
-  isKarta    Boolean   @default(false)
-  joinedAt   DateTime  @default(now())
-  joinedBy   String?
-  leftAt     DateTime?
-  leftReason String? // MARRIED_OUT, DECEASED, SEPARATED, ERROR, MERGED; F11: WRONGLY_ADDED, MOVED_OUT, DUPLICATE
+  id                 String    @id @default(cuid())
+  familyId           String
+  memberId           String
+  isKarta            Boolean   @default(false)
+  joinedAt           DateTime  @default(now())
+  joinedBy           String?
+  leftAt             DateTime?
+  leftReason         String? // MARRIED_OUT, DECEASED, SEPARATED, ERROR, MERGED; F11: WRONGLY_ADDED, MOVED_OUT, DUPLICATE
   // Rule 1 / F24: the membership record carries the relationship role
   // (relationship_types.code, or 'karta'), who it is relative to, and a status:
   // ACTIVE, REMOVED (F11), ENDED (divorce, death...). INVITED / REQUESTED live in
   // family_join_requests until accepted.
   relationshipRole   String?
   relativeToMemberId String?
-  status             String  @default("ACTIVE")
+  status             String    @default("ACTIVE")
   // Rule 2, enforced by the database: a generated column (migration
   // 20261009150000_p2_family_karta) that is 1 only on the active Karta row,
   // under unique(familyId, kartaGuard) — at most one active Karta per family.
   // Never written by the application.
-  kartaGuard Int?
+  kartaGuard         Int?
 
   family Family @relation(fields: [familyId], references: [id])
   member Member @relation(fields: [memberId], references: [id])
@@ -1512,4 +1514,32 @@ model ProfileClaim {
   @@index([targetMemberId, status])
   @@index([userId, status])
   @@map("profile_claims")
+}
+
+/// F22 — link a person in one family's tree to the same person in another
+/// family. On acceptance the two records merge into one person shown in both
+/// trees. PLACEHOLDER is a sibling marked "has own family on site" (F21)
+/// before the matching person is chosen. Conflicting fields are listed side
+/// by side; when the two Kartas disagree it goes to an Operator.
+model TreeLinkRequest {
+  id                 String    @id @default(cuid())
+  fromFamilyId       String
+  fromMemberId       String
+  toFamilyId         String
+  toMemberId         String?
+  status             String    @default("PENDING") // PLACEHOLDER, PENDING, OPERATOR_REVIEW, ACCEPTED, REJECTED, CANCELLED
+  conflicts          Json?
+  proposedResolution Json?
+  resolution         Json?
+  note               String?   @db.Text
+  reason             String?   @db.Text
+  requestedBy        String
+  decidedBy          String?
+  decidedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([toFamilyId, status])
+  @@index([fromFamilyId, status])
+  @@map("tree_link_requests")
 }

@@ -8,6 +8,7 @@ import { generateMemberNumber } from '@/lib/utils'
 import { recordAudit, requestIp } from '@/lib/audit'
 import { notifyUser } from '@/lib/notify'
 import { familyUserIds } from '@/lib/family-rules'
+import { bloodRelated } from '@/lib/relations'
 
 /**
  * F13 — the Karta adds a new-born. Both parents must be active members of the
@@ -40,6 +41,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const mother = parents.find((p) => p.memberId === body.motherId)?.member
   if (!father || !mother) return NextResponse.json({ message: 'Choose the father and the mother from this family' }, { status: 400 })
   if (father.gender !== 'MALE' || mother.gender !== 'FEMALE') return NextResponse.json({ message: 'Check the parents: father must be male, mother female' }, { status: 400 })
+  if (await bloodRelated(father.id, mother.id)) {
+    return NextResponse.json({ message: 'These two are recorded as blood relatives. Check the father and mother.' }, { status: 400 })
+  }
   for (const p of [father, mother]) {
     if (p.dateOfBirth && born <= p.dateOfBirth) return NextResponse.json({ message: 'Birth date must be after the parents\' dates of birth' }, { status: 400 })
   }

@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { withdrawMatrimonyOnMarriage } from '@/lib/matrimony'
 import { UNMARRIED_FLOW_RESET } from '@/lib/profile-details'
+import { generateMemberNumber } from '@/lib/utils'
 
 /**
  * Whether an action needs Operator/Admin review before it takes effect.
@@ -19,6 +20,10 @@ export async function requiresApproval(actionCode: string): Promise<boolean> {
 export interface SpouseLinkPayload {
   spouseMemberId?: string | null
   externalSpouseName?: string | null
+  /** F23: date of the marriage (ISO). */
+  marriageDate?: string | null
+  /** F23: spouse not yet on the site, recorded as a person (so their side of the tree can be built). */
+  newSpouse?: { firstName: string; lastName?: string | null; gender: 'MALE' | 'FEMALE'; dateOfBirth?: string | null } | null
 }
 
 /**
@@ -37,11 +42,24 @@ export async function applySpouseLink(
   const member = await tx.member.findUnique({ where: { id: memberId } })
   if (!member) throw new Error('Member not found')
 
+  // F23: a new spouse becomes a (non-login) person record when applied.
+  if (!payload.spouseMemberId && payload.newSpouse) {
+    const ns = payload.newSpouse
+    const created = await tx.member.create({
+      data: {
+        memberNumber: generateMemberNumber(), firstName: ns.firstName, lastName: ns.lastName ?? null, gender: ns.gender,
+        dateOfBirth: ns.dateOfBirth ? new Date(ns.dateOfBirth) : null, maritalStatus: 'UNMARRIED', status: 'ACTIVE', createdBy: actorId,
+      },
+    })
+    payload = { ...payload, spouseMemberId: created.id }
+  }
+
   await tx.marriageRecord.create({
     data: {
       memberId1: memberId,
       memberId2: payload.spouseMemberId ?? null,
       externalSpouseName: payload.spouseMemberId ? null : payload.externalSpouseName ?? null,
+      marriageDate: payload.marriageDate ? new Date(payload.marriageDate) : null,
       status: 'MARRIED',
       createdBy: actorId,
     },
@@ -113,6 +131,7 @@ export async function applySpouseLink(
     where: { memberId: { in: [memberId, payload.spouseMemberId ?? ''] } },
     data: UNMARRIED_FLOW_RESET,
   })
+  return { spouseMemberId: payload.spouseMemberId ?? null }
 }
 
 export async function createApprovalRecord(

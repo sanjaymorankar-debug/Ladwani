@@ -59,7 +59,7 @@ describe('F14 Request to join / F15 Karta accepts or rejects', () => {
     expect(res.status).toBe(200)
     expect(await prisma.familyMember.findFirst({ where: { familyId: famId, memberId: asker.memberId } })).toMatchObject({ relationshipRole: 'son', relativeToMemberId: wife.memberId, status: 'ACTIVE' })
     const back = await prisma.memberRelationship.findFirst({ where: { fromMemberId: wife.memberId, toMemberId: asker.memberId }, include: { relationshipType: true } })
-    expect(back?.relationshipType.code).toBe('father') // inverse of 'son' per the seeded master
+    expect(back?.relationshipType.code).toBe('mother') // inverse of 'son', fitted to her gender (P3)
     expect(await prisma.notification.count({ where: { recipientId: asker.userId, title: { contains: 'accepted' } } })).toBe(1)
   })
 

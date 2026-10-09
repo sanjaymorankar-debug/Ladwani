@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ClipboardCheck, Loader2 } from 'lucide-react'
 import VacancyConfirmList from '@/components/family/VacancyConfirmList'
+import TreeLinksInbox from '@/components/family/TreeLinksInbox'
 
 /** F05 — the signed-in Operator's own verification queue (nobody else's tasks appear here). */
 export default function VerificationQueuePage() {
@@ -37,6 +38,7 @@ export default function VerificationQueuePage() {
     <div className="max-w-4xl mx-auto space-y-5">
       <h1 className="text-xl font-bold text-gray-900 font-display flex items-center gap-2"><ClipboardCheck className="w-5 h-5" /> My verification tasks</h1>
       <VacancyConfirmList />
+      <TreeLinksInbox />
       <p className="text-sm text-gray-500">Each task is yours alone. Another operator checks the same person independently; you never see their task or decision.</p>
       <div className="card p-0 divide-y divide-gray-100">
         <h2 className="px-4 py-2 text-sm font-semibold text-gray-700">Open ({open.length})</h2>

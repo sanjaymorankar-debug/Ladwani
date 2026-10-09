@@ -7,6 +7,7 @@ import RelationshipSelect from './RelationshipSelect'
 interface JoinRequest {
   id: string
   relationshipTypeCode: string | null
+  origin?: string
   relatedToMemberId: string | null
   member: {
     id: string
@@ -47,13 +48,16 @@ export default function JoinRequestsInbox({ familyId }: { familyId: string }) {
   }, [familyId])
 
   const respond = async (r: JoinRequest, decision: 'APPROVE' | 'REJECT') => {
+    // F15: a rejection carries a reason for the requester.
+    const note = decision === 'REJECT' ? window.prompt('Reason for rejecting (shown to the requester)')?.trim() : undefined
+    if (decision === 'REJECT' && !note) return
     setBusyId(r.id)
     try {
       const corrected = roles[r.id] && roles[r.id] !== r.relationshipTypeCode
       const res = await fetch(`/api/families/${familyId}/join-requests/${r.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, ...(decision === 'APPROVE' && corrected ? { relationshipTypeCode: roles[r.id] } : {}) }),
+        body: JSON.stringify({ decision, note, ...(decision === 'APPROVE' && corrected ? { relationshipTypeCode: roles[r.id] } : {}) }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message ?? 'Failed')
@@ -89,7 +93,10 @@ export default function JoinRequestsInbox({ familyId }: { familyId: string }) {
             {requests.map((r) => (
               <div key={r.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border border-gray-100 rounded-xl">
                 <div>
-                  <p className="font-medium text-gray-900 text-sm">{r.member.firstName} {r.member.lastName ?? ''}</p>
+                  <p className="font-medium text-gray-900 text-sm">
+                    {r.member.firstName} {r.member.lastName ?? ''}
+                    {r.origin === 'MARRIAGE' && <span className="ml-2 badge-orange text-xs">Marriage</span>}
+                  </p>
                   <p className="text-xs text-gray-500">
                     {[r.member.mobilePrimary, r.member.email, r.member.currentCity].filter(Boolean).join(' · ')}
                   </p>

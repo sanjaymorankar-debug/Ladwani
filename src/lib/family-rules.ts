@@ -90,7 +90,7 @@ export async function eldestAdultCandidate(familyId: string, exceptMemberId?: st
 }
 
 /** Operators mapped to a district, District team of it, and Admins — for vacancy alerts. */
-async function districtResponders(districtId: string | null) {
+export async function districtResponders(districtId: string | null) {
   const ids = new Set<string>()
   if (districtId) {
     const rows = await prisma.userRole.findMany({

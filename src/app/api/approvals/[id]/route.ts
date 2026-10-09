@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { afterMemberExpired, closeKartaTransfer } from '@/lib/family-rules'
-import { applySpouseLink, applyMarkDeceased, applyKartaChange, applyAddressChange } from '@/lib/approvals'
+import { applySpouseLink, applyMarkDeceased, applyKartaChange, applyAddressChange, type SpouseLinkPayload } from '@/lib/approvals'
+import { afterMarriage } from '@/lib/marriage'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -73,6 +74,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
   }
 
+  let marriedPair: { a: string; b: string; by: string } | null = null
   const updated = await prisma.$transaction(async (tx) => {
     const approval = await tx.approval.update({
       where: { id: params.id },
@@ -129,8 +131,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       }
 
       if (approval.actionCode === 'member.marital_status.change' && approval.entityType === 'member' && action === 'approve') {
-        const payload = (approval.newValue ?? {}) as { spouseMemberId?: string | null; externalSpouseName?: string | null }
-        await applySpouseLink(tx, approval.entityId, payload, session.user?.id as string, approval.id)
+        const payload = (approval.newValue ?? {}) as SpouseLinkPayload
+        const linked = await applySpouseLink(tx, approval.entityId, payload, session.user?.id as string, approval.id)
+        if (linked.spouseMemberId) marriedPair = { a: approval.entityId, b: linked.spouseMemberId, by: approval.submittedBy }
       }
 
       if (approval.actionCode === 'member.mark_deceased' && approval.entityType === 'member' && action === 'approve') {
@@ -159,6 +162,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     return approval
   })
+
+  // F23: the marriage asks each spouse's family Karta to add the other.
+  // (assigned inside the transaction callback, which TypeScript cannot see)
+  const pair = marriedPair as { a: string; b: string; by: string } | null
+  if (pair) await afterMarriage(pair.a, pair.b, pair.by)
 
   // F12 / F16 follow-ups that notify people run after the commit.
   if (updated.entityId && action === 'approve') {

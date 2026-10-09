@@ -226,6 +226,20 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       },
     })
 
+    // F23: divorced / widowed marks the marriage link but keeps its history.
+    if (member.maritalStatus === 'MARRIED' && ['DIVORCED', 'WIDOWED'].includes(updated.maritalStatus)) {
+      const open = await tx.marriageRecord.findMany({ where: { status: 'MARRIED', OR: [{ memberId1: params.id }, { memberId2: params.id }] } })
+      for (const m of open) {
+        await tx.marriageRecord.update({ where: { id: m.id }, data: { status: updated.maritalStatus, dissolutionDate: new Date() } })
+        const spouseId = m.memberId1 === params.id ? m.memberId2 : m.memberId1
+        if (spouseId && updated.maritalStatus === 'DIVORCED') {
+          await tx.member.update({ where: { id: spouseId }, data: { maritalStatus: 'DIVORCED' } })
+          await tx.maritalStatusHistory.create({ data: { memberId: spouseId, status: 'DIVORCED', changedBy: userId } })
+        }
+      }
+      await tx.maritalStatusHistory.create({ data: { memberId: params.id, status: updated.maritalStatus, changedBy: userId } })
+    }
+
     if (occupation || (body.employmentStatus !== undefined && canonicalSocialStatus(body.employmentStatus) !== 'WORKING')) {
       const occ = occupation ?? Object.fromEntries(OCCUPATION_FIELDS.map((f) => [f, null]))
       await tx.memberProfileDetail.upsert({ where: { memberId: params.id }, update: occ, create: { memberId: params.id, ...occ } })

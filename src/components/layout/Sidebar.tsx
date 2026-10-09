@@ -47,7 +47,7 @@ export default function Sidebar() {
     exact ? pathname === href : pathname.startsWith(href)
 
   return (
-    <aside className={cn('hidden md:flex flex-col bg-white border-r border-gray-100 transition-all duration-300 shadow-sm',
+    <aside className={cn('hidden md:flex print:hidden flex-col bg-white border-r border-gray-100 transition-all duration-300 shadow-sm',
       collapsed ? 'w-16' : 'w-60')}>
       <div className="h-16 flex items-center px-4 border-b border-gray-100">
         {!collapsed ? (

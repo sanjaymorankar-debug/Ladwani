@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { genderedCode } from '@/lib/relations'
 import { getFamilyAccess } from '@/lib/family-auth'
 import { recordAudit } from '@/lib/audit'
 import { notifyUser } from '@/lib/notify'
@@ -95,7 +96,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string; me
   if (!relative || relativeTo === params.memberId) return NextResponse.json({ message: 'Choose who in this family the role is relative to' }, { status: 400 })
 
   const type = (await prisma.relationshipType.findUnique({ where: { code: role } }))!
-  const inverse = type.inverseCode ? await prisma.relationshipType.findUnique({ where: { code: type.inverseCode } }) : null
+  const relativeGender = (await prisma.member.findUnique({ where: { id: relativeTo }, select: { gender: true } }))?.gender
+  const inverse = type.inverseCode ? await prisma.relationshipType.findUnique({ where: { code: genderedCode(type.inverseCode, relativeGender) } }) : null
   const old = { relationshipRole: membership.relationshipRole, relativeToMemberId: membership.relativeToMemberId }
 
   await prisma.$transaction(async (tx) => {

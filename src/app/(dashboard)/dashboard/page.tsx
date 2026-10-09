@@ -17,7 +17,7 @@ async function getDashboardData(userId: string) {
       include: {
         member: {
           include: {
-            families: { include: { family: true }, take: 1 },
+            families: { where: { leftAt: null }, orderBy: { joinedAt: 'asc' }, include: { family: true } },
             matrimonialProfile: { select: { isVisible: true } },
           },
         },
@@ -50,7 +50,12 @@ export default async function DashboardPage() {
   const member = user?.member
   const family = member?.families[0]?.family
   const roles = ((session.user as any).roles ?? []) as string[]
-  const isKarta = member?.families[0]?.isKarta ?? false
+  const isKarta = member?.families.some((f) => f.isKarta) ?? false
+  // F24: every family this person belongs to, with their role in each.
+  const myFamilies = member?.families ?? []
+  const roleLabels = new Map((await prisma.relationshipType.findMany({
+    where: { code: { in: myFamilies.map((f) => f.relationshipRole).filter(Boolean) as string[] } }, select: { code: true, label: true },
+  })).map((t) => [t.code, t.label]))
   // Where this user said they wanted to go at signup, if they haven't
   // completed family setup yet.
   const onboardingPath = resolveOnboardingPath(user?.joinIntent)
@@ -82,6 +87,23 @@ export default async function DashboardPage() {
       )}
       {/* F16: Karta nominations to answer (and vacancies, for Operators). */}
       <VacancyConfirmList />
+
+      {myFamilies.length > 1 && (
+        <div className="card">
+          <h2 className="font-semibold text-gray-900 mb-3">My Families</h2>
+          <div className="divide-y divide-gray-100">
+            {myFamilies.map((m) => (
+              <div key={m.familyId} className="flex items-center justify-between py-2 text-sm">
+                <Link href={`/family?f=${m.familyId}`} className="font-medium text-gray-900 hover:text-saffron-700">{m.family.name}</Link>
+                <span className="flex items-center gap-3">
+                  <span className="text-gray-500">{m.isKarta ? 'Karta' : (m.relationshipRole && roleLabels.get(m.relationshipRole)) || 'Member'}</span>
+                  <Link href={`/family/${m.familyId}/tree`} className="text-saffron-600 flex items-center gap-1"><TreePine className="w-3.5 h-3.5" /> Tree</Link>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Welcome banner */}
       <div className="bg-gradient-to-r from-saffron-600 to-orange-500 rounded-2xl p-6 text-white shadow-sm">
         <div className="flex items-start justify-between">

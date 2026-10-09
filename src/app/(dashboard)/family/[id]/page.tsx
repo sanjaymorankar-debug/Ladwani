@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { ArrowLeft, Mail, MapPin, TreePine, Users, CheckCircle2, Home, Calendar, Plus } from 'lucide-react'
 import { formatDate, calculateAge, GENDER_LABELS, MARITAL_STATUS_LABELS } from '@/lib/utils'
 import JoinRequestsInbox from '@/components/family/JoinRequestsInbox'
+import TreeLinksInbox from '@/components/family/TreeLinksInbox'
 import ChangeKartaPanel from '@/components/family/ChangeKartaPanel'
 import FamilyPhoto from '@/components/family/FamilyPhoto'
 import MemberManageActions from '@/components/family/MemberManageActions'
@@ -194,6 +195,7 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
       )}
 
       {isKarta && <JoinRequestsInbox familyId={family.id} />}
+      {isKarta && <TreeLinksInbox familyId={family.id} />}
 
       {isKarta && <NewbornPanel familyId={family.id} fathers={adults('MALE')} mothers={adults('FEMALE')} />}
 
