@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { Droplet } from 'lucide-react'
 import ContactRequests from '@/components/connect/ContactRequests'
 import { BLOOD_GROUPS } from '@/lib/additional-details/sections'
+import { BASE_PATH } from '@/lib/api-path'
 
 /**
  * Blood donor finder (rule 10). Search needs both blood group and city; results
@@ -18,13 +19,13 @@ export default function BloodDonorsPage() {
 
   const search = async (e: React.FormEvent) => {
     e.preventDefault()
-    const res = await fetch(`/api/blood-donors?bloodGroup=${encodeURIComponent(bloodGroup)}&city=${encodeURIComponent(city)}`)
+    const res = await fetch(`${BASE_PATH}/api/blood-donors?bloodGroup=${encodeURIComponent(bloodGroup)}&city=${encodeURIComponent(city)}`)
     const body = await res.json()
     if (!res.ok) return toast.error(body.message)
     setDonors(body.donors)
   }
   const request = async (memberId: string) => {
-    const res = await fetch('/api/contact-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ toMemberId: memberId, purpose: 'BLOOD_DONOR' }) })
+    const res = await fetch(`${BASE_PATH}/api/contact-requests`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ toMemberId: memberId, purpose: 'BLOOD_DONOR' }) })
     const body = await res.json()
     toast[res.ok ? 'success' : 'error'](body.message)
     if (res.ok) setRequested((r) => [...r, memberId])

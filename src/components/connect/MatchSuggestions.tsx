@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { Sparkles } from 'lucide-react'
+import { BASE_PATH } from '@/lib/api-path'
 
 const SECTIONS = [
   { key: 'canTeachYou', title: 'Members who can teach what you want to learn' },
@@ -14,12 +15,12 @@ const SECTIONS = [
 /** Dashboard suggestions — built only from what both people chose to share with the community. */
 export default function MatchSuggestions({ memberId }: { memberId: string }) {
   const [matches, setMatches] = useState<Record<string, any[]> | null>(null)
-  useEffect(() => { fetch('/api/matches').then((r) => r.json()).then((d) => setMatches(d.matches)) }, [])
+  useEffect(() => { fetch(`${BASE_PATH}/api/matches`).then((r) => r.json()).then((d) => setMatches(d.matches)) }, [])
   if (!matches) return null
   const any = SECTIONS.some((s) => matches[s.key]?.length)
 
   const connect = async (toMemberId: string) => {
-    const res = await fetch('/api/contact-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ toMemberId, purpose: 'CONNECT' }) })
+    const res = await fetch(`${BASE_PATH}/api/contact-requests`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ toMemberId, purpose: 'CONNECT' }) })
     toast[res.ok ? 'success' : 'error']((await res.json()).message)
   }
   return (

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import type { FieldDef } from '@/lib/additional-details/sections'
 import type { OptionLists } from '@/lib/additional-details/options'
+import { BASE_PATH } from '@/lib/api-path'
 
 export interface PickerData {
   lists: OptionLists
@@ -178,7 +179,7 @@ function FileInput({ id, label, field, value, onChange, memberId, rowLabel }: {
       const fd = new FormData()
       fd.set('file', file)
       fd.set('purpose', field.filePurpose ?? 'MARKSHEET')
-      const res = await fetch(`/api/members/${memberId}/additional-details/files`, { method: 'POST', body: fd })
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/additional-details/files`, { method: 'POST', body: fd })
       const body = await res.json()
       if (!res.ok) throw new Error(body.message)
       onChange(body.fileId)
@@ -193,7 +194,7 @@ function FileInput({ id, label, field, value, onChange, memberId, rowLabel }: {
     <div className="sm:col-span-2">{label}
       {value ? (
         <div className="flex items-center gap-3 text-sm">
-          <a href={`/api/member-files/${value}`} target="_blank" rel="noreferrer" className="text-saffron-700 underline">View uploaded file</a>
+          <a href={`${BASE_PATH}/api/member-files/${value}`} target="_blank" rel="noreferrer" className="text-saffron-700 underline">View uploaded file</a>
           <button type="button" className="text-red-600" onClick={() => onChange(null)}>Remove</button>
         </div>
       ) : (

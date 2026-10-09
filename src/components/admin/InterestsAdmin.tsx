@@ -2,23 +2,24 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { INTEREST_CATEGORIES } from '@/lib/interest-master'
+import { BASE_PATH } from '@/lib/api-path'
 
 export default function InterestsAdmin() {
   const [items, setItems] = useState<any[]>([])
   const [mergeTarget, setMergeTarget] = useState<Record<string, string>>({})
   const [newName, setNewName] = useState('')
   const [newCategory, setNewCategory] = useState(INTEREST_CATEGORIES[0])
-  const load = () => fetch('/api/admin/interests').then((r) => r.json()).then((d) => setItems(d.interests ?? []))
+  const load = () => fetch(`${BASE_PATH}/api/admin/interests`).then((r) => r.json()).then((d) => setItems(d.interests ?? []))
   useEffect(() => { load() }, [])
 
   const patch = async (id: string, body: Record<string, unknown>) => {
-    const res = await fetch(`/api/admin/interests/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const res = await fetch(`${BASE_PATH}/api/admin/interests/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     toast[res.ok ? 'success' : 'error']((await res.json()).message)
     load()
   }
   const add = async (e: React.FormEvent) => {
     e.preventDefault()
-    const res = await fetch('/api/admin/interests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName, category: newCategory }) })
+    const res = await fetch(`${BASE_PATH}/api/admin/interests`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName, category: newCategory }) })
     const body = await res.json()
     toast[res.ok ? 'success' : 'error'](res.ok ? 'Added' : body.message)
     if (res.ok) setNewName('')

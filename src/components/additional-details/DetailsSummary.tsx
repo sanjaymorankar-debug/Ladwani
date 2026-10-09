@@ -7,6 +7,7 @@ import { canViewSection, getDetailsContext } from '@/lib/additional-details/acce
 import { getOptionLists, loadDetails, presentSection } from '@/lib/additional-details/server'
 import { applicableSections, completenessScore, VISIBILITY_LABELS, type FieldDef, type Visibility } from '@/lib/additional-details/sections'
 import { optionLabel, type OptionLists } from '@/lib/additional-details/options'
+import { BASE_PATH } from '@/lib/api-path'
 
 /**
  * Read-only Additional Details on a member's profile page. Each section is
@@ -68,7 +69,7 @@ export default async function DetailsSummary({ session, memberId }: { session: S
                 {(s.row?.fields ?? []).filter((f) => hasValue(r[f.key])).map((f) => (
                   <div key={f.key} className="flex gap-2">
                     <dt className="text-gray-500">{f.label}</dt>
-                    <dd className="text-gray-900">{f.type === 'interest' ? String(r.interestName ?? '') : f.type === 'file' ? <a className="underline" href={`/api/member-files/${r[f.key]}`}>View</a> : display(f, r[f.key], lists)}</dd>
+                    <dd className="text-gray-900">{f.type === 'interest' ? String(r.interestName ?? '') : f.type === 'file' ? <a className="underline" href={`${BASE_PATH}/api/member-files/${r[f.key]}`}>View</a> : display(f, r[f.key], lists)}</dd>
                   </div>
                 ))}
               </dl>

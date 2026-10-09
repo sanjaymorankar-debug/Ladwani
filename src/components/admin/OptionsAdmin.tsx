@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { BASE_PATH } from '@/lib/api-path'
 
 interface List { listKey: string; options: { value: string; label: string }[]; customised: boolean }
 
@@ -10,12 +11,12 @@ export default function OptionsAdmin() {
   const [lists, setLists] = useState<List[]>([])
   const [open, setOpen] = useState<string | null>(null)
   const [draft, setDraft] = useState<{ value: string; label: string }[]>([])
-  const load = () => fetch('/api/admin/options').then((r) => r.json()).then((d) => setLists(d.lists ?? []))
+  const load = () => fetch(`${BASE_PATH}/api/admin/options`).then((r) => r.json()).then((d) => setLists(d.lists ?? []))
   useEffect(() => { load() }, [])
 
   const edit = (l: List) => { setOpen(l.listKey); setDraft(l.options.map((o) => ({ ...o }))) }
   const save = async (body: Record<string, unknown>) => {
-    const res = await fetch('/api/admin/options', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listKey: open, ...body }) })
+    const res = await fetch(`${BASE_PATH}/api/admin/options`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listKey: open, ...body }) })
     toast[res.ok ? 'success' : 'error']((await res.json()).message)
     if (res.ok) { setOpen(null); load() }
   }

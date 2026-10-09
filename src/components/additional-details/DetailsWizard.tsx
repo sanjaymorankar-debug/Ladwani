@@ -9,6 +9,7 @@ import {
   ANSWERS, SECTION_BY_KEY, VISIBILITY_LABELS, VISIBILITY_LEVELS, completenessScore, fieldVisible, maxVisibilityFor,
   rowFieldVisible, visibilityRank, type SectionDef, type SupportDef,
 } from '@/lib/additional-details/sections'
+import { BASE_PATH } from '@/lib/api-path'
 
 type Row = Record<string, any>
 interface Draft {
@@ -41,7 +42,7 @@ export default function DetailsWizard({ memberId }: { memberId: string }) {
   const [saved, setSaved] = useState<Set<string>>(new Set())
 
   const load = async () => {
-    const res = await fetch(`/api/members/${memberId}/additional-details`)
+    const res = await fetch(`${BASE_PATH}/api/members/${memberId}/additional-details`)
     const body = await res.json()
     if (!res.ok) return setError(body.message ?? 'Could not load')
     if (!body.canEdit) return setError('Only the member — or the parent/Karta for children and members without a login — can fill in these details.')
@@ -51,8 +52,8 @@ export default function DetailsWizard({ memberId }: { memberId: string }) {
     setDrafts(d)
     setSaved(new Set(body.sections.filter((s: any) => s.answer).map((s: any) => s.key)))
     const [all, sports] = await Promise.all([
-      fetch('/api/interests').then((r) => r.json()),
-      fetch('/api/interests?sports=true').then((r) => r.json()),
+      fetch(`${BASE_PATH}/api/interests`).then((r) => r.json()),
+      fetch(`${BASE_PATH}/api/interests?sports=true`).then((r) => r.json()),
     ])
     setPicker({
       lists: body.options, interests: all.categories ?? {}, sports: sports.categories ?? {},
@@ -69,7 +70,7 @@ export default function DetailsWizard({ memberId }: { memberId: string }) {
 
   if (!data.consent.given) {
     const giveConsent = async () => {
-      const res = await fetch(`/api/members/${memberId}/additional-details/consent`, {
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/additional-details/consent`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agree: true, version: data.consent.version }),
       })
@@ -108,7 +109,7 @@ export default function DetailsWizard({ memberId }: { memberId: string }) {
     }
     setSaving(true)
     try {
-      const res = await fetch(`/api/members/${memberId}/additional-details/${section.key}`, {
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/additional-details/${section.key}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           answer: draft.answer, visibility: draft.visibility, values: draft.values,
@@ -134,10 +135,10 @@ export default function DetailsWizard({ memberId }: { memberId: string }) {
 
   const deleteSection = async () => {
     if (!confirm(`Delete everything saved in "${section.title}"? This removes the data permanently.`)) return
-    const res = await fetch(`/api/members/${memberId}/additional-details/${section.key}`, { method: 'DELETE' })
+    const res = await fetch(`${BASE_PATH}/api/members/${memberId}/additional-details/${section.key}`, { method: 'DELETE' })
     const body = await res.json()
     if (!res.ok) return toast.error(body.message)
-    const fresh = await fetch(`/api/members/${memberId}/additional-details/${section.key}`).then((r) => r.json())
+    const fresh = await fetch(`${BASE_PATH}/api/members/${memberId}/additional-details/${section.key}`).then((r) => r.json())
     setDrafts((d) => ({ ...d, [section.key]: toDraft(fresh.section) }))
     setSaved((s) => { const n = new Set(s); n.delete(section.key); return n })
     if (body.groups?.removable?.length) setRemovable(body.groups.removable)
@@ -145,14 +146,14 @@ export default function DetailsWizard({ memberId }: { memberId: string }) {
   }
 
   const leave = async (g: GroupRef) => {
-    const res = await fetch(`/api/interest-groups/${g.id}/membership`, { method: 'DELETE' })
+    const res = await fetch(`${BASE_PATH}/api/interest-groups/${g.id}/membership`, { method: 'DELETE' })
     if (res.ok) {
       setAdded((a) => a.filter((x) => x.id !== g.id))
       toast.success(`You left ${g.name}`)
     }
   }
   const confirmRemoval = async () => {
-    const res = await fetch('/api/interest-groups/leave-unmatched', {
+    const res = await fetch(`${BASE_PATH}/api/interest-groups/leave-unmatched`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ memberId, groupIds: removable.map((g) => g.id) }),
     })
@@ -160,7 +161,7 @@ export default function DetailsWizard({ memberId }: { memberId: string }) {
     setRemovable([])
   }
   const joinSuggested = async (g: GroupRef) => {
-    const res = await fetch(`/api/interest-groups/${g.id}/membership`, { method: 'POST' })
+    const res = await fetch(`${BASE_PATH}/api/interest-groups/${g.id}/membership`, { method: 'POST' })
     toast[res.ok ? 'success' : 'error']((await res.json()).message)
     setSuggested((s) => s.filter((x) => x.id !== g.id))
   }
@@ -382,13 +383,13 @@ function GroupPreferences({ memberId, initial, isMinor }: { memberId: string; in
   const [autoAdd, setAutoAdd] = useState(initial.autoAdd)
   const [minorConsent, setMinorConsent] = useState(initial.minorConsent)
   const toggle = async () => {
-    const res = await fetch(`/api/members/${memberId}/group-settings`, {
+    const res = await fetch(`${BASE_PATH}/api/members/${memberId}/group-settings`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ autoAddToGroups: !autoAdd }),
     })
     if (res.ok) setAutoAdd(!autoAdd)
   }
   const consent = async () => {
-    const res = await fetch(`/api/members/${memberId}/additional-details/consent`, {
+    const res = await fetch(`${BASE_PATH}/api/members/${memberId}/additional-details/consent`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agree: true, type: 'MINOR_GROUPS' }),
     })
     if (res.ok) { setMinorConsent(true); toast.success('Consent recorded — child-safe groups only') }

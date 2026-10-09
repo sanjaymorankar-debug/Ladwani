@@ -2,16 +2,17 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Phone } from 'lucide-react'
+import { BASE_PATH } from '@/lib/api-path'
 
 /** Incoming and outgoing "request contact" items. A phone number appears only after the other person accepts. */
 export default function ContactRequests() {
   const [data, setData] = useState<{ incoming: any[]; outgoing: any[] } | null>(null)
-  const load = () => fetch('/api/contact-requests').then((r) => r.json()).then(setData)
+  const load = () => fetch(`${BASE_PATH}/api/contact-requests`).then((r) => r.json()).then(setData)
   useEffect(() => { load() }, [])
   if (!data || (!data.incoming.length && !data.outgoing.length)) return null
 
   const answer = async (id: string, action: 'accept' | 'decline') => {
-    const res = await fetch(`/api/contact-requests/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
+    const res = await fetch(`${BASE_PATH}/api/contact-requests/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
     toast[res.ok ? 'success' : 'error']((await res.json()).message)
     load()
   }

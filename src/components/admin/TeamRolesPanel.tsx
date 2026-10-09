@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { HeartHandshake } from 'lucide-react'
+import { BASE_PATH } from '@/lib/api-path'
 
 const TEAM_ROLES = [
   { code: 'DISTRICT_TEAM', label: 'District team', areaType: 'DISTRICT', note: 'Sees named support requests for this district.' },
@@ -13,13 +14,13 @@ const TEAM_ROLES = [
 export default function TeamRolesPanel({ userId, user, onChange }: { userId: string; user: any; onChange: (u: any) => void }) {
   const [areaId, setAreaId] = useState<Record<string, string>>({})
   const toggle = async (code: string, area: string | null) => {
-    const res = await fetch(`/api/admin/users/${userId}`, {
+    const res = await fetch(`${BASE_PATH}/api/admin/users/${userId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ toggleRole: code, areaId: area }),
     })
     const body = await res.json()
     if (!res.ok) return toast.error(body.message)
     toast.success('Updated')
-    onChange(await fetch(`/api/admin/users/${userId}`).then((r) => r.json()))
+    onChange(await fetch(`${BASE_PATH}/api/admin/users/${userId}`).then((r) => r.json()))
   }
   const held = (code: string) => (user?.userRoles ?? []).filter((ur: any) => ur.role.code === code)
   return (

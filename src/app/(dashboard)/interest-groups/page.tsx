@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { Users, Search, BellOff, Bell } from 'lucide-react'
+import { BASE_PATH } from '@/lib/api-path'
 
 interface MyGroup { id: string; name: string; description: string | null; memberCount: number; notifyMode: string; isMuted: boolean; parentGroupId: string | null; district: string | null }
 interface DirGroup { id: string; name: string; description: string | null; category: string; memberCount: number; subGroupCount: number }
@@ -13,8 +14,8 @@ export default function InterestGroupsPage() {
   const [all, setAll] = useState<DirGroup[]>([])
   const [q, setQ] = useState('')
 
-  const loadMine = () => fetch('/api/interest-groups?mine=true').then((r) => r.json()).then((d) => setMine(d.groups ?? []))
-  const loadAll = () => fetch(`/api/interest-groups${q ? `?q=${encodeURIComponent(q)}` : ''}`).then((r) => r.json()).then((d) => setAll(d.groups ?? []))
+  const loadMine = () => fetch(`${BASE_PATH}/api/interest-groups?mine=true`).then((r) => r.json()).then((d) => setMine(d.groups ?? []))
+  const loadAll = () => fetch(`${BASE_PATH}/api/interest-groups${q ? `?q=${encodeURIComponent(q)}` : ''}`).then((r) => r.json()).then((d) => setAll(d.groups ?? []))
   useEffect(() => { loadMine(); loadAll() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const call = async (url: string, method: string, body?: unknown) => {
@@ -56,14 +57,14 @@ export default function InterestGroupsPage() {
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <label className="sr-only" htmlFor={`n-${g.id}`}>Notifications</label>
                 <select id={`n-${g.id}`} className="form-input py-1 text-sm w-auto" value={g.notifyMode} disabled={g.isMuted}
-                  onChange={(e) => call(`/api/interest-groups/${g.id}/membership`, 'PATCH', { notifyMode: e.target.value })}>
+                  onChange={(e) => call(`${BASE_PATH}/api/interest-groups/${g.id}/membership`, 'PATCH', { notifyMode: e.target.value })}>
                   <option value="DAILY_DIGEST">Daily digest</option>
                   <option value="EVERY_POST">Every post</option>
                 </select>
-                <button className="btn-ghost text-sm flex items-center gap-1" onClick={() => call(`/api/interest-groups/${g.id}/membership`, 'PATCH', { isMuted: !g.isMuted })}>
+                <button className="btn-ghost text-sm flex items-center gap-1" onClick={() => call(`${BASE_PATH}/api/interest-groups/${g.id}/membership`, 'PATCH', { isMuted: !g.isMuted })}>
                   {g.isMuted ? <><Bell className="w-4 h-4" /> Unmute</> : <><BellOff className="w-4 h-4" /> Mute</>}
                 </button>
-                <button className="btn-ghost text-sm text-red-600" onClick={() => confirm(`Leave ${g.name}? You won't be added back automatically.`) && call(`/api/interest-groups/${g.id}/membership`, 'DELETE')}>Leave</button>
+                <button className="btn-ghost text-sm text-red-600" onClick={() => confirm(`Leave ${g.name}? You won't be added back automatically.`) && call(`${BASE_PATH}/api/interest-groups/${g.id}/membership`, 'DELETE')}>Leave</button>
               </div>
             </div>
           ))}
@@ -88,7 +89,7 @@ export default function InterestGroupsPage() {
                     </div>
                     {myIds.has(g.id)
                       ? <span className="badge-green text-xs">Joined</span>
-                      : <button className="btn-secondary text-sm" onClick={() => call(`/api/interest-groups/${g.id}/membership`, 'POST')}>Join</button>}
+                      : <button className="btn-secondary text-sm" onClick={() => call(`${BASE_PATH}/api/interest-groups/${g.id}/membership`, 'POST')}>Join</button>}
                   </div>
                 ))}
               </div>

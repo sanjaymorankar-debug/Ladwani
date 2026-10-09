@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { HeartHandshake } from 'lucide-react'
 import { SUPPORT_CATEGORY_LABELS, type SupportCategory } from '@/lib/additional-details/sections'
 import { formatDate } from '@/lib/utils'
+import { BASE_PATH } from '@/lib/api-path'
 
 const label = (k: string) => SUPPORT_CATEGORY_LABELS[k as SupportCategory] ?? k
 
@@ -12,7 +13,7 @@ export default function CommunitySupportView({ canSeeNames }: { canSeeNames: boo
   const [data, setData] = useState<any>(null)
   const [reports, setReports] = useState<any>(null)
   const load = async () => {
-    const [d, r] = await Promise.all([fetch('/api/support-requests').then((x) => x.json()), fetch('/api/reports/community-support').then((x) => x.json())])
+    const [d, r] = await Promise.all([fetch(`${BASE_PATH}/api/support-requests`).then((x) => x.json()), fetch(`${BASE_PATH}/api/reports/community-support`).then((x) => x.json())])
     setData(d)
     setReports(r)
   }
@@ -20,7 +21,7 @@ export default function CommunitySupportView({ canSeeNames }: { canSeeNames: boo
   if (!data || !reports) return <div className="card text-sm text-gray-500">Loading…</div>
 
   const close = async (requestId: string) => {
-    const res = await fetch('/api/support-requests', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId }) })
+    const res = await fetch(`${BASE_PATH}/api/support-requests`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId }) })
     toast[res.ok ? 'success' : 'error']((await res.json()).message)
     load()
   }
