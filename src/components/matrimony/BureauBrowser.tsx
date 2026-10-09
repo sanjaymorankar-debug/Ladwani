@@ -5,7 +5,7 @@ import { AlertTriangle, MapPin, GraduationCap, Briefcase } from 'lucide-react'
 import AreaCascadePicker from '@/components/shared/AreaCascadePicker'
 import SendInterestButton from './SendInterestButton'
 
-const INCOME: Record<string, string> = { BELOW_2L: 'Below ₹2 L', '2L_5L': '₹2–5 L', '5L_10L': '₹5–10 L', '10L_25L': '₹10–25 L', '25L_50L': '₹25–50 L', ABOVE_50L: 'Above ₹50 L', NOT_SAY: 'Not stated' }
+const INCOME: Record<string, string> = { BELOW_2L: 'Below ₹2 L', '2L_5L': '₹2–5 L', '5L_10L': '₹5–10 L', '10L_20L': '₹10–20 L', '20L_50L': '₹20–50 L', ABOVE_50L: 'Above ₹50 L', NOT_SAY: 'Not stated' }
 
 /** F38 search: age, education, occupation, district, Gotra. Limited cards; same-Gotra flagged. */
 export default function BureauBrowser() {

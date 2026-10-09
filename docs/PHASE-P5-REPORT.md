@@ -20,7 +20,7 @@ Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as P0�
 | F34 Upload photos | PARTIAL | Member gallery (resized copies, private storage, visibility); one family photo; asset photos | No family album. No Friends / friend-list visibility. No report abuse (the `reports` table was unused). The security items above. | **Family album**: members upload, each photo with Only me / Family / Friends / Community; delete by uploader or Karta. **FRIENDS** and **FRIEND_LIST** visibility. **Report abuse** on photos, posts and comments: once reports from `moderation.report_threshold` (3) different people are open, the item is hidden until a moderator restores or removes it. A Reported Content queue for Operators and Admins. | None (additive column `photos.audienceListId`) |
 | F35 Friend lists | MISSING | — | — | Search by name, Gotra, Mul Gaon, district (no contact details). Request → accept / decline / cancel. Named lists (only friends can be in a list). **Removing a friend silently takes them out of both people's lists.** An expired member (F12) is removed from friends and lists. | New tables |
 | F36 Posts to groups | PARTIAL | Posts, moderation by any Operator, likes, comments | No audience: everyone saw every post. No family / friend-list / organisation / district / state posts. No moderation "by that body". No edit / delete. No photos on posts. No report abuse. | **Audience** on each post: Community (existing behaviour, still Operator-moderated), Family, Friend list or Organisation (published at once, members alerted), and District / State / National (held until **that LadWani body's President or Secretary**, or an Admin, approves). The feed, the post page, comments and reactions all follow the audience. Authors edit (a moderated post goes back for approval) and delete. Photos on posts follow the post's audience. Report abuse with threshold hiding. | Additive columns. Existing posts become audience COMMUNITY, which is exactly how they are shown today. |
-| F37 Bureau opt in / out | PARTIAL | Listing toggle; auto-off on marriage and death | No legal-age check. Listing allowed for Divorced / Widowed and without earning (**CONFLICT**, see decisions). No horoscope or contact preference. Karta not told. A Separated member stayed listed. | **Legal age 18 F / 21 M** is checked always. Extra details: expectations, horoscope (optional), contact preference (me / Karta / both). The **Karta is told** on opt-in. The toggle shows only when eligible, with the reason otherwise. Auto-off when the status becomes ineligible. **The workbook's "Unmarried AND earning" rule is built behind the `bureau.workbook_rules` setting** (default off). | Additive columns |
+| F37 Bureau opt in / out | PARTIAL | Listing toggle; auto-off on marriage and death | No legal-age check. Listing allowed for Divorced / Widowed and without earning (**CONFLICT**, see decisions). No horoscope or contact preference. Karta not told. A Separated member stayed listed. | **Legal age 18 F / 21 M** is checked always. Extra details: expectations, horoscope (optional), contact preference (me / Karta / both). The **Karta is told** on opt-in. The toggle shows only when eligible, with the reason otherwise. Auto-off when the status becomes ineligible. **The workbook's "Unmarried AND earning" rule is on** (`bureau.workbook_rules`, switched on by your decision — see §9). | Additive columns |
 | F38 Browse and interest | PARTIAL | List, detail, interests (send / accept) | Contact details leaked (see §0). No occupation / district / Gotra filters. No same-Gotra flag. Income not shown as a band. Karta could not answer. No contact sharing. Anyone could browse (**CONFLICT**). | Filters: age, education, occupation, district, Gotra (plus gender). Limited cards; **same-Gotra flagged**; income as a band. **The Karta** can send for a family member and accept / decline for them (recorded as `respondedBy`). **Contact shared on acceptance** per preference. "Only listed users and their Karta browse" is built behind the same setting. An Interests panel was added (none existed). | Additive column |
 
 ### a) Found in code, not in the workbook (left as they are)
@@ -76,16 +76,7 @@ The new tests are named by Flow ID:
 - `tests/p5/F34-F36-social.test.ts` (14)
 - `tests/p5/F37-F38-marriage-bureau.test.ts` (7), covering both bureau modes.
 
-No existing test was edited. All existing photo, post and matrimony tests pass unchanged.
-
-**With `bureau.workbook_rules` switched on**, these existing tests fail, because they pin the earlier rules:
-- `TC-MAT-001/002`: an unlisted viewer browses.
-- `TC-MAT-007/008`: an unlisted member sends an interest.
-- `TC-MAT-009`: the sender is unlisted.
-- `TC-MAT-012`: a member who isn't earning opts in, and an unlisted viewer browses.
-- `TC-MAT-013`: an unlisted viewer browses.
-
-That is why the setting is off by default.
+All existing photo and post tests pass unchanged. The existing matrimony tests were updated to the workbook rules **on your instruction** (see §9).
 
 A browser run against the production build covered:
 1. A Karta finds a member by name on Friends and sends a request; the member accepts.
@@ -101,12 +92,12 @@ There are no new environment keys.
 
 Settings to review:
 - `moderation.report_threshold` (default 3)
-- `bureau.workbook_rules` (default false)
+- `bureau.workbook_rules` (on; set to false to return to the earlier rules)
 
 ## 6. Exit criteria (Phase Plan, P5)
-- **Bureau toggle rules enforced** — ⚠ partly.
-  - Legal age, auto-off and the "toggle only when eligible" behaviour are enforced and tested.
-  - The workbook's "Unmarried AND earning" and "only listed users and their Karta browse" rules are **built and tested** but switched off pending your decision. Turning them on is one setting.
+- **Bureau toggle rules enforced** — ✅.
+  - Legal age, Unmarried AND earning, auto-off, and the "toggle only when eligible" behaviour are enforced and tested.
+  - Only listed members and their Karta browse and send interests (tested).
 - **Abuse reporting works** — ✅.
   - Photos, posts and comments can be reported; one report per person.
   - The item is hidden at the threshold. A moderator restores or removes it, and the owner is told.
@@ -122,6 +113,19 @@ Settings to review:
 - Contact preference defaults to the member's own details. "Karta" shares the Karta's details instead.
 
 ## 8. Decisions needed
-1. **Turn on the workbook bureau rules?** (`bureau.workbook_rules`.) This means only Unmarried and earning members may list, and only listed members and their Karta may browse and send interests. The 5 existing tests listed in §4 would then need updating to the new behaviour; your rules say I must not change them without your yes.
-2. **OP-08:** with the workbook rules on, Widowed and Divorced members cannot list. Should they be allowed?
-3. **Community-wide posts:** keep Operator moderation for every member post to the whole community, or publish them at once (the workbook only requires moderation for District / State / National posts)?
+1. **OP-08:** with the workbook rules on, Widowed and Divorced members cannot list. Should they be allowed?
+2. **Community-wide posts:** keep Operator moderation for every member post to the whole community, or publish them at once (the workbook only requires moderation for District / State / National posts)?
+
+## 9. Follow-up: workbook bureau rules switched on (your decision)
+- **Migration** `20261009200000_bureau_workbook_rules_on` (phpMyAdmin: `set_bureau_workbook_rules_on.sql`) sets `bureau.workbook_rules` = true. The code also treats a missing setting as on. Rollback: `down.sql` sets it back to false.
+- **Effect on live data:** no member rows change. Listings that no longer qualify (Divorced or Widowed members, or anyone not marked as earning) stay switched on but are hidden from search until the member qualifies. Members who want to list must set their social status to Working and choose an income band. Members who are not listed (and are not a listed member's Karta) can no longer browse or send interests.
+- **Existing tests updated to the new behaviour.** Each test now makes its UAT members bureau-ready (earning, listed) inside `try/finally` and puts them back afterwards, using the new helper `bureauReady` in `tests/uat/helpers.ts`. What each test checks:
+  - `TC-MAT-001/002`: a listed viewer sees the profile and loses it on opt-out. **Added:** a viewer who is not listed gets 403.
+  - `TC-MAT-007/008`: a listed member sends an interest that is accepted.
+  - `TC-MAT-009`: as before, a stranger cannot accept someone else's interest. The sender is now listed, and the send is checked to succeed.
+  - `TC-MAT-010`: the viewer is now listed, so the search really runs. Before this change it returned 403 and the test passed without checking anything.
+  - `TC-MAT-012`: **added** a check that a member who isn't earning is refused with the earning reason; after becoming earning they opt in and appear. The viewer changed from KARTA-02 (married, so can never be listed) to a listed member.
+  - `TC-MAT-013`: the same viewer change; marriage still withdraws the listing.
+- **My own P5 bureau tests** now run with the rules on by default. A new test checks that switching the setting off restores the earlier rules.
+- Tests: **406 passed**, twice in a row on a fresh database. Typecheck clean; build OK.
+- Fixed in passing: the bureau search showed wrong income-band labels (10L_25L / 25L_50L instead of the schema's 10L_20L / 20L_50L).

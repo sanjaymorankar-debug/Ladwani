@@ -8,7 +8,7 @@ import { GET as getVisibility, PATCH as patchVisibility } from '@/app/api/member
 import { GET as listProfiles } from '@/app/api/matrimony/profiles/route'
 import { POST as postInterest, GET as getInterests } from '@/app/api/matrimony/interests/route'
 import { PATCH as patchInterest } from '@/app/api/matrimony/interests/[id]/route'
-import { account, actAs, jsonReq } from './helpers'
+import { account, actAs, jsonReq, bureauReady } from './helpers'
 
 describe('TC-PRIV — field visibility', () => {
   it('TC-PRIV-001 a member can set their mobile to Private and another member stops seeing it', async () => {
@@ -70,6 +70,9 @@ describe('TC-PRIV — field visibility', () => {
   })
 })
 
+// Workbook bureau rules (owner's decision): only Unmarried AND earning members
+// are listed, and only listed members (or their Karta) browse and send
+// interests. Each test makes its UAT members bureau-ready and puts them back.
 describe('TC-MAT — matrimony', () => {
   async function ensureProfile(memberId: string, isVisible: boolean) {
     return prisma.matrimonialProfile.upsert({
@@ -82,71 +85,93 @@ describe('TC-MAT — matrimony', () => {
   it('TC-MAT-001/002 a visible profile is listed; opting out removes it', async () => {
     const m = await account('MEMBER-02')
     const viewer = await account('MEMBER-01')
-    await ensureProfile(m.memberId, true)
+    const restore = [await bureauReady(m.memberId), await bureauReady(viewer.memberId)]
+    try {
+      await ensureProfile(m.memberId, true)
 
-    actAs({ userId: viewer.userId, roles: viewer.roles, memberId: viewer.memberId })
-    let listed = await (await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)).json()
-    const ids = (listed.profiles ?? listed).map?.((p: any) => p.memberId) ?? []
-    expect(ids).toContain(m.memberId)
+      actAs({ userId: viewer.userId, roles: viewer.roles, memberId: viewer.memberId })
+      let res = await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)
+      expect(res.status).toBe(200)
+      let listed = await res.json()
+      expect(listed.profiles.map((p: any) => p.memberId)).toContain(m.memberId)
 
-    await ensureProfile(m.memberId, false) // opt out
-    listed = await (await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)).json()
-    const idsAfter = (listed.profiles ?? listed).map?.((p: any) => p.memberId) ?? []
-    expect(idsAfter).not.toContain(m.memberId)
+      await ensureProfile(m.memberId, false) // opt out
+      listed = await (await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)).json()
+      expect(listed.profiles.map((p: any) => p.memberId)).not.toContain(m.memberId)
+
+      // Workbook rule: someone not listed in the bureau cannot browse it.
+      await ensureProfile(viewer.memberId, false)
+      res = await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)
+      expect(res.status).toBe(403)
+    } finally { for (const r of restore) await r() }
   })
 
   it('TC-MAT-007/008 interest can be sent, then accepted, and notifies the sender', async () => {
     const from = await account('MEMBER-01')
     const to = await account('MEMBER-02')
-    await ensureProfile(to.memberId, true)
-    await prisma.matrimonialInterest.deleteMany({ where: { fromMemberId: from.memberId, toMemberId: to.memberId } })
+    const restore = [await bureauReady(to.memberId), await bureauReady(from.memberId)]
+    try {
+      await ensureProfile(to.memberId, true)
+      await prisma.matrimonialInterest.deleteMany({ where: { fromMemberId: from.memberId, toMemberId: to.memberId } })
 
-    actAs({ userId: from.userId, roles: from.roles, memberId: from.memberId })
-    const sendRes = await postInterest(jsonReq('http://x', 'POST', { toMemberId: to.memberId }) as any)
-    expect(sendRes.status).toBe(201)
-    const { interest } = await sendRes.json()
+      actAs({ userId: from.userId, roles: from.roles, memberId: from.memberId })
+      const sendRes = await postInterest(jsonReq('http://x', 'POST', { toMemberId: to.memberId }) as any)
+      expect(sendRes.status).toBe(201)
+      const { interest } = await sendRes.json()
 
-    // Recipient is notified.
-    const notif = await prisma.notification.findFirst({
-      where: { recipientId: to.userId, type: 'MATRIMONIAL_INTEREST' }, orderBy: { createdAt: 'desc' },
-    })
-    expect(notif).not.toBeNull()
+      // Recipient is notified.
+      const notif = await prisma.notification.findFirst({
+        where: { recipientId: to.userId, type: 'MATRIMONIAL_INTEREST' }, orderBy: { createdAt: 'desc' },
+      })
+      expect(notif).not.toBeNull()
 
-    // Recipient accepts.
-    actAs({ userId: to.userId, roles: to.roles, memberId: to.memberId })
-    const acceptRes = await patchInterest(jsonReq('http://x', 'PATCH', { action: 'accept' }) as any, { params: { id: interest.id } })
-    expect(acceptRes.status).toBe(200)
-    expect((await prisma.matrimonialInterest.findUniqueOrThrow({ where: { id: interest.id } })).status).toBe('ACCEPTED')
+      // Recipient accepts.
+      actAs({ userId: to.userId, roles: to.roles, memberId: to.memberId })
+      const acceptRes = await patchInterest(jsonReq('http://x', 'PATCH', { action: 'accept' }) as any, { params: { id: interest.id } })
+      expect(acceptRes.status).toBe(200)
+      expect((await prisma.matrimonialInterest.findUniqueOrThrow({ where: { id: interest.id } })).status).toBe('ACCEPTED')
+      await prisma.matrimonialInterest.deleteMany({ where: { id: interest.id } })
+    } finally { for (const r of restore) await r() }
   })
 
   it('TC-MAT-009 a third party cannot accept someone else\'s interest', async () => {
     const from = await account('MEMBER-01')
     const to = await account('MEMBER-02')
     const stranger = await account('KARTA-02')
-    await prisma.matrimonialInterest.deleteMany({ where: { fromMemberId: from.memberId, toMemberId: to.memberId } })
+    const restore = [await bureauReady(to.memberId), await bureauReady(from.memberId)]
+    try {
+      await prisma.matrimonialInterest.deleteMany({ where: { fromMemberId: from.memberId, toMemberId: to.memberId } })
 
-    actAs({ userId: from.userId, roles: from.roles, memberId: from.memberId })
-    const { interest } = await (await postInterest(jsonReq('http://x', 'POST', { toMemberId: to.memberId }) as any)).json()
+      actAs({ userId: from.userId, roles: from.roles, memberId: from.memberId })
+      const sent = await postInterest(jsonReq('http://x', 'POST', { toMemberId: to.memberId }) as any)
+      expect(sent.status).toBe(201)
+      const { interest } = await sent.json()
 
-    actAs({ userId: stranger.userId, roles: stranger.roles, memberId: stranger.memberId })
-    const res = await patchInterest(jsonReq('http://x', 'PATCH', { action: 'accept' }) as any, { params: { id: interest.id } })
-    expect(res.status).toBe(403)
+      actAs({ userId: stranger.userId, roles: stranger.roles, memberId: stranger.memberId })
+      const res = await patchInterest(jsonReq('http://x', 'PATCH', { action: 'accept' }) as any, { params: { id: interest.id } })
+      expect(res.status).toBe(403)
 
-    await prisma.matrimonialInterest.deleteMany({ where: { id: interest.id } })
+      await prisma.matrimonialInterest.deleteMany({ where: { id: interest.id } })
+    } finally { for (const r of restore) await r() }
   })
 
   it('TC-MAT-010 a MARRIED member is excluded from matrimony results', async () => {
     const m = await account('MEMBER-02')
     const viewer = await account('MEMBER-01')
+    const restore = [await bureauReady(m.memberId), await bureauReady(viewer.memberId)]
     await ensureProfile(m.memberId, true)
     await prisma.member.update({ where: { id: m.memberId }, data: { maritalStatus: 'MARRIED' } })
 
     actAs({ userId: viewer.userId, roles: viewer.roles, memberId: viewer.memberId })
-    const listed = await (await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)).json()
-    const ids = (listed.profiles ?? listed).map?.((p: any) => p.memberId) ?? []
+    const res = await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)
+    const status = res.status
+    const ids = ((await res.json()).profiles ?? []).map((p: any) => p.memberId)
 
     await prisma.member.update({ where: { id: m.memberId }, data: { maritalStatus: 'UNMARRIED' } })
     await ensureProfile(m.memberId, false)
+    for (const r of restore) await r()
+
+    expect(status).toBe(200) // the viewer is listed, so this is a real search
 
     // Matrimony now lists only members who opted in AND are free to marry.
     expect(ids).not.toContain(m.memberId)

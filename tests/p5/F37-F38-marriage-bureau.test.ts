@@ -42,9 +42,9 @@ beforeAll(async () => {
   young = await fx.adult('y', { dob: `${new Date().getFullYear() - 20}-01-01` })
   await fx.family('Groom', groomK, [{ p: groom, role: 'son' }], { gotra: 'Kashyap' })
   await fx.family('Bride', brideK, [{ p: bride, role: 'daughter' }], { gotra: 'Kashyap' })
-  await setRules(false)
+  await setRules(true) // the workbook rules are the default (owner's decision)
 })
-afterAll(async () => { await setRules(false); await fx.cleanup() })
+afterAll(async () => { await setRules(true); await fx.cleanup() })
 
 describe('F37 Opt in / out of the marriage bureau', () => {
   it('F37 legal age: a man under 21 cannot register', async () => {
@@ -55,6 +55,7 @@ describe('F37 Opt in / out of the marriage bureau', () => {
   })
 
   it('F37 extra details are validated; opting in tells the Karta of the family', async () => {
+    await earning(groom)
     actAs(groom)
     expect((await createProfile(json('http://x', 'POST', { heightCm: 20 }))).status).toBe(400)
     groomProfile = await profileFor(groom, { horoscope: 'Mesh rashi', expectations: 'Educated' })
@@ -64,28 +65,26 @@ describe('F37 Opt in / out of the marriage bureau', () => {
   })
 
   it('F37 workbook rules: only unmarried AND earning members may list; the reason is shown instead of the toggle', async () => {
-    await setRules(true)
-    try {
-      actAs(bride)
-      const m = await (await mine()).json()
-      expect(m.eligibility).toMatchObject({ ok: false })
-      expect(m.eligibility.reason).toMatch(/earning/)
-      actAs(bride)
-      expect((await createProfile(json('http://x', 'POST', {}))).status).toBe(403)
-      await earning(bride)
-      brideProfile = await profileFor(bride)
-      expect((await toggle(bride, brideProfile, true)).status).toBe(200)
-      // Divorced is not allowed under the workbook rules (OP-08 assumption).
-      await prisma.member.update({ where: { id: viewer.memberId }, data: { maritalStatus: 'DIVORCED' } })
-      await earning(viewer)
-      actAs(viewer)
-      expect((await createProfile(json('http://x', 'POST', {}))).status).toBe(403)
-      await prisma.member.update({ where: { id: viewer.memberId }, data: { maritalStatus: 'UNMARRIED' } })
-    } finally { await setRules(false) }
+    actAs(bride)
+    const m = await (await mine()).json()
+    expect(m.eligibility).toMatchObject({ ok: false })
+    expect(m.eligibility.reason).toMatch(/earning/)
+    actAs(bride)
+    expect((await createProfile(json('http://x', 'POST', {}))).status).toBe(403)
+    await earning(bride)
+    brideProfile = await profileFor(bride)
+    expect((await toggle(bride, brideProfile, true)).status).toBe(200)
+    // Divorced is not allowed under the workbook rules (OP-08 assumption).
+    await prisma.member.update({ where: { id: viewer.memberId }, data: { maritalStatus: 'DIVORCED' } })
+    await earning(viewer)
+    actAs(viewer)
+    expect((await createProfile(json('http://x', 'POST', {}))).status).toBe(403)
+    await prisma.member.update({ where: { id: viewer.memberId }, data: { maritalStatus: 'UNMARRIED' } })
   })
 
   it('F37 a status that cannot be listed takes the listing down automatically', async () => {
     const other = await fx.adult('sep', { dob: '1992-01-01' })
+    await earning(other)
     const id = await profileFor(other)
     await toggle(other, id, true)
     actAs(other)
@@ -137,16 +136,27 @@ describe('F38 Browse and express interest', () => {
   })
 
   it('F38 workbook rules: only listed members and their Karta may browse and send interests', async () => {
-    await setRules(true)
+    actAs(viewer)
+    expect((await list(json('http://x/api/matrimony/profiles', 'GET'))).status).toBe(403)
+    actAs(viewer)
+    expect((await sendInterest(json('http://x', 'POST', { toMemberId: groom.memberId }))).status).toBe(403)
+    actAs(brideK) // Karta of a listed member
+    expect((await list(json('http://x/api/matrimony/profiles', 'GET'))).status).toBe(200)
+    actAs(brideK)
+    expect((await sendInterest(json('http://x', 'POST', { toMemberId: groom.memberId, fromMemberId: bride.memberId }))).status).toBe(409) // already accepted
+  })
+
+  it('switching bureau.workbook_rules off restores the earlier rules (anyone browses; divorced may list)', async () => {
+    await setRules(false)
     try {
       actAs(viewer)
-      expect((await list(json('http://x/api/matrimony/profiles', 'GET'))).status).toBe(403)
-      actAs(viewer)
-      expect((await sendInterest(json('http://x', 'POST', { toMemberId: groom.memberId }))).status).toBe(403)
-      actAs(brideK) // Karta of a listed member
       expect((await list(json('http://x/api/matrimony/profiles', 'GET'))).status).toBe(200)
-      actAs(brideK)
-      expect((await sendInterest(json('http://x', 'POST', { toMemberId: groom.memberId, fromMemberId: bride.memberId }))).status).toBe(409) // already accepted
-    } finally { await setRules(false) }
+      await prisma.member.update({ where: { id: viewer.memberId }, data: { maritalStatus: 'DIVORCED' } })
+      actAs(viewer)
+      expect((await createProfile(json('http://x', 'POST', {}))).status).toBe(201)
+    } finally {
+      await prisma.member.update({ where: { id: viewer.memberId }, data: { maritalStatus: 'UNMARRIED' } })
+      await setRules(true)
+    }
   })
 })

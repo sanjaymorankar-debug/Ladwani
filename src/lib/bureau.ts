@@ -14,15 +14,16 @@ import { ageOn } from '@/lib/validators'
  * details); contact shared only once an interest is accepted; same-Gotra
  * flag; income as a band; the Karta is told on opt-in and may answer interests.
  *
- * With Setting `bureau.workbook_rules` = true (the workbook): only Unmarried
- * AND earning members may list, and only listed members and their Karta may
- * browse and send interests. Off (default) keeps the earlier rules
- * (Unmarried / Divorced / Widowed may list; any member may browse), because
- * existing tests and users rely on them — see the P5 report.
+ * Setting `bureau.workbook_rules` (ON by default — the owner's decision):
+ * only Unmarried AND earning members may list, and only listed members and
+ * their Karta may browse and send interests. Switching it to false restores
+ * the earlier rules (Unmarried / Divorced / Widowed may list; any member may
+ * browse).
  */
 export async function workbookRules() {
   const s = await prisma.setting.findUnique({ where: { key: 'bureau.workbook_rules' } })
-  const v = typeof s?.value === 'string' ? JSON.parse(s.value) : s?.value
+  if (!s) return true
+  const v = typeof s.value === 'string' ? JSON.parse(s.value) : s.value
   return v === true || v === 'true'
 }
 
