@@ -16,13 +16,15 @@ cd "$(dirname "$0")/.."
 
 fail=0
 
-# middleware.ts is the one legitimate exception: Next strips the prefix before
+# middleware.ts (and src/lib/bkesari-sso.ts, whose decide() it calls) are the
+# legitimate exceptions: Next strips the prefix before
 # middleware runs, so its pathname comparisons must NOT carry it. Verified —
 # /ladwani/login reaches its allow-list and returns 200.
 offenders=$(grep -rnE "[\`'\"]/api/" src/ \
   | grep -v 'BASE_PATH' \
   | grep -v '^src/lib/api-path.ts:' \
-  | grep -v '^src/middleware.ts:' || true)
+  | grep -v '^src/middleware.ts:' \
+  | grep -v '^src/lib/bkesari-sso.ts:' || true)
 
 if [ -n "$offenders" ]; then
   fail=1

@@ -98,7 +98,13 @@ export default function Sidebar() {
         </Link>
         {/* NextAuth navigates the browser to this itself, so unlike
             router.push it does not get the prefix applied for us. */}
-        <button onClick={() => signOut({ callbackUrl: `${BASE_PATH}/login` })}
+        <button onClick={() => {
+            // Signed in through bkesari.com: end the local session, then the
+            // central one, which also signs out every other project and agtci.com.
+            const hub = process.env.NEXT_PUBLIC_BKESARI_SSO_URL
+            if (hub) signOut({ redirect: false }).then(() => { window.location.href = `${hub}/auth/logout` })
+            else signOut({ callbackUrl: `${BASE_PATH}/login` })
+          }}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors">
           <LogOut className="w-5 h-5 flex-shrink-0" />
           {!collapsed && <span>Sign Out</span>}

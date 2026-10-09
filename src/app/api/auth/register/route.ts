@@ -5,8 +5,14 @@ import { registerSchema } from '@/lib/validators'
 import { generateMemberNumber } from '@/lib/utils'
 import { requireAccountVerification } from '@/lib/auth-config'
 import { sendEmail, otpEmailTemplate, isEmailConfigured } from '@/lib/email'
+import { ssoConfig } from '@/lib/bkesari-sso'
 
 export async function POST(req: Request) {
+  // With central login enforced, accounts are created at bkesari.com only.
+  const sso = ssoConfig()
+  if (sso?.enforce) {
+    return NextResponse.json({ message: 'Create your account at bkesari.com.', signup: `${sso.hubUrl}/auth/signup` }, { status: 403 })
+  }
   try {
     const body = await req.json()
     const parsed = registerSchema.safeParse({ ...body, confirmPassword: body.password, consentAccepted: true })
