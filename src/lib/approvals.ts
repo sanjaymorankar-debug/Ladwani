@@ -211,15 +211,37 @@ export async function applyKartaChange(tx: Prisma.TransactionClient, payload: Ka
     where: { familyId: payload.familyId, isKarta: true, memberId: { not: payload.newKartaMemberId } },
     include: { member: { select: { userId: true } } },
   })
+  // F16: the old Karta becomes a normal member; their role is stated relative
+  // to the new Karta where the relationship says so (e.g. new Karta was 'son'
+  // of the old one → old Karta is 'father').
+  const newRole = target.relationshipRole
+  const inverse = newRole ? await tx.relationshipType.findUnique({ where: { code: newRole } }) : null
   for (const p of previous) {
-    await tx.familyMember.update({ where: { id: p.id }, data: { isKarta: false } })
+    const oldMember = await tx.member.findUnique({ where: { id: p.memberId }, select: { gender: true } })
+    let role: string | null = null
+    if (inverse?.inverseCode && target.relativeToMemberId === p.memberId) {
+      const inv = await tx.relationshipType.findUnique({ where: { code: inverse.inverseCode } })
+      const genderOk = !inv?.genderApplicable || ['ANY', oldMember?.gender].includes(inv.genderApplicable)
+      role = genderOk ? inverse.inverseCode : inverse.inverseCode === 'father' ? 'mother' : inverse.inverseCode === 'mother' ? 'father' : null
+    }
+    await tx.familyMember.update({
+      where: { id: p.id },
+      data: { isKarta: false, relationshipRole: role, relativeToMemberId: role ? payload.newKartaMemberId : null },
+    })
     if (kartaRole && p.member.userId) {
       await tx.userRole.deleteMany({ where: { userId: p.member.userId, roleId: kartaRole.id, familyId: payload.familyId } })
     }
   }
 
-  await tx.familyMember.update({ where: { id: target.id }, data: { isKarta: true } })
-  await tx.family.update({ where: { id: payload.familyId }, data: { kartaMemberId: payload.newKartaMemberId, updatedBy: actorId } })
+  await tx.familyMember.update({ where: { id: target.id }, data: { isKarta: true, relationshipRole: 'karta', relativeToMemberId: null } })
+  await tx.family.update({
+    where: { id: payload.familyId },
+    data: {
+      kartaMemberId: payload.newKartaMemberId, updatedBy: actorId,
+      // F16: a vacant family is whole again.
+      ...(family.status === 'KARTA_VACANT' ? { status: 'ACTIVE' as const } : {}),
+    },
+  })
   if (kartaRole) {
     const exists = await tx.userRole.findFirst({
       where: { userId: target.member.userId!, roleId: kartaRole.id, familyId: payload.familyId },

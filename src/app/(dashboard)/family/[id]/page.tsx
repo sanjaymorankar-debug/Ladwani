@@ -1,7 +1,8 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { canManageFamily } from '@/lib/family-auth'
+import { canManageFamily, canViewFamily } from '@/lib/family-auth'
+import { operatorCoversFamily } from '@/lib/family-rules'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Mail, MapPin, TreePine, Users, CheckCircle2, Home, Calendar, Plus } from 'lucide-react'
@@ -9,12 +10,49 @@ import { formatDate, calculateAge, GENDER_LABELS, MARITAL_STATUS_LABELS } from '
 import JoinRequestsInbox from '@/components/family/JoinRequestsInbox'
 import ChangeKartaPanel from '@/components/family/ChangeKartaPanel'
 import FamilyPhoto from '@/components/family/FamilyPhoto'
+import MemberManageActions from '@/components/family/MemberManageActions'
+import NewbornPanel from '@/components/family/NewbornPanel'
+import JoinFamilyPanel from '@/components/family/JoinFamilyPanel'
 
 export default async function FamilyDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session) return null
 
   const isKarta = await canManageFamily(session, params.id)
+  const roles = ((session.user as any)?.roles ?? []) as string[]
+  // F18: an Operator of the family's district may view it to correct roles.
+  const isDistrictOperator = !isKarta && (await operatorCoversFamily(session.user?.id as string, roles, params.id))
+  const isMember = await canViewFamily(session, params.id)
+
+  // F14: before joining, only a limited summary is visible.
+  if (!isMember && !isDistrictOperator) {
+    const summary = await prisma.family.findUnique({
+      where: { id: params.id, deletedAt: null },
+      select: {
+        id: true, name: true, registrationNumber: true, gotra: true, nativeVillage: true, nativeDistrict: true, nativeState: true,
+        kartaMemberId: true, karta: { select: { firstName: true, lastName: true } },
+        _count: { select: { members: { where: { leftAt: null } } } },
+      },
+    })
+    if (!summary) notFound()
+    const viewerGender = (await prisma.member.findUnique({ where: { id: (session.user as any).memberId ?? '' }, select: { gender: true } }))?.gender ?? null
+    const kartaName = summary.karta ? `${summary.karta.firstName} ${summary.karta.lastName ?? ''}`.trim() : null
+    return (
+      <div className="max-w-2xl mx-auto space-y-5">
+        <div className="card">
+          <h1 className="text-2xl font-bold text-gray-900 font-display">{summary.name} Family</h1>
+          <div className="text-sm text-gray-600 mt-2 space-y-1">
+            <p><span className="badge-orange">{summary.registrationNumber}</span></p>
+            {kartaName && <p>Karta: {kartaName}</p>}
+            {summary.gotra && <p>Gotra: {summary.gotra}</p>}
+            {summary.nativeVillage && <p>Mul Gaon: {[summary.nativeVillage, summary.nativeDistrict, summary.nativeState].filter(Boolean).join(', ')}</p>}
+            <p>{summary._count.members} members</p>
+          </div>
+        </div>
+        <JoinFamilyPanel familyId={summary.id} kartaMemberId={summary.kartaMemberId} kartaName={kartaName} gender={viewerGender} />
+      </div>
+    )
+  }
 
   const family = await prisma.family.findUnique({
     where: { id: params.id, deletedAt: null },
@@ -47,6 +85,17 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
       if (k || !member.userId || member.status !== 'ACTIVE') return false
       return !member.dateOfBirth || (calculateAge(member.dateOfBirth) ?? 18) >= 18
     })
+    .map(({ member }: any) => ({ id: member.id, name: `${member.firstName} ${member.lastName ?? ''}`.trim() }))
+
+  // Rule 1 / F24: each membership's role, labelled from the relationship master.
+  const roleTypes = await prisma.relationshipType.findMany({
+    where: { code: { in: family.members.map((m: any) => m.relationshipRole).filter(Boolean) } },
+    select: { code: true, label: true },
+  })
+  const roleLabel = new Map(roleTypes.map((t) => [t.code, t.label]))
+  const relatives = family.members.map(({ member }: any) => ({ id: member.id, name: `${member.firstName} ${member.lastName ?? ''}`.trim() }))
+  const living = family.members.filter(({ member }: any) => member.status !== 'DECEASED')
+  const adults = (g: string) => living.filter(({ member }: any) => member.gender === g && (calculateAge(member.dateOfBirth) ?? 18) >= 15)
     .map(({ member }: any) => ({ id: member.id, name: `${member.firstName} ${member.lastName ?? ''}`.trim() }))
 
   const currentAddress = family.addresses.find((a: any) => a.addressType === 'CURRENT')
@@ -138,7 +187,15 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
         )}
       </div>
 
+      {family.status === 'KARTA_VACANT' && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          This family has no Karta. An Operator of the district will confirm the new Karta (the eldest adult is suggested).
+        </div>
+      )}
+
       {isKarta && <JoinRequestsInbox familyId={family.id} />}
+
+      {isKarta && <NewbornPanel familyId={family.id} fathers={adults('MALE')} mothers={adults('FEMALE')} />}
 
       {isKarta && <ChangeKartaPanel familyId={family.id} candidates={kartaCandidates} />}
 
@@ -165,11 +222,13 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-3">Family Members</h2>
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {family.members.map(({ member, isKarta }: any) => {
+          {family.members.map(({ member, isKarta: memberIsKarta, relationshipRole }: any) => {
             const age = calculateAge(member.dateOfBirth)
             const edu = member.education[0]
+            const late = member.status === 'DECEASED'
             return (
-              <Link key={member.id} href={`/members/${member.id}`} className="card-hover block">
+              <div key={member.id} className="card-hover block">
+              <Link href={`/members/${member.id}`} className="block">
                 <div className="flex items-start gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 ${
                     member.gender === 'MALE' ? 'bg-blue-500' : member.gender === 'FEMALE' ? 'bg-pink-500' : 'bg-gray-400'
@@ -179,11 +238,12 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="font-semibold text-gray-900 text-sm truncate">
-                        {member.firstName} {member.lastName ?? ''}
+                        {late ? 'Late ' : ''}{member.firstName} {member.lastName ?? ''}
                       </p>
-                      {isKarta && <span className="badge-orange text-xs shrink-0">Karta</span>}
+                      {memberIsKarta && <span className="badge-orange text-xs shrink-0">Karta</span>}
                     </div>
                     <div className="text-xs text-gray-500 space-y-0.5 mt-0.5">
+                      {relationshipRole && relationshipRole !== 'karta' && <div className="text-saffron-700">{roleLabel.get(relationshipRole) ?? relationshipRole}</div>}
                       <div>{GENDER_LABELS[member.gender as keyof typeof GENDER_LABELS] ?? member.gender} {age ? `· ${age} yrs` : ''}</div>
                       <div>{MARITAL_STATUS_LABELS[member.maritalStatus as keyof typeof MARITAL_STATUS_LABELS] ?? member.maritalStatus}</div>
                       {member.currentCity && <div>{member.currentCity}</div>}
@@ -192,6 +252,12 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
                   </div>
                 </div>
               </Link>
+              {(isKarta || isDistrictOperator) && !memberIsKarta && (
+                <MemberManageActions familyId={family.id} memberId={member.id} gender={member.gender}
+                  canRemove={isKarta} isOperator={isDistrictOperator}
+                  relatives={relatives.filter((r: any) => r.id !== member.id)} />
+              )}
+              </div>
             )
           })}
         </div>

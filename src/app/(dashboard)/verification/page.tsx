@@ -30,8 +30,13 @@ export default function VerificationPage() {
   const [agree, setAgree] = useState(false)
   const [otp, setOtp] = useState('')
   const [codeSent, setCodeSent] = useState(false)
+  // F17: profiles a Karta may already have created for this person.
+  const [claims, setClaims] = useState<{ matches: any[]; claims: any[] }>({ matches: [], claims: [] })
 
-  const load = useCallback(() => fetch('/api/verification').then((r) => r.json()).then(setData), [])
+  const load = useCallback(() => {
+    fetch('/api/claims').then((r) => (r.ok ? r.json() : { matches: [], claims: [] })).then(setClaims).catch(() => {})
+    return fetch('/api/verification').then((r) => r.json()).then(setData)
+  }, [])
   useEffect(() => { load() }, [load])
 
   const call = async (url: string, init: RequestInit) => {
@@ -76,6 +81,23 @@ export default function VerificationPage() {
           <pre className="text-sm mt-3 whitespace-pre-wrap font-sans bg-white/60 rounded-lg p-3">{data.note}</pre>
         )}
       </div>
+
+      {(claims.matches.length > 0 || claims.claims.some((c) => c.status === 'PENDING')) && (
+        <div className="card space-y-2 border-2 border-saffron-200">
+          <h2 className="font-semibold text-gray-900">Is one of these you?</h2>
+          <p className="text-sm text-gray-500">A family may already have added you. Claiming it keeps one record with all your family links; the family&apos;s Karta confirms.</p>
+          {claims.claims.filter((c) => c.status === 'PENDING').map((c) => (
+            <p key={c.id} className="text-sm text-blue-700">Your claim is waiting for the Karta to confirm.</p>
+          ))}
+          {!claims.claims.some((c) => c.status === 'PENDING') && claims.matches.map((m) => (
+            <div key={m.memberId} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-3">
+              <span><strong>{m.name}</strong>{m.birthYear ? `, born ${m.birthYear}` : ''}{m.mulGaon ? ` · ${m.mulGaon}` : ''} · {m.families.map((f: any) => f.name).join(', ')} family</span>
+              <button type="button" className="btn-primary text-xs" disabled={busy}
+                onClick={() => call('/api/claims', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId: m.memberId }) })}>This is me</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="card space-y-3">
         <div className="flex items-center justify-between">

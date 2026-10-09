@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { afterMemberExpired, closeKartaTransfer } from '@/lib/family-rules'
 import { applySpouseLink, applyMarkDeceased, applyKartaChange, applyAddressChange } from '@/lib/approvals'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
@@ -158,6 +159,17 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     return approval
   })
+
+  // F12 / F16 follow-ups that notify people run after the commit.
+  if (updated.entityId && action === 'approve') {
+    if (updated.actionCode === 'member.mark_deceased' && updated.entityType === 'member') {
+      await afterMemberExpired(updated.entityId, session.user?.id as string)
+    }
+    if (updated.actionCode === 'family.karta.change' && updated.entityType === 'family') {
+      const payload = updated.newValue as { familyId: string; newKartaMemberId: string }
+      await closeKartaTransfer(payload.familyId, payload.newKartaMemberId, session.user?.id as string)
+    }
+  }
 
   return NextResponse.json({ message: 'Updated', approval: updated })
 }

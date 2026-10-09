@@ -6,6 +6,7 @@ import {
   ChevronRight, Calendar, MapPin
 } from 'lucide-react'
 import Link from 'next/link'
+import VacancyConfirmList from '@/components/family/VacancyConfirmList'
 import { formatDate, calculateAge } from '@/lib/utils'
 import { resolveDashboardLabel, resolveOnboardingPath } from '@/lib/dashboard-routing'
 
@@ -79,6 +80,8 @@ export default async function DashboardPage() {
           <p className="text-sm mt-0.5">Family, community and matrimony features open once two community operators verify your profile. Open Verification →</p>
         </Link>
       )}
+      {/* F16: Karta nominations to answer (and vacancies, for Operators). */}
+      <VacancyConfirmList />
       {/* Welcome banner */}
       <div className="bg-gradient-to-r from-saffron-600 to-orange-500 rounded-2xl p-6 text-white shadow-sm">
         <div className="flex items-start justify-between">

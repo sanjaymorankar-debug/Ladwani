@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { generateMemberNumber } from '@/lib/utils'
 import { canManageFamily, canViewFamily } from '@/lib/family-auth'
 import { requireActiveAccount } from '@/lib/account-state'
+import { roleGenderError, familyUserIds } from '@/lib/family-rules'
+import { recordAudit } from '@/lib/audit'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -41,6 +43,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ message: 'Only this family\'s Karta can add members' }, { status: 403 })
   }
 
+  // F10: the relationship must suit the person's gender ('Daughter' needs Female),
+  // and must be relative to someone actually in this family.
+  const genderError = await roleGenderError(body.relationshipTypeCode, body.gender)
+  if (genderError) return NextResponse.json({ message: genderError }, { status: 400 })
+  if (body.relatedToMemberId) {
+    const relative = await prisma.familyMember.findFirst({ where: { familyId: params.id, memberId: body.relatedToMemberId, leftAt: null } })
+    if (!relative) return NextResponse.json({ message: 'The person this relationship is relative to is not in this family' }, { status: 400 })
+  }
+
   // Duplicate detection: don't silently create a second Member record for
   // someone who's already in the system. Search by mobile/email (exact) and
   // by name+DOB (a looser match) before creating anything.
@@ -56,6 +67,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 firstName: { equals: body.firstName },
                 lastName: body.lastName ? { equals: body.lastName } : undefined,
                 dateOfBirth: new Date(body.dateOfBirth),
+              }
+            : undefined,
+          // F10: name + father's name (when no DOB is known).
+          body.firstName && body.fatherName && !body.dateOfBirth
+            ? {
+                firstName: { equals: body.firstName },
+                relationshipsFrom: { some: { relationshipType: { code: { in: ['son', 'daughter'] } }, toMember: { firstName: { equals: String(body.fatherName).trim() }, gender: 'MALE' } } },
               }
             : undefined,
         ].filter(Boolean) as any[],
@@ -106,9 +124,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       },
     })
 
-    // Add to family
+    // Add to family — rule 1: the membership row carries the role and relative-to.
     await tx.familyMember.create({
-      data: { familyId: params.id, memberId: member.id, joinedBy: userId },
+      data: {
+        familyId: params.id, memberId: member.id, joinedBy: userId,
+        relationshipRole: body.relationshipTypeCode || null,
+        relativeToMemberId: body.relatedToMemberId || null,
+      },
     })
 
     // Create relationship if specified
@@ -156,17 +178,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       })
     }
 
-    // Audit log
-    await tx.auditLog.create({
-      data: {
-        actorId: userId,
-        actorRole: ((session.user as any)?.roles ?? ['MEMBER'])[0],
-        action: 'family.member.add',
-        entityType: 'member',
-        entityId: member.id,
-        newValue: { firstName: member.firstName, lastName: member.lastName, familyId: params.id },
+    await recordAudit({
+      actorId: userId, actorRole: ((session.user as any)?.roles ?? ['MEMBER'])[0], action: 'family.member.add',
+      entityType: 'member', entityId: member.id,
+      newValue: {
+        firstName: member.firstName, lastName: member.lastName, gender: member.gender, dateOfBirth: member.dateOfBirth,
+        familyId: params.id, relationshipRole: body.relationshipTypeCode || null, relativeToMemberId: body.relatedToMemberId || null,
       },
-    })
+    }, req, tx)
 
     return member
   })

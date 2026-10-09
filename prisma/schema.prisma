@@ -224,12 +224,14 @@ model Family {
   @@map("families")
 }
 
+// Workbook "Family" statuses: ACTIVE, KARTA_VACANT (F16), MERGED; CLOSED = ARCHIVED.
 enum FamilyStatus {
   PENDING
   ACTIVE
   INACTIVE
   MERGED
   ARCHIVED
+  KARTA_VACANT
 }
 
 enum VerificationStatus {
@@ -260,7 +262,10 @@ model FamilyJoinRequest {
   family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
   member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
-  @@unique([familyId, memberId, status, direction])
+  // F14: one OPEN request per person per family is enforced in code; the old
+  // unique(familyId, memberId, status, direction) also blocked a second
+  // REJECTED row, so a re-request could never be rejected again.
+  @@index([familyId, memberId, status])
   @@map("family_join_requests")
 }
 
@@ -300,12 +305,25 @@ model FamilyMember {
   joinedAt   DateTime  @default(now())
   joinedBy   String?
   leftAt     DateTime?
-  leftReason String? // MARRIED_OUT, DECEASED, SEPARATED, ERROR, MERGED
+  leftReason String? // MARRIED_OUT, DECEASED, SEPARATED, ERROR, MERGED; F11: WRONGLY_ADDED, MOVED_OUT, DUPLICATE
+  // Rule 1 / F24: the membership record carries the relationship role
+  // (relationship_types.code, or 'karta'), who it is relative to, and a status:
+  // ACTIVE, REMOVED (F11), ENDED (divorce, death...). INVITED / REQUESTED live in
+  // family_join_requests until accepted.
+  relationshipRole   String?
+  relativeToMemberId String?
+  status             String  @default("ACTIVE")
+  // Rule 2, enforced by the database: a generated column (migration
+  // 20261009150000_p2_family_karta) that is 1 only on the active Karta row,
+  // under unique(familyId, kartaGuard) — at most one active Karta per family.
+  // Never written by the application.
+  kartaGuard Int?
 
   family Family @relation(fields: [familyId], references: [id])
   member Member @relation(fields: [memberId], references: [id])
 
   @@unique([familyId, memberId])
+  @@unique([familyId, kartaGuard])
   @@map("family_members")
 }
 
@@ -421,6 +439,11 @@ model RelationshipType {
   inverseCode      String?
   genderApplicable String? // MALE, FEMALE, ANY
   isSpouse         Boolean @default(false)
+  // Workbook "Relationships" sheet columns.
+  localName        String? // Hindi / Marathi
+  generation       Int? // relative to Karta: +1 = one up, -1 = one down
+  side             String? // PATERNAL, MATERNAL, HUSBAND_SIDE, WIFE_SIDE, SPOUSE_SIDE
+  linkType         String? // BIRTH, MARRIAGE, BIRTH_OR_ADOPTION
   isActive         Boolean @default(true)
   sortOrder        Int     @default(0)
 
@@ -1446,4 +1469,47 @@ model ProfileChangeRequest {
 
   @@index([memberId, status])
   @@map("profile_change_requests")
+}
+
+/// F16 — handing the Karta role over. VOLUNTARY: the current Karta nominates
+/// an adult active member, who must accept (then the existing Admin review
+/// applies when ApprovalRule family.karta.change is on). VACANCY: the Karta
+/// died; the eldest adult is suggested and an Operator of the family's
+/// district (or an Admin) confirms.
+model KartaTransfer {
+  id                String    @id @default(cuid())
+  familyId          String
+  kind              String // VOLUNTARY, VACANCY
+  fromMemberId      String?
+  toMemberId        String?
+  suggestedMemberId String?
+  status            String    @default("PENDING") // PENDING, ACCEPTED, DECLINED, CONFIRMED, CANCELLED
+  requestedBy       String?
+  respondedAt       DateTime?
+  confirmedBy       String?
+  confirmedAt       DateTime?
+  slaAlertedAt      DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@index([familyId, status])
+  @@map("karta_transfers")
+}
+
+/// F17 — a registered user says "this is me" about a profile a Karta created
+/// earlier; that family's Karta confirms and the two records merge into one.
+model ProfileClaim {
+  id               String    @id @default(cuid())
+  userId           String
+  claimantMemberId String // the member created at registration
+  targetMemberId   String // the Karta-created, account-less profile
+  familyId         String
+  status           String    @default("PENDING") // PENDING, CONFIRMED, REJECTED
+  decidedBy        String?
+  decidedAt        DateTime?
+  note             String?
+  createdAt        DateTime  @default(now())
+
+  @@index([targetMemberId, status])
+  @@index([userId, status])
+  @@map("profile_claims")
 }
