@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -28,7 +29,7 @@ export default function ClaimProfilePage({ params }: { params: { token: string }
   })
 
   useEffect(() => {
-    fetch(`/api/invitations/${params.token}`)
+    fetch(`${BASE_PATH}/api/invitations/${params.token}`)
       .then(async (r) => {
         const json = await r.json()
         if (!r.ok) throw new Error(json.message ?? 'This invitation link is not valid.')
@@ -41,7 +42,7 @@ export default function ClaimProfilePage({ params }: { params: { token: string }
   const onSubmit = async (data: ClaimInput) => {
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/invitations/${params.token}/accept`, {
+      const res = await fetch(`${BASE_PATH}/api/invitations/${params.token}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

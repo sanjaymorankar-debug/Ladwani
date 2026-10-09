@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { UsersRound, UserMinus, Loader2, Search, CheckCircle2 } from 'lucide-react'
@@ -36,7 +37,7 @@ export default function GroupRosterManager({
   const [busy, setBusy] = useState(false)
 
   const load = () =>
-    fetch(`/api/groups/${groupId}/members`)
+    fetch(`${BASE_PATH}/api/groups/${groupId}/members`)
       .then((r) => r.json())
       .then((d) => setRoster(d.roster ?? []))
       .catch(() => {})
@@ -47,7 +48,7 @@ export default function GroupRosterManager({
   useEffect(() => {
     if (!query.trim()) { setHits([]); return }
     const t = setTimeout(() => {
-      fetch(`/api/search?q=${encodeURIComponent(query)}`)
+      fetch(`${BASE_PATH}/api/search?q=${encodeURIComponent(query)}`)
         .then((r) => r.json())
         .then((d) => setHits((d.members ?? []).filter((m: SearchHit) => !roster.some((r) => r.memberId === m.id))))
         .catch(() => {})
@@ -58,7 +59,7 @@ export default function GroupRosterManager({
   const addMember = async (memberId: string) => {
     setBusy(true)
     try {
-      const res = await fetch(`/api/groups/${groupId}/members`, {
+      const res = await fetch(`${BASE_PATH}/api/groups/${groupId}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ memberId }),
@@ -79,7 +80,7 @@ export default function GroupRosterManager({
   const removeMember = async (memberId: string) => {
     setBusy(true)
     try {
-      const res = await fetch(`/api/groups/${groupId}/members?memberId=${memberId}`, { method: 'DELETE' })
+      const res = await fetch(`${BASE_PATH}/api/groups/${groupId}/members?memberId=${memberId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error((await res.json()).message)
       setRoster((r) => r.filter((x) => x.memberId !== memberId))
     } catch (e: any) {
@@ -92,7 +93,7 @@ export default function GroupRosterManager({
   const confirmRoster = async () => {
     setBusy(true)
     try {
-      const res = await fetch(`/api/groups/${groupId}/roster-review`, { method: 'POST' })
+      const res = await fetch(`${BASE_PATH}/api/groups/${groupId}/roster-review`, { method: 'POST' })
       if (!res.ok) throw new Error((await res.json()).message)
       toast.success('Roster marked as current')
       location.reload()

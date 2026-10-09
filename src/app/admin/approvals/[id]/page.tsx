@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -14,7 +15,7 @@ export default function ApprovalDetailPage() {
   const [isLoading, setIsLoading] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`/api/approvals/${params.id}`)
+    fetch(`${BASE_PATH}/api/approvals/${params.id}`)
       .then((r) => r.json())
       .then(setApproval)
   }, [params.id])
@@ -22,7 +23,7 @@ export default function ApprovalDetailPage() {
   const act = async (action: string) => {
     setIsLoading(action)
     try {
-      const res = await fetch(`/api/approvals/${params.id}`, {
+      const res = await fetch(`${BASE_PATH}/api/approvals/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, note }),

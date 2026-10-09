@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { Lock, Save, Loader2 } from 'lucide-react'
@@ -39,7 +40,7 @@ export default function PrivacySettingsPage() {
 
   useEffect(() => {
     if (!memberId) return
-    fetch(`/api/members/${memberId}/visibility`)
+    fetch(`${BASE_PATH}/api/members/${memberId}/visibility`)
       .then((r) => r.json())
       .then((d) => {
         if (d.settings) {
@@ -57,7 +58,7 @@ export default function PrivacySettingsPage() {
     if (!memberId) return
     setIsSaving(true)
     try {
-      const res = await fetch(`/api/members/${memberId}/visibility`, {
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/visibility`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings }),

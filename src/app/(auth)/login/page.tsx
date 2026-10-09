@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn, getSession } from 'next-auth/react'
@@ -38,7 +39,7 @@ function LoginForm() {
       // Pre-flight check first: NextAuth collapses every authorize() failure
       // into a generic "CredentialsSignin" error, so we can't tell suspended
       // from locked from wrong-password through signIn() alone.
-      const checkRes = await fetch('/api/auth/login-check', {
+      const checkRes = await fetch(`${BASE_PATH}/api/auth/login-check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier: data.identifier, password: data.password }),

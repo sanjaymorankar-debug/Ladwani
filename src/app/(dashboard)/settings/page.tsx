@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { Eye, EyeOff, Loader2, Save, Bell, Lock, Trash2, Shield } from 'lucide-react'
@@ -20,7 +21,7 @@ export default function SettingsPage() {
     if (newPwd.length < 8) return toast.error('Password must be at least 8 characters')
     setIsSaving(true)
     try {
-      const res = await fetch('/api/auth/change-password', {
+      const res = await fetch(`${BASE_PATH}/api/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentPassword: current, newPassword: newPwd }),

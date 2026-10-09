@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -60,7 +61,7 @@ function FamilySetup() {
     if (!searchQuery.trim()) return
     setIsSearching(true)
     try {
-      const res = await fetch(`/api/families?q=${encodeURIComponent(searchQuery)}&limit=10`)
+      const res = await fetch(`${BASE_PATH}/api/families?q=${encodeURIComponent(searchQuery)}&limit=10`)
       const data = await res.json()
       setSearchResults(data.families ?? [])
     } finally { setIsSearching(false) }
@@ -69,7 +70,7 @@ function FamilySetup() {
   const requestJoin = async (familyId: string, familyName: string) => {
     setJoiningFamilyId(familyId)
     try {
-      const res = await fetch(`/api/families/${familyId}/join-requests`, {
+      const res = await fetch(`${BASE_PATH}/api/families/${familyId}/join-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -88,7 +89,7 @@ function FamilySetup() {
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
     try {
-      const res = await fetch('/api/families', {
+      const res = await fetch(`${BASE_PATH}/api/families`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
