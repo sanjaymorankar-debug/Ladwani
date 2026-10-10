@@ -2,9 +2,9 @@
 
 This change adds 23 optional "Additional Details" sections to every member's profile. It also adds community interest groups that are built from what members choose to share. Written 9 Oct 2026.
 
-> **Stack note.** The brief describes a Laravel/PHP codebase. This repository is actually **Next.js 14 (App Router) + Prisma 5 + MySQL** (`package.json`, `prisma/schema.prisma`). Everything was built in that existing stack and style:
+> **Stack note.** The brief describes a Laravel/PHP codebase. This repository is actually **Next.js 14 (App Router) + Prisma 5 + PostgreSQL** (`package.json`, `prisma/schema.prisma`). The database was MySQL when this was built and moved to PostgreSQL later in Oct 2026; the notes below on migrations, test runs and deployment say which applies. Everything was built in the existing stack and style:
 >
-> - Laravel migrations → Prisma migrations, each with a `down.sql`
+> - Laravel migrations → Prisma migrations (each with a `down.sql` while on MySQL)
 > - policies → `src/lib/*-auth.ts`-style access helpers
 > - form requests → shared validators in `src/lib/additional-details/`
 > - Blade views → React pages
@@ -107,14 +107,11 @@ All 23 sections are **built**: saved, edited and deleted through the API, and co
 
 ## 3. Files added or changed
 
-### Database (run order)
+### Database
 
-1. `prisma/migrations/20261009100000_member_additional_details/migration.sql`: new tables, plus nullable columns on `education_records`, `businesses` and `consent_records`. Rollback is `down.sql` in the same folder.
-2. `prisma/migrations/20261009110000_interest_groups/migration.sql`: nullable columns on `community_groups`, `community_group_members` and `posts`, plus poll and RSVP tables. Rollback is its own `down.sql`. When rolling back, run this one **first**.
-3. `database/phpmyadmin/add_additional_details_and_interest_groups.sql`: both migrations plus reference data, for phpMyAdmin.
-4. `database/phpmyadmin/rollback_additional_details_and_interest_groups.sql`: the phpMyAdmin rollback.
+On PostgreSQL these tables and columns are part of the single baseline migration, `prisma/migrations/20261009200000_postgresql_baseline/`, and of `scripts/postgres/01-schema.sql`. They are new tables, nullable columns on `education_records`, `businesses`, `consent_records`, `community_groups`, `community_group_members` and `posts`, plus poll and RSVP tables.
 
-Both `down.sql` scripts were checked: applying up → down → up gives a schema identical to `schema.prisma`, and up → down gives a schema identical to the pre-change schema.
+When this was built on MySQL they shipped as two additive migrations, `20261009100000_member_additional_details` and `20261009110000_interest_groups`, each with a `down.sql`, plus phpMyAdmin import and rollback files under `database/phpmyadmin/`. The two `down.sql` scripts were checked: up → down → up gave a schema identical to `schema.prisma`. All of those MySQL files were removed when the database moved to PostgreSQL.
 
 Changed:
 - `prisma/schema.prisma`: models for the above.
@@ -216,7 +213,7 @@ No existing test was edited.
 
 ## 4. Test results
 
-The suites run against MySQL 8.0, as in CI.
+These results were recorded against MySQL 8.0, the database at the time. After the move to PostgreSQL the same suites, plus four PostgreSQL-specific tests, run against PostgreSQL 16 in CI: 300 tests, all passing.
 
 | | Test files | Tests | Result |
 |---|---|---|---|
@@ -257,19 +254,17 @@ The brief's requested test areas map to these test IDs:
 
 The wizard, auto-join notice, group page and dashboard were also walked through in a real browser (Chromium, 390 px wide) against the production build.
 
-## 5. Deploying on the shared host
+## 5. Deploying
 
-These steps are for the person who deploys. Nothing here was run against production.
+These steps are for the person who deploys. Nothing here was run against production. The database is PostgreSQL; the full procedure is in `DEPLOYMENT.md`. A database that is still MySQL can't be upgraded with these steps. Its data moves with `MIGRATION.md`.
 
-1. **Back up the database** (hPanel → Databases → phpMyAdmin → Export) and keep the current app folder.
+1. **Back up the database** (your PostgreSQL provider's backup, or `pg_dump -Fc`) and keep the current app folder.
 2. Deploy the code as you do today (`git pull` on the host, or upload the build).
-3. Run `npm ci`, then `npx prisma migrate deploy`. This applies exactly the two new migrations, which are additive only.
-   - If you manage the schema through phpMyAdmin instead, import `database/phpmyadmin/add_additional_details_and_interest_groups.sql` **once**.
-   - Then run `npx prisma migrate resolve --applied 20261009100000_member_additional_details` and `npx prisma migrate resolve --applied 20261009110000_interest_groups`.
-4. Run `npm run db:seed` to add the team roles, district areas, hobby master and group post types. It is idempotent and creates no test accounts unless `SEED_TEST_ACCOUNTS=true`. The phpMyAdmin file already contains the same reference data.
+3. Run `npm ci`, then `npx prisma migrate deploy`. On a new database this creates everything, these sections included. (`scripts/postgres/01-schema.sql` is the SQL-file alternative.)
+4. Run `npm run db:seed` to add the team roles, district areas, hobby master and group post types. It is idempotent and creates no test accounts unless `SEED_TEST_ACCOUNTS=true`. `scripts/postgres/02-reference-data.sql` contains the same reference data.
 5. Add `CRON_SECRET=<long random string>` to the app's environment variables.
-6. Run `npm run build`, then restart the Node.js app from hPanel.
-7. Create the daily digest cron job (hPanel → Advanced → Cron Jobs, once a day, e.g. 07:00):
+6. Run `npm run build`, then restart the Node.js app (hPanel's Restart button on Hostinger).
+7. Create the daily digest cron job with your host's scheduler (on Hostinger: hPanel → Advanced → Cron Jobs), once a day, e.g. 07:00:
    `curl -s -X POST -H "x-cron-secret: <CRON_SECRET>" https://<your-site>/api/cron/group-digest`
 8. Sign in as Admin:
    - Assign **Community teams** on each person's user page (Admin → Users → user → Community teams): a district for District team, a state for State team.
@@ -277,18 +272,13 @@ These steps are for the person who deploys. Nothing here was run against product
    - Adjust **Additional Details Dropdowns** if needed.
 9. Uploads use the existing `UPLOAD_DIR`. Keep it outside `public_html`, as it is for photos today.
 
-**Rollback:**
-1. Restore the previous app build.
-2. Run `prisma/migrations/20261009110000_interest_groups/down.sql`, then `prisma/migrations/20261009100000_member_additional_details/down.sql`. The phpMyAdmin rollback file does both.
-3. Delete the two rows from `_prisma_migrations`, as the scripts' headers describe.
-
-Rollback removes all data entered in these sections.
+**Rollback:** on PostgreSQL these sections are part of the baseline schema, so there is no separate down migration. Roll back by restoring the previous app build and the database backup from step 1. That removes all data entered since the backup.
 
 ## 6. Assumptions and decisions
 
 These are worth confirming.
 
-1. **Stack.** The work is in Next.js + Prisma + MySQL, because that is what this repository is (see the note at the top). The brief's "bkesari.com/ladwani" host was not touched.
+1. **Stack.** The work is in Next.js + Prisma, on MySQL at the time and PostgreSQL now, because that is what this repository is (see the note at the top). The brief's "bkesari.com/ladwani" host was not touched.
 2. **Visibility levels.** Rule 2 lists four levels but gives "Community" as a default. Five levels were implemented, ordered narrowest to widest:
    - Only me
    - My Karta

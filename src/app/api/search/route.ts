@@ -21,17 +21,17 @@ export async function GET(req: Request) {
 
   if (q) {
     where.OR = [
-      { firstName: { contains: q } },
-      { lastName: { contains: q } },
-      { currentCity: { contains: q } },
-      { nativeVillage: { contains: q } },
-      { occupationCategory: { contains: q } },
+      { firstName: { contains: q, mode: 'insensitive' } },
+      { lastName: { contains: q, mode: 'insensitive' } },
+      { currentCity: { contains: q, mode: 'insensitive' } },
+      { nativeVillage: { contains: q, mode: 'insensitive' } },
+      { occupationCategory: { contains: q, mode: 'insensitive' } },
     ]
   }
 
   if (gender) where.gender = gender
   if (maritalStatus) where.maritalStatus = maritalStatus
-  if (city) where.currentCity = { contains: city }
+  if (city) where.currentCity = { contains: city, mode: 'insensitive' }
 
   if (minAge || maxAge) {
     const now = new Date()

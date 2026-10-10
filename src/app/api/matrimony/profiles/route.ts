@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   const memberWhere: any = { status: 'ACTIVE' }
   if (gender) memberWhere.gender = gender
-  if (city) memberWhere.currentCity = { contains: city }
+  if (city) memberWhere.currentCity = { contains: city, mode: 'insensitive' }
   if (minAge || maxAge) {
     const now = new Date()
     memberWhere.dateOfBirth = {}
