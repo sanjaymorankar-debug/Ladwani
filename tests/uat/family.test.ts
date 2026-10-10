@@ -3,7 +3,7 @@ import { describe, it, expect, afterAll, vi } from 'vitest'
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }))
 
 import { prisma } from '@/lib/prisma'
-import { POST as postFamilies } from '@/app/api/families/route'
+import { POST as postFamilies, GET as listFamilies } from '@/app/api/families/route'
 import { POST as postMembers, GET as getMembers } from '@/app/api/families/[id]/members/route'
 import { GET as getTree } from '@/app/api/families/[id]/tree/route'
 import { POST as postJoinRequest, GET as getJoinRequests } from '@/app/api/families/[id]/join-requests/route'
@@ -196,6 +196,20 @@ describe('TC-FAM — family and Karta', () => {
     })
     expect(link).toBeNull()
     await prisma.familyJoinRequest.deleteMany({ where: { memberId: joiner.memberId } })
+  })
+})
+
+describe('TC-FAM — search', () => {
+  it('TC-FAM-010 family search matches a name typed in a different case', async () => {
+    const karta = await account('KARTA-01')
+    const family = await prisma.family.findUniqueOrThrow({ where: { id: karta.familyId! } })
+    const swapCase = (t: string) =>
+      t.split('').map((c) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase())).join('')
+    expect(swapCase(family.name)).not.toBe(family.name) // the test really changes the case
+    actAs({ userId: karta.userId, roles: karta.roles, memberId: karta.memberId })
+    const res = await listFamilies(new Request(`http://x/api/families?q=${encodeURIComponent(swapCase(family.name))}`) as any)
+    expect(res.status).toBe(200)
+    expect(JSON.stringify(await res.json())).toContain(family.id)
   })
 })
 
