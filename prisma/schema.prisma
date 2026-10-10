@@ -322,7 +322,9 @@ model Member {
   physicalDisability    String?
   mobilePrimary         String?
   mobileAlternate       String?
-  email                 String?
+  /// CITEXT, like users.email: the Karta's duplicate check matches an address
+  /// whatever case it was typed in. Not unique: a parent and child may share one.
+  email                 String?        @db.Citext
   profilePhotoId        String?        @unique
   biography             String?        @db.Text
   currentCity           String?

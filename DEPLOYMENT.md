@@ -56,7 +56,10 @@ PostgreSQL features. Moving back restored both, plus case-insensitive email:
 - **Case-insensitive search** (`mode: 'insensitive'`) is back on free-text
   filters. MySQL's collation had made that implicit.
 - **`users.email` is `CITEXT`**, so login, registration and the unique index
-  ignore letter case, as they did under MySQL.
+  ignore letter case, as they did under MySQL. **`members.email`** is
+  `CITEXT` too (migration `20261010090000_member_email_citext`), so the
+  Karta's duplicate-member check matches an address in any case. It has no
+  unique constraint.
 - Array-valued columns (languages, preferred locations, facilities, the
   Additional Details multi-selects) stay JSON, now `jsonb`.
 - The six MySQL migrations were replaced by one PostgreSQL baseline

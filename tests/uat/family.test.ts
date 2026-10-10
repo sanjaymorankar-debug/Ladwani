@@ -119,6 +119,27 @@ describe('TC-FAM — family and Karta', () => {
     expect(after).toBe(before) // nothing was created (spec §31)
   })
 
+  it('TC-FAM-007b the duplicate check matches an email typed in a different case', async () => {
+    const karta = await account('KARTA-01')
+    // Someone already in the community with only an email on record.
+    const existing = await prisma.member.create({
+      data: { memberNumber: `UAT-TMP-${Date.now()}`, firstName: 'Meera', lastName: 'Casecheck', email: 'Meera.Casecheck@uat.test' },
+    })
+    created.push(existing.id)
+    actAs({ userId: karta.userId, roles: ['KARTA'], memberId: karta.memberId })
+
+    const before = await prisma.member.count()
+    const res = await postMembers(
+      jsonReq('http://x', 'POST', { firstName: 'M', lastName: 'C', gender: 'FEMALE', email: 'MEERA.CASECHECK@UAT.TEST' }) as any,
+      { params: { id: karta.familyId! } }
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.possibleDuplicates.map((d: any) => d.id)).toContain(existing.id)
+    expect(await prisma.member.count()).toBe(before)
+  })
+
   it('TC-FAM-008 an existing member can request to join, and the Karta accepts', async () => {
     const joiner = await account('MEMBER-02')
     const karta = await account('KARTA-02')

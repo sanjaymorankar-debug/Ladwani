@@ -128,9 +128,12 @@ create missing Member rows, cancel one of each overlapping pair) **before**
 migrating. It's much easier to fix in MySQL, where you still have the full
 original context, than afterwards.
 
-Email addresses need no clean-up: `users.email` is case-insensitive in both
-databases (MySQL by collation, PostgreSQL as `CITEXT`), so MySQL can't hold
-two addresses that would collide in PostgreSQL.
+Email addresses need no clean-up. `users.email` and `members.email` are
+case-insensitive in both databases (MySQL by collation, PostgreSQL as
+`CITEXT`). The unique index on `users.email` therefore can't reject anything
+MySQL accepted. `members.email` has no unique constraint at all; the
+duplicate-members query above already compares it case-insensitively on
+MySQL.
 
 ## Step 3 — Migrate
 

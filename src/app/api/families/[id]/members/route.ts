@@ -39,7 +39,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   // Duplicate detection: don't silently create a second Member record for
   // someone who's already in the system. Search by mobile/email (exact) and
-  // by name+DOB (a looser match) before creating anything.
+  // by name+DOB (a looser match) before creating anything. members.email is
+  // CITEXT, so the email match ignores letter case.
   if (!body.forceCreate) {
     const candidates = await prisma.member.findMany({
       where: {

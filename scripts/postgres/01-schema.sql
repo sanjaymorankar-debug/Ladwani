@@ -1865,6 +1865,19 @@ ALTER TABLE "bookings"
   WHERE ("status" IN ('PENDING_PAYMENT', 'CONFIRMED'));
 
 -- ───────────────────────────────────────────────────────────────────────────
+-- Migration 20261010090000_member_email_citext
+-- ───────────────────────────────────────────────────────────────────────────
+-- members.email becomes CITEXT, matching users.email, so the Karta's
+-- duplicate-member check (POST /api/families/[id]/members) finds an existing
+-- member whatever case the address was typed in. MySQL's collation did this
+-- implicitly. The column has no unique constraint, so existing rows that
+-- differ only in case are kept as they are. The citext extension is created
+-- by the baseline migration.
+
+-- AlterTable
+ALTER TABLE "members" ALTER COLUMN "email" SET DATA TYPE CITEXT;
+
+-- ───────────────────────────────────────────────────────────────────────────
 -- Prisma's migration bookkeeping (same shape `prisma migrate deploy` creates)
 -- ───────────────────────────────────────────────────────────────────────────
 CREATE TABLE "_prisma_migrations" (
@@ -1881,5 +1894,7 @@ CREATE TABLE "_prisma_migrations" (
 
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "applied_steps_count")
 VALUES (gen_random_uuid()::text, 'dcf5db65296a63511737971b7e3ff4c47ba6450abeb6769ed6cbda30cfd1fd2e', now(), '20261009200000_postgresql_baseline', 1);
+INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "applied_steps_count")
+VALUES (gen_random_uuid()::text, 'fa59c54b17202fb8b994f2301b1ae5b38c7ead740f3b751f902dd3e99ac09741', now(), '20261010090000_member_email_citext', 1);
 
 COMMIT;
