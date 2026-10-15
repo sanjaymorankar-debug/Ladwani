@@ -10,9 +10,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest --runInBand",
     "test:integration": "jest --runInBand --testPathIgnorePatterns=[] --testRegex \".*\\.integration\\.spec\\.ts$\"",
+    "test:setup:local": "node scripts/with-env.js .env.test npx prisma migrate deploy",
+    "test:integration:local": "node scripts/with-env.js .env.test npm run test:integration",
     "test:watch": "jest --watch",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {

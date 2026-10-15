@@ -43,6 +43,19 @@ npm run test
 npm run build
 ```
 
+`npm run test` is the unit tier — 23 suites that use injected doubles and need
+no database, so it runs on a fresh clone. The one database-backed test (the
+booking concurrency lock) is excluded from it by Jest config and runs
+separately:
+
+```bash
+cp apps/api/.env.test.example apps/api/.env.test
+npm run test:local
+```
+
+See `docs/26-local-testing.md` for both tiers, the devstack setup, and why
+`DATABASE_URL` there must point at a throwaway database.
+
 ## Project Structure
 
 ```
