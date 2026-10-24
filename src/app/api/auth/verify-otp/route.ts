@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyOtp } from '@/lib/otp'
+import { tooManyRequests, LIMITS } from '@/lib/rate-limit'
 
 export async function POST(req: Request) {
   try {
@@ -9,6 +10,8 @@ export async function POST(req: Request) {
     if (!identifier || !otp) {
       return NextResponse.json({ message: 'Identifier and OTP are required' }, { status: 400 })
     }
+    const limited = tooManyRequests([`otp-verify:${String(identifier).toLowerCase()}`, LIMITS.otpVerify])
+    if (limited) return limited
 
     const user = await prisma.user.findFirst({ where: mobile ? { mobile } : { email } })
     // Same answer for an unknown account as for a wrong code — no enumeration.

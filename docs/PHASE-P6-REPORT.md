@@ -22,7 +22,9 @@ Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as P0�
 | Login | Admin 2FA; lockout after repeated failures (existing); OTPs hashed and burned after 5 tries. |
 | Headers | Existing: X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy. **Added HSTS** (1 year). |
 | Exports | Scoped, permission-gated, audited, formula-injection safe. |
-| Not done (proposals) | (1) A Content-Security-Policy header: it needs a pass over inline styles/scripts first, so it could break pages if rushed. (2) Rate limits on registration and search, which need a shared store on multi-instance hosting. (3) A DLT SMS gateway (OP-10). |
+| Content-Security-Policy | **Added** (§11): pages only; no outside scripts, plugins, framing or `<base>`. |
+| Rate limits | **Added** (§11): sign-up, sign-up code, password reset, search, directory and bureau listings (login already had one). |
+| Not done (proposal) | A DLT SMS gateway (OP-10). |
 
 **Performance on shared hosting:**
 - Reports use grouped queries (no per-district loops).
@@ -98,7 +100,7 @@ A browser run against the production build covered:
    - **production only, at go-live:** `set_death_certificate_required_on.sql` (from then on an Expired request needs a death certificate; P2 report §10)
 
    Then run `npm run db:seed` (reference data only; it does not overwrite real data). **Never run `db:seed:uat` on production.**
-3. **Environment:** `ID_PROOF_KEY` (32 random bytes, base64, kept safe), `CRON_SECRET` (16+ characters), working SMTP (Admin 2FA, confirmations). Optional: `AUTH_ADMIN_2FA`, `NEXT_PUBLIC_REGISTRATION_REQUIRE_MOBILE`. `UPLOAD_DIR` must be outside `public_html`.
+3. **Environment:** `ID_PROOF_KEY` (32 random bytes, base64, kept safe), `CRON_SECRET` (16+ characters), working SMTP (Admin 2FA, confirmations). Optional: `AUTH_ADMIN_2FA`, `NEXT_PUBLIC_REGISTRATION_REQUIRE_MOBILE`, `CSP_REPORT_ONLY` (build-time; `true` only reports CSP violations, the rollback switch in §11). `UPLOAD_DIR` must be outside `public_html`. Run **one** `next start` process: the rate limits are kept in memory.
 4. **Cron jobs (hPanel):**
    - hourly: `/api/cron/approval-sla`
    - daily: `/api/cron/daily`
@@ -115,7 +117,7 @@ A browser run against the production build covered:
 
 ## 9. Decisions needed
 1. **Production go-live:** when, and who runs the steps above?
-2. **Content-Security-Policy and rate limiting** (proposals in §2): build them now, or after launch?
+2. ~~**Content-Security-Policy and rate limiting**~~ — decided: build them (§11).
 3. ~~**Operator access to global counts**~~ — decided: Admin only (§10).
 
 ## 10. Follow-up: global counts are Admin only (your decision)
@@ -124,3 +126,40 @@ A browser run against the production build covered:
 - **No migration, no data change.** No existing test covered this endpoint.
 - **Test added:** `F39 the global counts (/api/admin/stats) are Admin only` in `tests/p6/F39-F40-reports-data-rights.test.ts` (Operator, District team, State team and member get 403; Admin gets the five counts). **409 passed**, twice in a row on a fresh database; typecheck clean; build OK.
 - **Browser check (production build):** Operator → `/admin` shows "Operator Dashboard" with no counts and `/api/admin/stats` returns 403; Admin → counts shown and the API returns 200.
+
+## 11. Follow-up: Content-Security-Policy and rate limits (your decision)
+**Content-Security-Policy** (`next.config.js`), sent on every page, not on `/api` routes (they return JSON or files; an ID proof or certificate PDF must still open inline):
+
+| Directive | Value | Why |
+|---|---|---|
+| `default-src` | `'self'` | Nothing from other sites unless listed below. |
+| `script-src` | `'self' 'unsafe-inline'` (+ `'unsafe-eval'` on the dev server only) | Next.js 14 writes small inline scripts into every page. A per-request nonce would make every page dynamic (slower on shared hosting), so inline stays allowed; scripts from any other site are blocked. |
+| `style-src` | `'self' 'unsafe-inline' https://fonts.googleapis.com` | Inline styles (Next.js, Leaflet) and the Google Fonts stylesheet. |
+| `font-src` | `'self' data: https://fonts.gstatic.com` | Google Fonts files. |
+| `img-src` | `'self' data: blob:`, OpenStreetMap tiles, and the image hosts already allowed in `next.config.js` | Photos, previews, the profile map. |
+| `connect-src` | `'self'` | The app only calls its own API. |
+| `object-src` / `base-uri` / `form-action` / `frame-ancestors` | `'none'` / `'self'` / `'self'` / `'none'` | No plugins, no `<base>` hijack, forms post only here, no framing by other sites. |
+
+- **Rollback without code:** build with `CSP_REPORT_ONLY=true`. The browser then only reports violations (`Content-Security-Policy-Report-Only`).
+- **Browser check (production build):** 51 pages visited, covering every page route: 6 public pages signed out, and 45 signed in as an Admin (with 2FA). Each was watched for CSP violation events and page errors: **0 violations, 0 page errors**. The profile map (Leaflet) loads its tiles with no violation. `/login` carries the header; `/api/areas` does not.
+
+**Rate limits** (`src/lib/rate-limit.ts`, the in-memory limiter login already used). Over the limit the answer is **429** "Too many requests. Please wait a few minutes and try again." with a `Retry-After` header.
+
+| What | Limit | Counted per |
+|---|---|---|
+| Login (existing, unchanged) | 10 / 15 min | address + account; plus the existing lock after 5 wrong passwords |
+| Sign-up (`/api/auth/register`) | 20 / hour | address (generous: mobile networks share addresses) |
+| Sign-up code (`/api/auth/verify-otp`) | 10 / 15 min | account; a code also dies after 5 wrong tries (existing) |
+| Password-reset code sent | 5 / hour per account, 20 / hour per address | both |
+| Password-reset code guesses | 5 / 15 min | account |
+| Search, Directory, Bureau listings | 60 / minute, shared | signed-in user |
+
+- Limits on an account are counted **before** the account lookup, so an unknown account answers the same way (no enumeration), and changing address does not reset them.
+- **Shared hosting:** the counts live in the app's memory, so run a single `next start` process (runbook step 3). A restart clears them.
+- **Fixed on the way (found while adding the limits; no behaviour change for users):**
+  - The password-reset code could be guessed without limit. It is a 6-digit code valid for 10 minutes, so this was a real account-takeover risk. It is now capped at 5 guesses per 15 minutes.
+  - The reset code was made with `Math.random`. It now uses `crypto.randomInt`, as the other codes already did.
+  - The server log printed every reset code, in production too. It now prints only on dev and test (where it is how a mobile reset is tested without SMS).
+- **Finding, not changed (needs your approval because it removes a route):** `/api/auth/verify/email` is an old, unused route that anyone can call. Given a user id and a code, it would mark the account ACTIVE and skip the P1 approval. Today it can never succeed, because it checks a SHA-256 hash while codes are stored as bcrypt. It is still a trap if someone "fixes" it. I propose deleting it. Nothing in the app or the tests calls it.
+- **No migration, no data change.**
+- **Tests added:** `tests/p6/P6-hardening-csp-rate-limits.test.ts` has 6 tests: sign-up 20/hour then 429 with Retry-After while another address is unaffected; reset guesses 5 per account from changing addresses; reset codes 5 per account, the same for an unknown account; sign-up code 10 per account (case-insensitive); search + directory 60/minute per user while another user is unaffected; and the CSP directives, applied to pages and not to `/api`. No existing test changed. **422 passed**, twice in a row on a fresh database; typecheck clean; build OK.

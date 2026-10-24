@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { tooManyRequests, LIMITS } from '@/lib/rate-limit'
 import { prisma } from '@/lib/prisma'
 import { redactMembersForViewer } from '@/lib/visibility'
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  const limited = tooManyRequests([`search:${session.user?.id}`, LIMITS.search])
+  if (limited) return limited
 
   const url = new URL(req.url)
   const q = url.searchParams.get('q')

@@ -58,6 +58,7 @@ Tick each line and note anything unexpected. The automated test for each flow is
 
 ## P6 — Reports and data rights
 - [ ] F39 A District team member's Reports show only their district; CSV opens in Excel; the Admin sees the Operator SLA; an Operator's Admin Panel shows no global counts.
+- [ ] P6 Browse the site with the browser console open: no "Content Security Policy" errors (map, photos, fonts all load). Request a password reset and enter a wrong code 6 times: the 6th says "Too many requests".
 - [ ] F40 Settings → Download My Data. Request deletion → Admin → Data requests → Anonymise; the person stays in trees as "Former member". Search consents by Person ID. Audit Logs → "ID proof only".
 
 ## Sign-off
