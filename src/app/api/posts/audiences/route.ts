@@ -23,9 +23,9 @@ export async function GET() {
     ...families.map((f) => ({ type: 'FAMILY', id: f.family.id, label: `${f.family.name} family` })),
     ...lists.map((l) => ({ type: 'FRIEND_LIST', id: l.id, label: `Friends: ${l.name}` })),
     ...orgRows.map((o) => ({ type: 'ORGANISATION', id: o.id, label: o.name })),
-    ...(home.district ? [{ type: 'DISTRICT', id: home.district, label: `${areaName(home.district)} district (moderated by the District body)` }] : []),
-    ...(home.state ? [{ type: 'STATE', id: home.state, label: `${areaName(home.state)} state (moderated by the State body)` }] : []),
-    { type: 'NATIONAL', id: null, label: 'National (moderated by the National body)' },
+    ...(home.district ? [{ type: 'DISTRICT', id: home.district, label: `${areaName(home.district)} district (moderated by the District organisation)` }] : []),
+    ...(home.state ? [{ type: 'STATE', id: home.state, label: `${areaName(home.state)} state (moderated by the State organisation)` }] : []),
+    { type: 'NATIONAL', id: null, label: 'National (moderated by the Country organisation)' },
   ]
   return NextResponse.json({ options })
 }

@@ -56,13 +56,18 @@ export default function VerificationTaskPage() {
         <div className="card grid sm:grid-cols-2 gap-2 text-sm">
           {field('Organisation', data.organisation.name)}
           {field('Registration no.', data.organisation.registrationNumber)}
-          {field('District', data.organisation.district ? [data.organisation.district.district, data.organisation.district.state].filter(Boolean).join(', ') : null)}
+          {field('Started on', data.organisation.startedOn ? String(data.organisation.startedOn).slice(0, 10) : null)}
+          {field('Taluka', data.organisation.district ? [data.organisation.district.taluka, data.organisation.district.district, data.organisation.district.state].filter(Boolean).join(', ') : null)}
+          {field('City / town', data.organisation.town)}
           {field('Address', data.organisation.addressLine)}
           <div className="sm:col-span-2">{field('Purpose', data.organisation.purpose)}</div>
           <div className="sm:col-span-2">
-            <p className="text-gray-500">Office bearers</p>
+            <p className="text-gray-500">Management body</p>
             {data.organisation.officers.map((o: any) => (
               <p key={o.designation}>{o.designation.toLowerCase()}: <strong>{o.name}</strong> {o.accepted ? '' : <span className="text-amber-600">(not yet accepted)</span>}</p>
+            ))}
+            {(data.organisation.members ?? []).map((o: any) => (
+              <p key={o.name}>member: <strong>{o.name}</strong> {o.accepted ? '' : <span className="text-amber-600">(not yet accepted)</span>}</p>
             ))}
           </div>
           {data.organisation.certificate && (

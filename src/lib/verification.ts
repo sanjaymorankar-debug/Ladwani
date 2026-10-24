@@ -35,10 +35,10 @@ export const CHECKLIST_ITEMS = [
 
 /** F26: what an Operator checks for an organisation. */
 export const ORG_CHECKLIST_ITEMS = [
-  { key: 'name', label: 'Name and registration number match the certificate' },
-  { key: 'certificate', label: 'Certificate looks genuine and current' },
-  { key: 'address', label: 'Address and district are plausible' },
-  { key: 'officers', label: 'Office bearers are genuine community members' },
+  { key: 'name', label: 'Name and start date are plausible (and match the certificate, if one is attached)' },
+  { key: 'certificate', label: 'Certificate, if attached, looks genuine and current' },
+  { key: 'address', label: 'Taluka and town are plausible' },
+  { key: 'officers', label: 'President, Secretary, Chairman and body members are genuine community members' },
 ] as const
 
 export const checklistFor = (kind: string) => (kind === KIND.ORGANISATION ? ORG_CHECKLIST_ITEMS : CHECKLIST_ITEMS)

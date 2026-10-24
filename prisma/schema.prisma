@@ -1574,7 +1574,9 @@ model Organisation {
   name               String
   registrationNumber String?
   addressLine        String?   @db.Text
-  areaId             String? // LOCAL / DISTRICT_BODY: a district; STATE_BODY: a state; NATIONAL_BODY: the country
+  areaId             String? // LOCAL: a taluka (older rows: a district); DISTRICT_BODY: a district; STATE_BODY: a state; NATIONAL_BODY: the country
+  startedOn          DateTime? // LOCAL: when the organisation started
+  town               String? // LOCAL: city / town name
   purpose            String?   @db.Text
   certificateKey     String? // encrypted file (secure-files)
   certificateMime    String?
@@ -1593,17 +1595,17 @@ model Organisation {
 
 /// Membership and designation. officeGuard is a STORED generated column (see
 /// the migration): the designation while ACTIVE and not MEMBER, so the unique
-/// index allows one President / Secretary / Treasurer per organisation.
+/// index allows one President / Secretary / Chairman per organisation.
 model OrganisationMember {
   id                 String    @id @default(cuid())
   organisationId     String
   memberId           String
-  designation        String    @default("MEMBER") // PRESIDENT, SECRETARY, TREASURER, MEMBER
+  designation        String    @default("MEMBER") // PRESIDENT, SECRETARY, CHAIRMAN, MEMBER
   pendingDesignation String? // F27 handover awaiting the new holder's acceptance
   status             String    @default("ACTIVE") // INVITED, REQUESTED, ACTIVE, DECLINED, ENDED
   termStart          DateTime?
   termEnd            DateTime?
-  seatId             String? // body membership that came from a nomination (F28–F30)
+  seatId             String? // body membership that came from automatic promotion (F28–F30)
   invitedBy          String?
   joinedAt           DateTime?
   endedAt            DateTime?
@@ -1618,8 +1620,8 @@ model OrganisationMember {
   @@map("organisation_members")
 }
 
-/// F28–F31 — a nomination from one unit to the next body up, and the seat it
-/// becomes. At most two open seats per nominating unit.
+/// F28–F31 — a seat on the next body up. Each unit's three office bearers
+/// hold one automatically while they hold the post (owner's decision).
 model BodySeat {
   id                 String    @id @default(cuid())
   fromOrganisationId String

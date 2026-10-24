@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { recordAudit } from '@/lib/audit'
 import { notifyUser } from '@/lib/notify'
-import { canManageOrganisation, endMembership, maybeActivate, userIdOfMember, OFFICES } from '@/lib/organisations'
+import { canManageOrganisation, canAppointBodyOffice, endMembership, maybeActivate, syncPromotions, userIdOfMember, OFFICES } from '@/lib/organisations'
 
 const isOffice = (d: string | null | undefined) => !!d && (OFFICES as readonly string[]).includes(d)
 
@@ -13,7 +13,10 @@ const isOffice = (d: string | null | undefined) => !!d && (OFFICES as readonly s
  *   accept | decline        — the person: an invitation, or a post handed to them
  *   approve | reject        — President / Secretary: a request to join
  *   designate {designation} — President / Secretary: hand a post over (the new holder accepts;
- *                             the outgoing holder becomes a Member) — there is always one of each
+ *                             the outgoing holder becomes a Member) — there is always one of each.
+ *                             On a LadWani body an Admin, or an Operator of its district / state,
+ *                             appoints its office bearers this way too (owner's decision).
+ *                             A change of office bearers updates the seats on the body above (syncPromotions).
  *   term {termStart, termEnd} — President / Secretary: an office bearer's term
  *   remove {reason}         — President / Secretary: a Member (not an office bearer)
  *   resign                  — the person (an office bearer hands over first)
@@ -61,6 +64,7 @@ export async function POST(req: Request, { params }: { params: { id: string; mem
           await tx.organisationMember.update({ where: { id: m.id }, data: { designation: post, pendingDesignation: null, termStart: new Date(), termEnd: null } })
         })
         await audit('handover.accept', { designation: m.designation }, { designation: post })
+        await syncPromotions(org.id, actorId)
         return NextResponse.json({ message: `You are now ${post.toLowerCase()}` })
       }
       return NextResponse.json({ message: 'Nothing to answer' }, { status: 409 })
@@ -78,11 +82,13 @@ export async function POST(req: Request, { params }: { params: { id: string; mem
     }
 
     case 'designate': {
-      if (!(await manage())) return NextResponse.json({ message: 'Only the President or Secretary changes designations' }, { status: 403 })
+      if (!(await manage()) && !(await canAppointBodyOffice(session, org))) {
+        return NextResponse.json({ message: org.kind === 'LOCAL' ? 'Only the President or Secretary changes designations' : 'Only an Admin, an Operator of this area or the body\'s President / Secretary appoints office bearers' }, { status: 403 })
+      }
       if (m.status !== 'ACTIVE') return NextResponse.json({ message: 'Only an active member can take a post' }, { status: 409 })
       const post = String(body.designation ?? '')
       if (!isOffice(post)) {
-        return NextResponse.json({ message: 'There is always one President, Secretary and Treasurer: hand the post to someone else instead' }, { status: 400 })
+        return NextResponse.json({ message: 'There is always one President, Secretary and Chairman: hand the post to someone else instead' }, { status: 400 })
       }
       if (m.designation === post) return NextResponse.json({ message: 'Already holds this post' }, { status: 409 })
       if (isOffice(m.designation)) return NextResponse.json({ message: 'Hand over the current post first' }, { status: 409 })

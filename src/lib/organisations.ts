@@ -5,23 +5,28 @@ import { notifyUser } from '@/lib/notify'
 import { areaChain, chainLevel } from '@/lib/locations'
 
 /**
- * P4 — social organisations and the LadWani bodies.
- *   LOCAL organisation ─2 seats→ DISTRICT_BODY ─2→ STATE_BODY ─2→ NATIONAL_BODY
- * Every unit has exactly one President, Secretary and Treasurer (database
- * guard on organisation_members) plus Members. A seat on a body gives the
- * matching data-view role (F30); ending a seat ends every seat above that
- * came from it and removes those roles (F31).
+ * P4 — social organisations and the LadWani bodies (owner's decisions):
+ *   Taluka (LOCAL) organisation → DISTRICT_BODY → STATE_BODY → NATIONAL_BODY
+ * Every unit has exactly one President, Secretary and Chairman (database
+ * guard on organisation_members) plus Members. A unit's three office bearers
+ * are promoted automatically: while they hold the post they have a seat on
+ * the next body up (syncPromotions). A body's own office bearers are
+ * appointed by an Admin, or an Operator of its district / state, and accept;
+ * they in turn sit on the body above. A seat gives the matching data-view
+ * role (F30); losing the post ends the seat, every seat above that came from
+ * it and those roles (F31).
  */
-export const OFFICES = ['PRESIDENT', 'SECRETARY', 'TREASURER'] as const
+export const OFFICES = ['PRESIDENT', 'SECRETARY', 'CHAIRMAN'] as const
 export const DESIGNATIONS = [...OFFICES, 'MEMBER'] as const
 export type Designation = (typeof DESIGNATIONS)[number]
-export const SEATS_PER_UNIT = 2
+/** At most this many people go up from each unit: its office bearers. */
+export const PROMOTED_PER_UNIT = OFFICES.length
 const OPEN_SEAT = ['NOMINATED', 'ACCEPTED', 'CONFIRMED']
 
 export const NEXT_BODY: Record<string, string> = { LOCAL: 'DISTRICT_BODY', DISTRICT_BODY: 'STATE_BODY', STATE_BODY: 'NATIONAL_BODY' }
 const BODY_ROLE: Record<string, string> = { DISTRICT_BODY: 'DISTRICT_TEAM', STATE_BODY: 'STATE_TEAM', NATIONAL_BODY: 'NATIONAL_TEAM' }
 const BODY_AREA: Record<string, string> = { DISTRICT_BODY: 'DISTRICT', STATE_BODY: 'STATE', NATIONAL_BODY: 'COUNTRY' }
-const LABEL: Record<string, string> = { DISTRICT_BODY: 'District', STATE_BODY: 'State', NATIONAL_BODY: 'National' }
+const LABEL: Record<string, string> = { DISTRICT_BODY: 'District', STATE_BODY: 'State', NATIONAL_BODY: 'Country' }
 
 const memberIdOf = (session: Session | null) => ((session?.user as any)?.memberId ?? null) as string | null
 const rolesOf = (session: Session | null) => ((session?.user as any)?.roles ?? []) as string[]
@@ -39,10 +44,27 @@ export async function canManageOrganisation(session: Session | null, organisatio
   return !!m && (m.designation === 'PRESIDENT' || m.designation === 'SECRETARY')
 }
 
-/** F28–F30: the President of this unit (or an Admin) nominates and confirms. */
-export async function isPresidentOf(session: Session | null, organisationId: string) {
-  if (rolesOf(session).includes('ADMIN')) return true
-  return (await activeMembership(organisationId, memberIdOf(session)))?.designation === 'PRESIDENT'
+/**
+ * Who appoints a LadWani body's office bearers: an Admin; for a District
+ * body also an Operator of that district, for a State body an Operator of
+ * a district in that state. Not for local organisations (their posts are
+ * handed over by their own President / Secretary).
+ */
+export async function canAppointBodyOffice(session: Session | null, org: { kind: string; areaId: string | null }) {
+  if (org.kind === 'LOCAL') return false
+  const roles = rolesOf(session)
+  if (roles.includes('ADMIN')) return true
+  const userId = (session?.user as any)?.id as string | undefined
+  if (!userId || !roles.includes('OPERATOR') || !org.areaId || org.kind === 'NATIONAL_BODY') return false
+  const grants = await prisma.userRole.findMany({
+    where: { userId, role: { code: 'OPERATOR' }, areaId: { not: null }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+    select: { areaId: true },
+  })
+  for (const g of grants) {
+    if (org.kind === 'DISTRICT_BODY' && g.areaId === org.areaId) return true
+    if (org.kind === 'STATE_BODY' && chainLevel(await areaChain(g.areaId!), 'STATE')?.id === org.areaId) return true
+  }
+  return false
 }
 
 export async function userIdOfMember(memberId: string) {
@@ -73,7 +95,7 @@ export async function organisationOutcome(organisationId: string, outcome: strin
     await prisma.organisation.update({ where: { id: org.id }, data: { approvedAt: new Date(), decisionNote: null } })
     await recordAudit({ actorId: org.applicantUserId!, action: 'organisation.approved', entityType: 'organisation', entityId: org.id, oldValue: { approvedAt: null }, newValue: { approvedAt: new Date() }, metadata: { round } })
     if (!(await maybeActivate(org.id))) {
-      await tell([org.applicantUserId], 'ORGANISATION_RESULT', `${org.name} is approved`, 'It becomes active once the President, Secretary and Treasurer have all accepted.', { organisationId: org.id })
+      await tell([org.applicantUserId], 'ORGANISATION_RESULT', `${org.name} is approved`, 'It becomes active once the President, Secretary and Chairman have all accepted.', { organisationId: org.id })
     }
     return
   }
@@ -95,12 +117,13 @@ export async function maybeActivate(organisationId: string) {
   if (moved.count !== 1) return false
   await recordAudit({ actorId: org.applicantUserId!, action: 'organisation.activate', entityType: 'organisation', entityId: org.id, oldValue: { status: 'PENDING_APPROVAL' }, newValue: { status: 'ACTIVE' } })
   await tell([org.applicantUserId, ...(await officeUserIds(org.id, [...OFFICES]))], 'ORGANISATION_RESULT', `${org.name} is now active`, 'Your organisation is registered and active.', { organisationId: org.id })
+  await syncPromotions(org.id, org.applicantUserId!)
   return true
 }
 
 // ── F28–F30: the body chain ─────────────────────────────────────
 
-/** The body the unit nominates to, created on first use (one per area). */
+/** The body above the unit, created on first use (one per area). */
 export async function targetBodyFor(organisationId: string) {
   const org = await prisma.organisation.findUniqueOrThrow({ where: { id: organisationId } })
   const kind = NEXT_BODY[org.kind]
@@ -111,17 +134,41 @@ export async function targetBodyFor(organisationId: string) {
   return prisma.organisation.upsert({
     where: { bodyKey },
     update: {},
-    create: { kind, bodyKey, areaId: area.id, name: `LadWani ${LABEL[kind]} Body — ${area.name}`, status: 'ACTIVE', approvedAt: new Date() },
+    create: { kind, bodyKey, areaId: area.id, name: `LadWani ${LABEL[kind]} Organisation — ${area.name}`, status: 'ACTIVE', approvedAt: new Date() },
   })
 }
 
-/** Who confirms a seat on a body: its President, or the Admins while it has none. */
-export async function bodyConfirmers(bodyId: string) {
-  const presidents = await officeUserIds(bodyId, ['PRESIDENT'])
-  return presidents.length ? presidents : adminUserIds()
+/**
+ * F28–F30 automatic promotion (owner's decision): the unit's office bearers
+ * (at most three) each hold a seat on the next body up while they hold the
+ * post. Called whenever the unit's posts may have changed: activation, a
+ * handover, an appointment, a term ending. Ends the seats of people who no
+ * longer hold a post (and everything above that came from them) and gives
+ * the new holders theirs.
+ */
+export async function syncPromotions(organisationId: string, actorId: string, depth = 0): Promise<void> {
+  if (depth > 5) return
+  const org = await prisma.organisation.findUnique({ where: { id: organisationId } })
+  if (!org || org.status !== 'ACTIVE' || !NEXT_BODY[org.kind]) return
+  const target = await targetBodyFor(org.id)
+  if (!target) return
+  const holders = await prisma.organisationMember.findMany({ where: { organisationId: org.id, status: 'ACTIVE', designation: { in: [...OFFICES] } }, select: { memberId: true } })
+  // Only living, active people go up.
+  const living = await prisma.member.findMany({ where: { id: { in: holders.map((h) => h.memberId) }, deletedAt: null, status: 'ACTIVE' }, select: { id: true } })
+  const bearerIds = living.map((m) => m.id).slice(0, PROMOTED_PER_UNIT)
+  const open = await prisma.bodySeat.findMany({ where: { fromOrganisationId: org.id, status: { in: OPEN_SEAT } } })
+  for (const s of open) {
+    if (!bearerIds.includes(s.memberId) || s.toOrganisationId !== target.id) await endSeat(s.id, 'NO_LONGER_OFFICE_BEARER', actorId, depth + 1)
+  }
+  const seated = new Set(open.filter((s) => bearerIds.includes(s.memberId) && s.toOrganisationId === target.id).map((s) => s.memberId))
+  for (const memberId of bearerIds) {
+    if (seated.has(memberId)) continue
+    const seat = await prisma.bodySeat.create({ data: { fromOrganisationId: org.id, toOrganisationId: target.id, memberId, nominatedBy: actorId, status: 'ACCEPTED', acceptedAt: new Date() } })
+    await confirmSeat(seat.id, actorId)
+  }
 }
 
-/** F28 step 4 / F30: the nominee joins the body and gets the matching data-view role. */
+/** F28 / F30: the office bearer joins the body above and gets the matching data-view role. */
 export async function confirmSeat(seatId: string, actorId: string) {
   const seat = await prisma.bodySeat.findUniqueOrThrow({ where: { id: seatId } })
   const body = await prisma.organisation.findUniqueOrThrow({ where: { id: seat.toOrganisationId } })
@@ -144,7 +191,7 @@ export async function confirmSeat(seatId: string, actorId: string) {
       oldValue: { status: seat.status }, newValue: { status: 'CONFIRMED', bodyId: body.id, role: roleCode ?? null },
     }, undefined, tx)
   })
-  await tell([userId, ...(await officeUserIds(seat.fromOrganisationId, ['PRESIDENT']))], 'BODY_SEAT', `Seat confirmed on the ${body.name}`, 'The nomination is confirmed.', { seatId: seat.id, bodyId: body.id })
+  await tell([userId], 'BODY_SEAT', `You are now a member of the ${body.name}`, 'As an office bearer you represent your organisation there.', { seatId: seat.id, bodyId: body.id })
 }
 
 // ── F31: vacancies ──────────────────────────────────────────────
@@ -173,7 +220,7 @@ export async function endSeat(seatId: string, reason: string, actorId: string, d
   for (const a of above) await endSeat(a.id, `Lower seat ended (${reason})`, actorId, depth + 1)
   if (seat.status === 'CONFIRMED' || seat.status === 'ACCEPTED') {
     const body = await prisma.organisation.findUnique({ where: { id: seat.toOrganisationId }, select: { name: true } })
-    await tell(await officeUserIds(seat.fromOrganisationId), 'BODY_SEAT_VACANT', `A seat on the ${body?.name ?? 'body'} is vacant`, 'Nominate a replacement.', { seatId: seat.id, organisationId: seat.fromOrganisationId })
+    await tell(await officeUserIds(seat.fromOrganisationId), 'BODY_SEAT_VACANT', `A seat on the ${body?.name ?? 'body'} is vacant`, 'It is filled automatically when the post is filled.', { seatId: seat.id, organisationId: seat.fromOrganisationId })
   }
 }
 
@@ -218,6 +265,7 @@ export async function runOrganisationJobs(now = new Date()) {
     const org = await prisma.organisation.findUnique({ where: { id: m.organisationId }, select: { name: true } })
     await tell([...(await officeUserIds(m.organisationId, [...OFFICES])), await userIdOfMember(m.memberId), ...(await adminUserIds())], 'OFFICE_VACANT',
       `${org?.name ?? 'An organisation'}: the ${m.designation.toLowerCase()}'s term has ended`, 'The post is vacant. Appoint a new office bearer.', { organisationId: m.organisationId })
+    if (subject) await syncPromotions(m.organisationId, subject)
   }
   return { officeTermsEnded: expired.length }
 }

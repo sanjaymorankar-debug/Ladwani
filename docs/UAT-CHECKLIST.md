@@ -42,10 +42,11 @@ Tick each line and note anything unexpected. The automated test for each flow is
 - [ ] F25 Tree: zoom, collapse, person card, jump icon, Print / Save as PDF. Someone from an unrelated family gets "not found".
 
 ## P4 — Organisations
-- [ ] F26 Register an organisation with a certificate; three office bearers accept; two Operators approve → ACTIVE.
+- [ ] F26 Create a local organisation: name, start date, taluka (State › District › Taluka), town, President / Secretary / Chairman and other members (certificate optional). Everyone named accepts; two Operators of the district approve → ACTIVE.
 - [ ] F27 Invite / accept, request / approve, hand the President post over (the new holder accepts), set a term.
-- [ ] F28–F30 Nominate exactly 2 to the District body, then 2 to the State body, then 2 to the National body; each confirmed. The seat gives the team view.
-- [ ] F31 A nominee resigns → their seats above end and their access goes; the vacancy is alerted.
+- [ ] F28 Once active, its President, Secretary and Chairman appear as members of the LadWani District organisation automatically (no nomination), and get the District team view.
+- [ ] F29–F30 An Admin or an Operator of the district appoints the District organisation's President / Secretary / Chairman (they accept) → they appear in the State organisation; the same from State to Country (Country: Admin only).
+- [ ] F31 Hand a local post to someone else → the old holder's seats above end and their access goes; the new holder goes up instead.
 
 ## P5 — Social and bureau
 - [ ] F34 Family album photo with "Family" visibility; an outsider cannot open it; three reports hide it.

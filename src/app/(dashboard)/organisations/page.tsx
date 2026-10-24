@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Landmark, Plus } from 'lucide-react'
 
-const KIND: Record<string, string> = { LOCAL: 'Organisation', DISTRICT_BODY: 'District body', STATE_BODY: 'State body', NATIONAL_BODY: 'National body' }
+const KIND: Record<string, string> = { LOCAL: 'Local (taluka) organisation', DISTRICT_BODY: 'District organisation', STATE_BODY: 'State organisation', NATIONAL_BODY: 'Country organisation' }
 const STATUS: Record<string, string> = { PENDING_APPROVAL: 'Being verified', CORRECTION_REQUIRED: 'Correction needed', REJECTED: 'Not approved', ACTIVE: 'Active', INACTIVE: 'Inactive' }
 
 /** F26–F31 — my organisations and bodies, and the active ones to browse and join. */
@@ -17,7 +17,7 @@ export default function OrganisationsPage() {
     <div className="max-w-4xl mx-auto space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Landmark className="w-5 h-5 text-saffron-600" /> Organisations</h1>
-        <Link href="/organisations/new" className="btn-primary text-sm flex items-center gap-1.5"><Plus className="w-4 h-4" /> Register organisation</Link>
+        <Link href="/organisations/new" className="btn-primary text-sm flex items-center gap-1.5"><Plus className="w-4 h-4" /> Create local organisation</Link>
       </div>
 
       {data?.mine.length ? (
@@ -26,7 +26,7 @@ export default function OrganisationsPage() {
           <div className="divide-y divide-gray-100">
             {data.mine.map((o) => (
               <Link key={o.id} href={`/organisations/${o.id}`} className="flex items-center justify-between py-2 text-sm hover:bg-gray-50">
-                <span><strong>{o.name}</strong> <span className="text-gray-500">· {KIND[o.kind]}{o.area ? ` · ${o.area}` : ''}</span></span>
+                <span><strong>{o.name}</strong> <span className="text-gray-500">· {KIND[o.kind]}{o.area ? ` · ${o.area}` : ''}{o.town ? ` · ${o.town}` : ''}</span></span>
                 <span className="text-xs text-gray-500">
                   {o.membership?.status === 'INVITED' ? <span className="text-saffron-700 font-medium">Invitation — answer</span>
                     : o.membership?.pendingDesignation ? <span className="text-saffron-700 font-medium">Post offered — answer</span>
@@ -49,7 +49,7 @@ export default function OrganisationsPage() {
         <div className="divide-y divide-gray-100">
           {(data?.organisations ?? []).map((o) => (
             <Link key={o.id} href={`/organisations/${o.id}`} className="block py-2 text-sm hover:bg-gray-50">
-              <strong>{o.name}</strong> <span className="text-gray-500">· {KIND[o.kind]}{o.area ? ` · ${o.area}` : ''}</span>
+              <strong>{o.name}</strong> <span className="text-gray-500">· {KIND[o.kind]}{o.area ? ` · ${o.area}` : ''}{o.town ? ` · ${o.town}` : ''}</span>
               {o.purpose && <p className="text-xs text-gray-500 truncate">{o.purpose}</p>}
             </Link>
           ))}
