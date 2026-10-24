@@ -9,12 +9,23 @@ export default withAuth(
     if (pathname.startsWith('/admin')) {
       const roles = (token as any)?.roles as string[] ?? []
       if (!roles.includes('ADMIN') && !roles.includes('OPERATOR')) {
-        return NextResponse.redirect(new URL('/dashboard', req.url))
+        // req.nextUrl knows the basePath (/ladwani on bkesari.com) and puts it
+        // back when serialised; `new URL('/dashboard', req.url)` would drop it
+        // and send the user to the hub's own /dashboard.
+        const url = req.nextUrl.clone()
+        url.pathname = '/dashboard'
+        url.search = ''
+        return NextResponse.redirect(url)
       }
     }
     return NextResponse.next()
   },
   {
+    // Without this, next-auth sends anonymous visitors to /api/auth/signin,
+    // which then redirects to authOptions.pages.signIn. Naming the page here
+    // goes there directly; withAuth adds the basePath itself, so this must
+    // NOT carry it (src/lib/auth.ts's pages must, see there).
+    pages: { signIn: '/login' },
     callbacks: {
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl

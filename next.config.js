@@ -37,6 +37,31 @@ function readBasePath() {
 
 const basePath = readBasePath()
 
+/**
+ * NEXTAUTH_URL may be the site's origin (https://bkesari.com) or the full URL
+ * of this app's auth API (https://bkesari.com/ladwani/api/auth). Any other
+ * path is refused, because next-auth's middleware skips every request whose
+ * path starts with NEXTAUTH_URL's path: set to .../ladwani, it would stop
+ * protecting every page of the app, and nothing else would look wrong.
+ */
+function checkNextAuthUrl() {
+  const raw = (process.env.NEXTAUTH_URL ?? '').trim()
+  if (!raw) return
+  let path
+  try {
+    path = new URL(raw.startsWith('http') ? raw : `https://${raw}`).pathname.replace(/\/$/, '')
+  } catch {
+    throw new Error(`NEXTAUTH_URL is not a URL (got ${JSON.stringify(raw)})`)
+  }
+  if (path && path !== `${basePath}/api/auth`) {
+    throw new Error(
+      `NEXTAUTH_URL must be the site's origin or end in ${basePath}/api/auth (got ${JSON.stringify(raw)}). ` +
+        "With any other path next-auth's middleware stops protecting the app's pages."
+    )
+  }
+}
+checkNextAuthUrl()
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   ...(basePath ? { basePath } : {}),

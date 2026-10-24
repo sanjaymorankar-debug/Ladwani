@@ -1,5 +1,9 @@
 version: '3.9'
 
+# Local services only. The app itself runs with `npm run dev` (README.md);
+# there is no container image for it. Only postgres is needed: the app does
+# not use Redis (it rate-limits in memory), and stores photos on local disk
+# unless STORAGE_DRIVER=S3 points it at MinIO.
 services:
   postgres:
     image: postgres:16-alpine
@@ -35,24 +39,6 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
-
-  web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-    environment:
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/miladwani?schema=public
-      NEXTAUTH_URL: http://localhost:3000/ladwani
-      NEXTAUTH_SECRET: dev-secret-change-in-production
-    ports:
-      - "3000:3000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/apps/web/.next
 
 volumes:
   postgres_data:

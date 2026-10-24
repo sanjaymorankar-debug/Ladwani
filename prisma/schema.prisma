@@ -2,10 +2,32 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Two URLs, the names Neon's own tooling writes:
+// - DATABASE_URL           the app at runtime. On Neon, the *pooled* endpoint
+//                          (host contains "-pooler"; PgBouncer, transaction mode).
+// - DATABASE_URL_UNPOOLED  the CLI: migrate, db push, studio. On Neon, the
+//                          *direct* endpoint, because migrate takes a
+//                          session-level advisory lock the pooler cannot hold.
+// The app at runtime never reads DATABASE_URL_UNPOOLED, but every CLI command
+// that loads this datasource fails while it is unset. Prisma has no fallback
+// of its own, so with only one database (local, CI) both hold the same URL:
+// scripts/with-env.js copies DATABASE_URL into it when it is unset, and
+// .env.example sets it to "${DATABASE_URL}", which Prisma's .env loader expands.
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
+
+// PostgreSQL notes (the database was MySQL until Oct 2026):
+// - users.email is CITEXT, so the unique index and every lookup are
+//   case-insensitive, as they were under MySQL's utf8mb4_unicode_ci. The
+//   baseline migration runs CREATE EXTENSION citext.
+// - bookings carries an exclusion constraint (bookings_no_overlap, btree_gist)
+//   that Prisma cannot express; it lives only in the migration SQL. See the
+//   comment on model Booking.
+// - Free-text search uses `mode: 'insensitive'` (ILIKE), since Postgres
+//   compares text case-sensitively by default.
 
 // ─────────────────────────────────────────────────────────────────
 // AUTHENTICATION & ROLES
@@ -13,7 +35,7 @@ datasource db {
 
 model User {
   id              String    @id @default(cuid())
-  email           String?   @unique
+  email           String?   @unique @db.Citext
   mobile          String?   @unique
   passwordHash    String
   emailVerified   Boolean   @default(false)
@@ -312,7 +334,9 @@ model Member {
   physicalDisability    String?
   mobilePrimary         String?
   mobileAlternate       String?
-  email                 String?
+  /// CITEXT, like users.email: the Karta's duplicate check matches an address
+  /// whatever case it was typed in. Not unique: a parent and child may share one.
+  email                 String?        @db.Citext
   profilePhotoId        String?        @unique
   biography             String?        @db.Text
   currentCity           String?
@@ -322,7 +346,7 @@ model Member {
   nativeDistrict        String?
   nativeState           String?
   nationality           String         @default("Indian")
-  languages             Json?          // JSON array of strings (MySQL has no native arrays)
+  languages             Json?          // JSON (jsonb) array of strings
   maritalStatus         MaritalStatus  @default(UNMARRIED)
   employmentStatus      String?
   occupationCategory    String?
@@ -1087,9 +1111,10 @@ model MatrimonialProfile {
   isVisible  Boolean @default(false)
   about      String? @db.Text
   heightCm   Int?
-  // MySQL has no native array column type (unlike Postgres) — stored as a
-  // JSON array of strings instead. Nullable; application code treats a
-  // missing value as an empty list.
+  // A JSON (jsonb) array of strings. It was a native String[] before the
+  // MySQL interlude and stayed JSON on the way back, so existing read sites
+  // and migrated MySQL rows need no conversion. Nullable; application code
+  // treats a missing value as an empty list.
   languages  Json?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -1477,11 +1502,13 @@ model AssetBlackout {
   @@map("asset_blackouts")
 }
 
-/// Double-booking prevention: MySQL has no equivalent of a Postgres GiST
-/// exclusion constraint, so overlap is enforced in application code —
-/// `SELECT ... FOR UPDATE` on the parent Asset row inside the booking
-/// transaction (see src/app/api/assets/[id]/bookings/route.ts) serializes
-/// concurrent attempts for the same asset before the overlap check runs.
+/// Double-booking prevention is enforced by the database: the exclusion
+/// constraint `bookings_no_overlap` (GiST, needs the btree_gist extension)
+/// makes two PENDING_PAYMENT/CONFIRMED bookings of the same asset with
+/// overlapping [startAt, endAt) ranges impossible. Prisma cannot declare it,
+/// so it is created in the baseline migration SQL. The booking route also
+/// locks the Asset row (`SELECT ... FOR UPDATE`) and checks for overlap first,
+/// so the usual case gets a clean 409 instead of a constraint error.
 model Booking {
   id            String        @id @default(cuid())
   reference     String        @unique
