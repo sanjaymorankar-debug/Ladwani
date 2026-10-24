@@ -23,7 +23,7 @@ import {
 } from './extended-fixtures'
 
 // Additional Details (Step 2 + rules 1–8, 11): every section through the real
-// API routes and a real MySQL database.
+// API routes and a real PostgreSQL database.
 
 const as = (p: XdPerson) => actAs({ userId: p.userId!, roles: p.roles, memberId: p.memberId })
 const put = (memberId: string, section: string, body: unknown, headers: Record<string, string> = {}) =>
@@ -324,6 +324,10 @@ describe('TC-AD — visibility at every level (rules 2 and 8)', () => {
     await put(adultF.memberId, 'business', { answer: 'YES', visibility: 'ONLY_ME', rows: [{ businessName: 'Neha Cakes', contact: '98220XDCONTACT', supportNeeds: ['FUNDING'] }] })
     as(outsider)
     const search = await (await searchMembers(new Request(`http://x/api/search?q=AdNeha`) as any)).json()
+    expect(search.members.map((m: any) => m.id)).toContain(adultF.memberId) // the search did find her
+    // Free-text search ignores letter case.
+    const lower = await (await searchMembers(new Request(`http://x/api/search?q=adneha`) as any)).json()
+    expect(lower.members.map((m: any) => m.id)).toContain(adultF.memberId)
     const json = JSON.stringify(search)
     const member = JSON.stringify(await (await getMember(jsonReq('http://x', 'GET') as any, { params: { id: adultF.memberId } })).json())
     for (const leak of ['Sai Motors', 'MH12AB1234', 'registrationNumber', 'teachSubjects', 'houseOwnership', 'insurerName', 'Kale Clinic', 'sectionSettings', 'additionalDetail', 'marksValue', '91.7', 'XdBoardUniv', 'XDCONTACT', 'supportNeeds', 'FUNDING']) {

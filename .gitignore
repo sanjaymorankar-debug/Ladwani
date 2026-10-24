@@ -49,3 +49,6 @@ uploads/
 
 # Test uploads written by the suite
 uploads-test/
+
+# MySQL -> PostgreSQL data migration reports (primary keys of real rows)
+migration-report-*.json

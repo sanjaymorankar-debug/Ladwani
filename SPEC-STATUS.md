@@ -58,7 +58,7 @@ and members can maintain full profiles. Roughly **32 of 52 sections are complete
 | 41 | Profile page UX | 🟡 | Sections with independent save ✅; **not tabbed** as the spec describes |
 | 42 | Mobile UX | 🟡 | Layout is responsive (Tailwind) but **not verified on mobile viewports** |
 | 43 | Don't break existing modules | ⚪ | Community feed, areas, family tree, matrimony, notifications, admin, operator, audit — all preserved ✅. **Asset registration, asset booking, online payment, community fees and community services never existed in this codebase** — see below |
-| 44 | Migration strategy | 🟡 | Script + `MIGRATION.md` runbook written; **not executed** (no network path to the live MySQL host) |
+| 44 | Migration strategy | 🟡 | Script + `MIGRATION.md` runbook, rewritten Oct 2026 for the current schema and tested against MySQL 8.0 and MariaDB 10.11 copies; **not executed against the live database** (no network path to the live MySQL host) |
 | 45 | Test users | ✅ | All 5 roles incl. Asset Owner |
 | 46 | Acceptance: authentication | ✅ | Register→verify→login→refresh→protected page→logout verified in browser |
 | 47 | Acceptance: Karta | 🟡 | Register→family→Karta→add members→tree→edit ✅. Family photo upload ❌; approve→verified tested via API, not clicked through |
@@ -144,3 +144,18 @@ Needs doing before this is trusted:
 - Existing tests that edit an already-saved address as a non-staff user will now get a 202 (queued) instead of an immediate save.
 
 Still open: §41 profile tabs, §42 mobile verification, real payment gateway, photo pipeline test against real storage, SMTP-dependent flows, and `/admin/areas`, `/admin/matrimony`, `/admin/approval-rules`, `/admin/roles`, `/admin/notifications` — linked from Admin Settings but the pages do not exist.
+
+---
+
+## Update Oct 2026 — PostgreSQL is the final database
+
+The schema moved from MySQL back to PostgreSQL, for good (`DEPLOYMENT.md`,
+"Database history"). The six MySQL migrations became one PostgreSQL baseline.
+The bookings exclusion constraint, case-insensitive search and
+case-insensitive email (`CITEXT`) are restored. The SQL scripts live in
+`scripts/postgres/`, and CI runs the suite (300 tests) against PostgreSQL 16.
+
+The §44 data migration matters again. Any MySQL database with real data
+(the live Hostinger one in particular) must be copied with `MIGRATION.md`
+before it is retired. Hostinger shared/cloud hosting has no PostgreSQL, so
+production needs a managed PostgreSQL or a VPS.
