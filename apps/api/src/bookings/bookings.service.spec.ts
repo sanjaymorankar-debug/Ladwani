@@ -61,7 +61,7 @@ describe('BookingsService', () => {
   describe('double-booking prevention (lock-then-check-then-write ordering)', () => {
     function makeTx(lockedRow: { id: string; status: string } | undefined) {
       return {
-        assetAvailability: { create: jest.fn().mockResolvedValue({}), update: jest.fn().mockResolvedValue({}) },
+        assetAvailability: { createMany: jest.fn().mockResolvedValue({ count: 0 }), update: jest.fn().mockResolvedValue({}) },
         $queryRaw: jest.fn().mockResolvedValue(lockedRow ? [lockedRow] : []),
         booking: { create: jest.fn().mockResolvedValue({ id: 'booking-1' }) },
       }
@@ -115,8 +115,13 @@ describe('BookingsService', () => {
 
       await service.createBooking('user-1', { assetId: 'asset-1', date: new Date('2026-12-25') } as never)
 
-      expect(tx.assetAvailability.create).toHaveBeenCalled()
-      expect(tx.$queryRaw).toHaveBeenCalled()
+      // ON CONFLICT DO NOTHING, never a caught duplicate-key error: on
+      // PostgreSQL that error would abort the transaction before the lock.
+      expect(tx.assetAvailability.createMany).toHaveBeenCalledWith({
+        data: [{ assetId: 'asset-1', date: new Date('2026-12-25'), slot: 'FULL_DAY', status: 'AVAILABLE' }],
+        skipDuplicates: true,
+      })
+      expect(tx.assetAvailability.createMany.mock.invocationCallOrder[0]).toBeLessThan(tx.$queryRaw.mock.invocationCallOrder[0])
     })
 
     it('refuses to book an asset that is not ACTIVE', async () => {

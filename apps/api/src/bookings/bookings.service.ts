@@ -1,6 +1,5 @@
 import { createHmac } from 'crypto'
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { AssetsService } from '../assets/assets.service'
 import { NotificationsService } from '../notifications/notifications.service'
@@ -40,11 +39,14 @@ export class BookingsService {
     const bookingType = asset.bookingApprovalRequired ? 'REQUEST' : 'INSTANT'
 
     const booking = await this.prisma.$transaction(async (tx) => {
-      try {
-        await tx.assetAvailability.create({ data: { assetId: dto.assetId, date: dto.date, slot, status: 'AVAILABLE' } })
-      } catch (err) {
-        if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') throw err
-      }
+      // Make sure the slot's row exists so there is something to lock. This is
+      // INSERT ... ON CONFLICT DO NOTHING: on PostgreSQL a failed statement
+      // aborts the whole transaction, so catching a duplicate-key error here
+      // would leave the SELECT below unable to run.
+      await tx.assetAvailability.createMany({
+        data: [{ assetId: dto.assetId, date: dto.date, slot, status: 'AVAILABLE' }],
+        skipDuplicates: true,
+      })
 
       const locked = await tx.$queryRaw<{ id: string; status: string }[]>`
         SELECT id, status FROM asset_availability

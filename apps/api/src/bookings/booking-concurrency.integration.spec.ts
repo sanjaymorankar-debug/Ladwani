@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto'
+import { ConflictException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AssetsService } from '../assets/assets.service'
 import { BookingsService } from '../bookings/bookings.service'
@@ -93,6 +94,12 @@ describe('Booking concurrency (real PostgreSQL)', () => {
 
     expect(fulfilled).toHaveLength(1)
     expect(rejected).toHaveLength(CONCURRENCY - 1)
+    // Every loser is told the slot is taken. On PostgreSQL a failed statement
+    // aborts the whole transaction, so a loser that tripped over the unique
+    // key and carried on would surface a database error (a 500) instead.
+    for (const r of rejected) {
+      expect((r as PromiseRejectedResult).reason).toBeInstanceOf(ConflictException)
+    }
 
     const bookingsForSlot = await prisma.booking.findMany({ where: { assetId, date, slot: 'FULL_DAY' } })
     expect(bookingsForSlot).toHaveLength(1)
@@ -102,4 +109,23 @@ describe('Booking concurrency (real PostgreSQL)', () => {
     })
     expect(availability?.status).toBe('RESERVED')
   }, 60_000)
+
+  it('books a slot whose availability row already exists and is AVAILABLE', async () => {
+    // How a slot looks after a declined request or a cancellation: the row
+    // stays, back at AVAILABLE.
+    const date = new Date('2027-06-16')
+    await prisma.assetAvailability.create({ data: { assetId, date, slot: 'FULL_DAY', status: 'AVAILABLE' } })
+
+    const booking = await bookingsService.createBooking(userIds[0], { assetId, date, slot: 'FULL_DAY' } as never)
+    expect(booking.status).toBe('REQUESTED')
+
+    const availability = await prisma.assetAvailability.findUnique({
+      where: { assetId_date_slot: { assetId, date, slot: 'FULL_DAY' } },
+    })
+    expect(availability?.status).toBe('RESERVED')
+
+    await expect(
+      bookingsService.createBooking(userIds[1], { assetId, date, slot: 'FULL_DAY' } as never),
+    ).rejects.toBeInstanceOf(ConflictException)
+  }, 30_000)
 })
