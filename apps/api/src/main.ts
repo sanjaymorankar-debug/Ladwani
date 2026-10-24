@@ -1,9 +1,11 @@
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
 import { ValidationPipe } from '@nestjs/common'
+import { NestExpressApplication } from '@nestjs/platform-express'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import { AppModule } from './app.module'
+import { trustProxySetting } from './common/trust-proxy'
 
 async function bootstrap() {
   // Fail fast rather than silently sign every session token with a secret checked into source
@@ -15,7 +17,10 @@ async function bootstrap() {
   // rawBody: true keeps req.rawBody available on every request (needed for webhook signature
   // verification, which must run over the exact bytes sent — docs/19 §3) without disabling the
   // global JSON parser for every other route.
-  const app = await NestFactory.create(AppModule, { rawBody: true })
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true })
+  // Per-visitor rate limits behind a proxy -- see common/trust-proxy.ts.
+  const trustProxy = trustProxySetting(process.env.TRUST_PROXY)
+  if (trustProxy !== undefined) app.set('trust proxy', trustProxy)
   app.use(helmet())
   app.use(cookieParser())
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))

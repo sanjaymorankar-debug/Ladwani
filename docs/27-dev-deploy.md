@@ -57,6 +57,24 @@ answers, and 503 when it cannot reach Neon.
 | `JWT_SECRET` | a long random value (`openssl rand -hex 32`). The API refuses to start in production without it. |
 | `WEB_ORIGIN` | `https://dev.bkesari.com` |
 | `NODE_ENV` | `production` (also makes the refresh cookie `Secure`) |
+| `TRUST_PROXY` | `loopback, <the server's IP>` (see below) |
+
+**`TRUST_PROXY`**: the API rate-limits per client IP. That means 20 requests a
+minute, 5 logins per 15 minutes and 5 sign-ups an hour. Every request reaches
+it through Hostinger's front end, and on dev also through the hub and the web
+site. So without this setting all visitors share one budget, and one person's
+mistyped password locks everyone out of signing in. Set it to our own hops:
+`loopback` plus the server's IP. All three sites sit on the same server, so
+that IP covers the hub and the web site; hPanel shows it. The API then counts
+each visitor by the first address in `X-Forwarded-For` that isn't one of
+those, which a caller can't forge. To check it after a deploy, make 6 bad
+sign-in attempts from one network, then 1 from another (a phone on mobile
+data). The other network should get 401, not 429.
+
+**Database connections**: Neon suspends an idle compute after five minutes. The
+API retires pooled connections idle for 30 s and allows 15 s to connect, so
+the first request after a quiet spell doesn't fail with P1017. It adds both
+to `DATABASE_URL` unless the URL already sets them.
 
 **Web**: nothing. `BASE_PATH=/ladwani` and the API's address are compiled in by
 the deploy's build. The host supplies `PORT`.
