@@ -42,3 +42,10 @@ prisma/migrations/*.sql.bak
 
 # Uploads (local dev)
 uploads/
+
+# Testing agent: gate state and run reports (local only)
+.claude/state/
+.claude/test-runs/
+
+# Test uploads written by the suite
+uploads-test/
