@@ -115,6 +115,23 @@ describe('F22 Link a person to another family tree', () => {
 
     expect((await send(ka, { fromFamilyId: famA, fromMemberId: ka.memberId, toFamilyId: famB, toMemberId: kb.memberId })).status).toBe(409)
   })
+
+  it("F22 a plain member may ask for a link (owner's decision); the other family's Karta still decides; the member can cancel", async () => {
+    const memA = await fx.adult('lnkmema', { villageId: geo.village })
+    const memB = await fx.adult('lnkmemb', { villageId: geo.village })
+    await prisma.familyMember.create({ data: { familyId: famA, memberId: memA.memberId, relationshipRole: 'brother', relativeToMemberId: ka.memberId } })
+    await prisma.familyMember.create({ data: { familyId: famB, memberId: memB.memberId, relationshipRole: 'brother', relativeToMemberId: kb.memberId } })
+    const a = await twin(famA, 'Atya', 'Y', '1960-01-01')
+    const b = await twin(famB, 'Atya', 'Y', '1960-01-01')
+    const res = await send(memA, { fromFamilyId: famA, fromMemberId: a.memberId, toFamilyId: famB, toMemberId: b.memberId })
+    expect(res.status).toBe(201)
+    const { linkId } = await res.json()
+    // A member of the other family is not its Karta: cannot accept.
+    expect((await act(memB, linkId, { action: 'accept', resolution: {} })).status).toBe(403)
+    // Someone outside famA cannot ask on its behalf.
+    expect((await send(memB, { fromFamilyId: famA, fromMemberId: a.memberId, toFamilyId: famB, toMemberId: b.memberId })).status).toBe(403)
+    expect((await act(memA, linkId, { action: 'cancel' })).status).toBe(200)
+  })
 })
 
 describe('F23 Marital status change triggers new family link / F24 one person in several families', () => {

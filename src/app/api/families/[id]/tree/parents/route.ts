@@ -12,10 +12,11 @@ import { ancestorLevels, generationIn } from '@/lib/tree'
 /**
  * F19 / F20 — tree builder: add a person's father and mother, as a
  * husband + wife pair, alive or expired, with a full date or a birth year.
- *   F19: the Karta builds the ancestor line up to `tree.ancestor_levels`
- *        generations above the Karta (OP-02, default 3).
+ *   F19: the ancestor line, up to `tree.ancestor_levels` generations above
+ *        the Karta (OP-02, default 3).
  *   F20: the same on the spouse side — the parents of someone married into
- *        the family. A member may do this for their own spouse.
+ *        the family.
+ * Any member of the family may build it, not only the Karta (owner's decision).
  * Each ancestor is a non-login record, joined to the family with the role
  * father / mother relative to the child.
  */
@@ -34,14 +35,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     include: { member: { select: { id: true, firstName: true, dateOfBirth: true } } },
   })
   if (!child) return NextResponse.json({ message: 'Choose a person in this family' }, { status: 400 })
-
-  // A plain member may only add their own spouse's parents (F20).
-  if (!access.isKarta && !access.isStaff) {
-    const isOwnSpouse = access.memberId && await prisma.memberRelationship.findFirst({
-      where: { fromMemberId: access.memberId, toMemberId: childId, isActive: true, relationshipType: { isSpouse: true } },
-    })
-    if (!isOwnSpouse) return NextResponse.json({ message: 'Only the Karta adds ancestors; members can add their own spouse\'s side' }, { status: 403 })
-  }
 
   const existing = await parentsOf(childId)
   if (existing.father || existing.mother) {

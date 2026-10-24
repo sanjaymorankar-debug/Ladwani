@@ -25,9 +25,7 @@ Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as P0�
 - Setting `tree.ancestor_levels`.
 
 ### c) Role differences
-- **F20 / F21:** "Karta / member" in the workbook.
-  - Members may add siblings anywhere, and the parents of their own spouse.
-  - Adding ancestors (F19) and linking families (F22) stays with the Karta.
+- **F19 / F20 / F21 / F22:** any member of the family may build the tree, not only the Karta (your decision, §9). Accepting a link from another family stays with that family's Karta.
 - **F22:** an unresolved conflict goes to an Operator of *either* family's district.
 
 ### d) Open points
@@ -118,6 +116,18 @@ A browser run against the production build covered:
 
 ## 8. Decisions needed
 1. **OP-02:** keep 3 generations up, or set `tree.ancestor_levels` to 2?
-2. **Marriage review:** the existing §28 review still applies before a marriage takes effect, so the family requests follow the review. The workbook F23 has no review step. Remove it? This is a switch in Approval Rules, `member.marital_status.change`.
+2. **Marriage review:** the existing §28 review still applies before a marriage takes effect, so the family requests follow the review. The workbook F23 has no review step. Remove it? It is the approval rule `member.marital_status.change`; there is no screen for it (see P2 report §9), so it would be switched off with a small migration.
 3. **Wrong-gender inverse links in existing data:** may I correct them? That would mean a script with a rollback list, run first on test.
-4. **Members building the tree** (F20/F21 "Karta / member"): keep, or Karta only?
+4. ~~**Members building the tree**~~ — decided: members may build the tree and its links (§9).
+
+## 9. Follow-up: members may build the tree and its links (your decision)
+- **Before:** members could add siblings anywhere and the parents of their own spouse. Adding ancestors (F19) and linking to another family's tree (F22) were for the Karta only.
+- **Now:** any active member of the family (and staff, as before) may:
+  - add the parents of anyone in the family's tree (F19 / F20). The depth limit (`tree.ancestor_levels`, OP-02) and the usual checks still apply: parents already recorded, parents older than the child, and so on;
+  - add siblings, as before (F21);
+  - ask to link a person in their tree to another family's tree (F22), search the other family's people for it (name, gender and birth year only, as before), and cancel their own request.
+- **Unchanged:** a link request from another family is still accepted or rejected only by **that family's Karta**, because it changes their tree; differences still go to an Operator; the requester is told the result. The family's own Karta still sees all its sent links in the link inbox. Adding a new member to the family (F10) stays with the Karta.
+- **Code:** `api/families/[id]/tree/parents` (Karta-only check removed), `api/tree-links` (POST for any family member; cancel also by the member who asked), `api/tree-links/candidates`, and the tree page's "Link to another family" button, now shown to every member.
+- **No migration, no data change.**
+- **Tests:** my own P3 test that expected a member to be refused for someone else's spouse side now checks the member's own spouse side only. New tests: a plain member adds ancestors for someone else in the family (the checks still apply; an outsider is still refused), and a plain member asks for a link that a non-Karta of the other family cannot accept, then cancels it. No existing test from before this PR depended on the old rule. **415 passed**, twice in a row on a fresh database; typecheck clean; build OK.
+- **Still open in §8:** OP-02 tree depth, the marriage review step, and correcting existing wrong-gender relationship rows.

@@ -33,10 +33,10 @@ Tick each line and note anything unexpected. The automated test for each flow is
 - [ ] F18 The district Operator changes a member's role with a remark.
 
 ## P3 — Family tree
-- [ ] F19 Tree builder: add parents, grandparents, great-grandparents (a 4th level is refused).
+- [ ] F19 Tree builder: add parents, grandparents, great-grandparents (a 4th level is refused). Repeat as a plain member (not the Karta): it works too.
 - [ ] F20 Spouse side: add your spouse's parents.
 - [ ] F21 Add a sibling at any level; tick "has own family on site".
-- [ ] F22 Link the sibling to the person in the other family; resolve any difference; the other Karta accepts → one person in both trees.
+- [ ] F22 Link the sibling to the person in the other family (a plain member can ask too); resolve any difference; the other Karta accepts → one person in both trees.
 - [ ] F23 Record a marriage (date, legal age); the spouse's family Karta gets a "Marriage" request.
 - [ ] F24 Someone in two families sees "My Families" with a role in each.
 - [ ] F25 Tree: zoom, collapse, person card, jump icon, Print / Save as PDF. Someone from an unrelated family gets "not found".

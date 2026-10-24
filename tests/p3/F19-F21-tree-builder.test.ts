@@ -88,7 +88,7 @@ describe('F19 Build ancestor tree (3 generations up)', () => {
 })
 
 describe('F20 Add spouse-side tree', () => {
-  it('F20 a member adds their own spouse\'s parents; not anyone else\'s; both sides join at the marriage', async () => {
+  it('F20 a member adds their own spouse\'s parents; both sides join at the marriage', async () => {
     const bro = await fx.adult('bro', { dob: '1980-01-01' })
     const broWife = await fx.profile('bw', { gender: 'FEMALE', dob: '1982-01-01' })
     await prisma.familyMember.createMany({ data: [
@@ -97,13 +97,29 @@ describe('F20 Add spouse-side tree', () => {
     ] })
     await linkPeople(prisma, bro.memberId, broWife.memberId, 'husband', k.userId, famId)
 
-    expect((await parents(bro, famId, { childMemberId: wife.memberId, father: { firstName: 'A' }, mother: { firstName: 'B' } })).status).toBe(403)
     const res = await parents(bro, famId, { childMemberId: broWife.memberId, father: { firstName: 'Sasur', birthYear: 1950 }, mother: { firstName: 'Saas', birthYear: 1955 } })
     expect(res.status).toBe(201)
     const { fatherId } = await res.json()
     const t = await tree(famId, k)
     expect(t.body.nodes.find((n: any) => n.id === fatherId).data.generation).toBe(1)
     expect(t.body.edges.some((e: any) => e.kind === 'parent' && e.source === fatherId && e.target === broWife.memberId)).toBe(true)
+  })
+})
+
+describe("Members build the tree (owner's decision), not only the Karta", () => {
+  it('F19/F20 a plain member adds ancestors for anyone in the family; the depth limit and the checks still apply', async () => {
+    const cousin = await fx.adult('cz', { dob: '1985-01-01' })
+    await prisma.familyMember.create({ data: { familyId: famId, memberId: cousin.memberId, relationshipRole: 'cousin', relativeToMemberId: k.memberId } })
+    // The Karta's wife is not the member's own spouse: allowed now.
+    const res = await parents(cousin, famId, { childMemberId: wife.memberId, father: { firstName: 'Mama', birthYear: 1950 }, mother: { firstName: 'Mami', birthYear: 1952 } })
+    expect(res.status).toBe(201)
+    const { fatherId } = await res.json()
+    expect(await code(fatherId, wife.memberId)).toContain('father')
+    // Same checks as for the Karta: parents already recorded → 409.
+    expect((await parents(cousin, famId, { childMemberId: wife.memberId, father: { firstName: 'X' }, mother: { firstName: 'Y' } })).status).toBe(409)
+    // Someone outside the family still cannot.
+    const outsider = await fx.adult('out2')
+    expect((await parents(outsider, famId, { childMemberId: son.memberId, father: { firstName: 'X' }, mother: { firstName: 'Y' } })).status).toBe(403)
   })
 })
 
