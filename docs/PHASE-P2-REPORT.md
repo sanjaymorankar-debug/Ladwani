@@ -117,13 +117,17 @@ No new environment keys.
 - **A removal reason** of "wrongly added" or "duplicate" gives status REMOVED; "moved out" gives ENDED.
 
 ## 8. Decisions needed
-1. **Admin review of a Karta change.**
-   - Today: after the nominee accepts, the existing Admin review still applies.
-   - The workbook F16 has no Admin step for a voluntary hand-over.
-   - Remove the review? This is a switch in the Approval Rules screen (`family.karta.change`); no code change is needed.
+1. ~~**Admin review of a Karta change.**~~ — decided: keep it (§9).
 2. **Review queue for marking Expired.**
    - Today: a non-staff Karta's request goes to the existing §28 review before it takes effect.
    - The workbook F12 makes it immediate.
-   - Remove the gate? Same switch, `member.mark_deceased`.
+   - Remove the gate? It is the approval rule `member.mark_deceased`. No code change is needed, but there is no screen for it (correction: the Settings page links to an "Approval Rules" page that does not exist, and did not before this PR), so it would be switched off with a small migration, as was done for address changes (P1 §10).
 3. **Reject without a reason (F15).** The workbook says reject with a reason. The inbox now asks for one, but the API still accepts a rejection without it, because the existing test TC-FAM-009 rejects without a note and expects success. Enforce it in the API? That test would then need a note added.
 4. **"Removed from friend lists" (F12)** waits for P5, because no friend/connection table exists yet.
+
+## 9. Follow-up: the Admin review of Karta hand-overs stays (your decision)
+- **Rule:** a voluntary hand-over goes: the Karta nominates → the nominee accepts → an Admin reviews → the change applies. The Admin step comes from the existing approval rule `family.karta.change` (§28), which stays on. The workbook F16 has no Admin step; this is a deliberate difference.
+- **Unchanged:** a vacancy (the Karta has died or left) is still confirmed by an Operator of the family's district or an Admin, not by this review.
+- **No code, migration or data change.** This was already the behaviour.
+- **Covered by an existing test:** `F16 voluntary: the nominee must accept; then the (existing) Admin review; the old Karta becomes a normal member` in `tests/p2/F14-F18-requests-transfer-claims.test.ts` checks that nothing changes until an Admin approves.
+- **Correction to §8:** the earlier text said this rule could be switched in an "Approval Rules" screen. That screen does not exist: the Settings page links to it, but the link was already broken before this PR. Changing an approval rule needs a small migration.

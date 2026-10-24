@@ -28,7 +28,7 @@ Tick each line and note anything unexpected. The automated test for each flow is
 - [ ] F12 Mark a member Expired (shown as "Late"). If they were Karta, the family becomes Karta-vacant.
 - [ ] F13 Add a new-born: choose father and mother; the name may be "Baby of …".
 - [ ] F14/F15 A non-member requests to join; the Karta corrects the role and accepts, or rejects with a reason.
-- [ ] F16 Karta hand-over (the nominee accepts) and vacancy (the district Operator confirms).
+- [ ] F16 Karta hand-over (the nominee accepts, then an Admin approves) and vacancy (the district Operator confirms).
 - [ ] F17 A new registrant finds their Karta-made profile, says "This is me", and the Karta confirms the merge.
 - [ ] F18 The district Operator changes a member's role with a remark.
 
