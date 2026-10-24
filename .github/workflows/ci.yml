@@ -40,6 +40,9 @@ jobs:
           --health-retries 10
 
     env:
+      # The service container above, and nothing else: CI never reaches Neon.
+      # One URL is enough here; DATABASE_URL_UNPOOLED falls back to it (see
+      # scripts/with-env.js and prisma/schema.prisma).
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/miladwani_test?schema=public
       NEXTAUTH_SECRET: ci-only-secret-not-used-in-production
       NEXTAUTH_URL: http://localhost:3000
@@ -82,8 +85,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Through with-env.js, which sets DATABASE_URL_UNPOOLED (the schema's
+      # directUrl) to DATABASE_URL: CI has one database, Neon has two URLs.
       - name: Check the Prisma schema is valid
-        run: npx prisma validate
+        run: node scripts/with-env.js .env.test npx prisma validate
 
       # basePath does not rewrite fetch(), so a newly added `fetch('/api/...')`
       # typechecks, passes the tests, and then calls the hub's root instead of

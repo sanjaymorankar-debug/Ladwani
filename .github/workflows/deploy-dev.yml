@@ -6,8 +6,10 @@
 # refuses agtci.com too — this app used to live at devmiladwani.agtci.com and
 # that site is not ours to overwrite.
 #
-# No database credential is stored in GitHub. The server's own .env holds them,
-# and rsync neither writes nor deletes it — see the "Upload" step.
+# No database credential is stored in GitHub. The server's own .env holds them
+# (the dev Neon branch's DATABASE_URL and DATABASE_URL_UNPOOLED, nothing from
+# test or production), and rsync neither writes nor deletes it — see the
+# "Upload" step.
 name: Deploy dev
 
 on:
@@ -54,8 +56,9 @@ jobs:
           --health-retries 10
 
     env:
-      # A throwaway CI database. Nothing here reaches any real tier: the dev,
-      # test and production credentials live only in each server's own .env.
+      # A throwaway CI database. Nothing here reaches any real tier or Neon:
+      # the dev, test and production URLs (DATABASE_URL, DATABASE_URL_UNPOOLED)
+      # live only in each server's own .env.
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/miladwani_test?schema=public
       NEXTAUTH_SECRET: ci-only-secret-not-used-in-production
       NEXTAUTH_URL: http://localhost:3000
@@ -98,8 +101,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Through with-env.js, which sets DATABASE_URL_UNPOOLED (the schema's
+      # directUrl) to DATABASE_URL: CI has one database, Neon has two URLs.
       - name: Check the Prisma schema is valid
-        run: npx prisma validate
+        run: node scripts/with-env.js .env.test npx prisma validate
 
       # basePath does not rewrite fetch(), so a newly added `fetch('/api/...')`
       # typechecks, passes the tests, and then calls the hub's root instead of
@@ -166,7 +171,8 @@ jobs:
         env:
           # Never connected to. Prisma's client wants a syntactically valid URL
           # at import time and `next build` imports modules that construct it.
-          # The real dev credentials live only in the server's .env.
+          # The real dev URLs (the dev Neon branch's pooled DATABASE_URL and
+          # direct DATABASE_URL_UNPOOLED) live only in the server's .env.
           DATABASE_URL: postgresql://build:build@127.0.0.1:5432/build
           NEXTAUTH_SECRET: build-only-not-used-at-runtime
           # The hub forwards /ladwani/ here WITHOUT stripping the prefix, so
@@ -267,10 +273,10 @@ jobs:
           REMOTE
 
       # Migrations are NOT applied automatically. Schema changes on this estate
-      # are reviewed and applied by hand (`npx prisma migrate deploy` from a
-      # machine that reaches the PostgreSQL database), so a deploy can never
-      # alter a database on its own. This step only reports what the push
-      # brought.
+      # are reviewed and applied by hand (`npx prisma migrate deploy` on the
+      # server, or from any machine with that tier's .env; Prisma takes the
+      # direct DATABASE_URL_UNPOOLED for it), so a deploy can never alter a
+      # database on its own. This step only reports what the push brought.
       - name: Report migrations included in this deploy
         env:
           # The branch head before this push. Empty on a manual run.

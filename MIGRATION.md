@@ -60,7 +60,12 @@ script only; the app itself never talks to MySQL.
   with the ids the migrated data points at. A seeded database would hold the
   same codes under different ids, and the copy would fail on unique keys.
   ```bash
-  DATABASE_URL="postgresql://...?schema=public" npx prisma migrate deploy
+  # On Neon: the branch's DIRECT connection string (Connection pooling off),
+  # for this whole runbook. The copy is one long-lived process, and Prisma's
+  # CLI reads DATABASE_URL_UNPOOLED, so export the same URL as both.
+  export DATABASE_URL="postgresql://bk_ladwani_app:<password>@<endpoint>.<region>.aws.neon.tech/bk_ladwani?sslmode=require&channel_binding=require"
+  export DATABASE_URL_UNPOOLED="$DATABASE_URL"
+  npx prisma migrate deploy
   ```
   (`scripts/postgres/01-schema.sql` is equivalent. Skip `02-reference-data.sql`.)
 - [ ] Confirm nobody is writing to the MySQL database during the migration
@@ -233,7 +238,8 @@ Using a handful of real (migrated) accounts:
 ## Step 7 — Cut over
 
 Once satisfied:
-1. Point the production `DATABASE_URL` at the new PostgreSQL database.
+1. Point the production `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED`
+   (direct) at the new PostgreSQL database (`DEPLOYMENT.md` Part 2).
 2. Deploy.
 3. Keep the MySQL database (and the backup from "Before you start")
    read-only and available for at least one full backup cycle, in case

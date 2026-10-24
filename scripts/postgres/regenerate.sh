@@ -25,7 +25,7 @@ psql "$SQLGEN_ADMIN_URL" -v ON_ERROR_STOP=1 -qc "DROP DATABASE IF EXISTS \"$DB\"
 
 # Reference data only: SEED_TEST_ACCOUNTS is forced off so no test login can
 # leak into a production file, and the admin password is the documented one.
-env -u SEED_TEST_ACCOUNTS DATABASE_URL="$DB_URL" \
+env -u SEED_TEST_ACCOUNTS DATABASE_URL="$DB_URL" DATABASE_URL_UNPOOLED="$DB_URL" \
   ADMIN_EMAIL=admin@miladwani.com ADMIN_PASSWORD='ChangeThisInProduction123!' \
   sh -c 'npx prisma migrate deploy && npm run db:seed' >/dev/null
 

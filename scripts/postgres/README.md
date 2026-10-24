@@ -20,9 +20,9 @@ passed the app's full test suite (300 tests) and showed no drift against
 
 ## 1. Create the database and its owner
 
-- **Managed PostgreSQL** (Neon, Supabase, AWS RDS, DigitalOcean, Aiven, ...):
-  create the database in the provider's dashboard and copy its connection
-  string. Skip `create-database.sql`.
+- **Neon** (every tier): the role `bk_ladwani_app` and the database `bk_ladwani`
+  are made in the Neon console, on each branch. Skip `create-database.sql`.
+  `../../DEPLOYMENT.md` Part 1 has the steps and the two connection strings.
 - **Your own server or a VPS:** run [`create-database.sql`](create-database.sql)
   with `psql` as a superuser:
   ```bash
@@ -31,7 +31,8 @@ passed the app's full test suite (300 tests) and showed no drift against
     -f scripts/postgres/create-database.sql
   ```
   It creates the role `miladwani_app` and the database `miladwani` owned by
-  it. Re-running it is harmless.
+  it (`-v app_role=bk_ladwani_app -v db_name=ladwani` for the names Neon uses).
+  Re-running it is harmless.
 
 The schema needs two extensions, `citext` and `btree_gist`. Both are
 "trusted" (PostgreSQL 13+), so the database owner creates them itself during
@@ -39,13 +40,16 @@ step 2 without superuser rights. Most managed providers allow both; check
 yours before the first deploy. PostgreSQL 13 or newer is required; CI tests
 against PostgreSQL 16.
 
-Then set `DATABASE_URL` in the app's `.env`:
+Then set the URLs in the app's `.env`. On Neon, `DATABASE_URL` is the pooled
+string and `DATABASE_URL_UNPOOLED` the direct one; Prisma's CLI (step 2A)
+uses the direct one. With a single database both are the same:
 
 ```
 DATABASE_URL="postgresql://miladwani_app:<password>@<host>:5432/miladwani?schema=public"
+DATABASE_URL_UNPOOLED="${DATABASE_URL}"
 ```
 
-Managed providers often require TLS: append `&sslmode=require` to the URL.
+Neon requires TLS: keep its `?sslmode=require&channel_binding=require`.
 
 ---
 
@@ -64,7 +68,8 @@ command safe to run against a live database. Don't use `migrate dev`,
 
 ## 2B. SQL files
 
-`psql` doesn't accept Prisma's `?schema=public` suffix, so leave it off here:
+Use the **direct** URL (on Neon, "Connection pooling" off). `psql` doesn't
+accept Prisma's `?schema=public` suffix, so leave it off here:
 
 ```bash
 psql "postgresql://miladwani_app:<password>@<host>:5432/miladwani" -v ON_ERROR_STOP=1 -f scripts/postgres/01-schema.sql

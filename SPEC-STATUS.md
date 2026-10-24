@@ -140,7 +140,7 @@ Built this pass (typechecks clean; **not yet run against a database**, see below
 
 Needs doing before this is trusted:
 - Apply the new migration (`prisma migrate deploy`) and re-seed approval rules (`member.address.change` was added to the seed; a missing rule defaults to *requires approval*, so it works even before re-seeding).
-- Run the suite. New tests are in `tests/uat/pending-items.test.ts`; they have not been executed — the local test MySQL rejected the configured credentials.
+- Run the suite. New tests are in `tests/uat/pending-items.test.ts`; they had not been executed at the time — the local test MySQL rejected the configured credentials. *(Since run: they are part of `npm test` and pass, on MySQL and now on PostgreSQL. `TEST_SPEC.md` §5 has the current counts.)*
 - Existing tests that edit an already-saved address as a non-staff user will now get a 202 (queued) instead of an immediate save.
 
 Still open: §41 profile tabs, §42 mobile verification, real payment gateway, photo pipeline test against real storage, SMTP-dependent flows, and `/admin/areas`, `/admin/matrimony`, `/admin/approval-rules`, `/admin/roles`, `/admin/notifications` — linked from Admin Settings but the pages do not exist.
@@ -153,7 +153,7 @@ The schema moved from MySQL back to PostgreSQL, for good (`DEPLOYMENT.md`,
 "Database history"). The six MySQL migrations became one PostgreSQL baseline.
 The bookings exclusion constraint, case-insensitive search and
 case-insensitive email (`CITEXT`) are restored. The SQL scripts live in
-`scripts/postgres/`, and CI runs the suite (300 tests) against PostgreSQL 16.
+`scripts/postgres/`, and CI runs the suite (300 tests at the time; `TEST_SPEC.md` §5 has the current count) against PostgreSQL 16. Every tier's database is on Neon (`DEPLOYMENT.md` Part 1).
 
 The §44 data migration matters again. Any MySQL database with real data
 (the live Hostinger one in particular) must be copied with `MIGRATION.md`
