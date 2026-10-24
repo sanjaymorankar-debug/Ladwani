@@ -94,6 +94,8 @@ A browser run against the production build covered:
    - `set_bureau_workbook_rules_on.sql`
    - `set_address_changes_instant.sql`
    - `add_p4_taluka_chain.sql`
+   - `add_death_certificate.sql`
+   - **production only, at go-live:** `set_death_certificate_required_on.sql` (from then on an Expired request needs a death certificate; P2 report §10)
 
    Then run `npm run db:seed` (reference data only; it does not overwrite real data). **Never run `db:seed:uat` on production.**
 3. **Environment:** `ID_PROOF_KEY` (32 random bytes, base64, kept safe), `CRON_SECRET` (16+ characters), working SMTP (Admin 2FA, confirmations). Optional: `AUTH_ADMIN_2FA`, `NEXT_PUBLIC_REGISTRATION_REQUIRE_MOBILE`. `UPLOAD_DIR` must be outside `public_html`.

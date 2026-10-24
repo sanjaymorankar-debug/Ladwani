@@ -118,10 +118,7 @@ No new environment keys.
 
 ## 8. Decisions needed
 1. ~~**Admin review of a Karta change.**~~ — decided: keep it (§9).
-2. **Review queue for marking Expired.**
-   - Today: a non-staff Karta's request goes to the existing §28 review before it takes effect.
-   - The workbook F12 makes it immediate.
-   - Remove the gate? It is the approval rule `member.mark_deceased`. No code change is needed, but there is no screen for it (correction: the Settings page links to an "Approval Rules" page that does not exist, and did not before this PR), so it would be switched off with a small migration, as was done for address changes (P1 §10).
+2. ~~**Review queue for marking Expired.**~~ — decided: the review stays, and a death certificate is added (§10).
 3. **Reject without a reason (F15).** The workbook says reject with a reason. The inbox now asks for one, but the API still accepts a rejection without it, because the existing test TC-FAM-009 rejects without a note and expects success. Enforce it in the API? That test would then need a note added.
 4. **"Removed from friend lists" (F12)** waits for P5, because no friend/connection table exists yet.
 
@@ -131,3 +128,18 @@ No new environment keys.
 - **No code, migration or data change.** This was already the behaviour.
 - **Covered by an existing test:** `F16 voluntary: the nominee must accept; then the (existing) Admin review; the old Karta becomes a normal member` in `tests/p2/F14-F18-requests-transfer-claims.test.ts` checks that nothing changes until an Admin approves.
 - **Correction to §8:** the earlier text said this rule could be switched in an "Approval Rules" screen. That screen does not exist: the Settings page links to it, but the link was already broken before this PR. Changing an approval rule needs a small migration.
+
+## 10. Follow-up: Expired keeps its review and gains a death certificate (your decision)
+- **Your answer:** marking a member Expired is still reviewed, and the request carries the death certificate "after go-live".
+- **Review:** unchanged. A Karta's request goes to the existing §28 review (`member.mark_deceased`); staff still record it directly. The workbook F12 has no review step; this is a deliberate difference.
+- **Certificate:** the "Mark as deceased" form now has a file field (JPG, PNG, WebP or PDF, up to 5 MB). The file is checked by its content, stored **encrypted** in `UPLOAD_DIR` (like the ID proofs), and travels with the review. When the request is approved it is kept on the member (`members.deathCertKey` / `deathCertMime`).
+- **Who can open it:** Admins and Operators only, from the review screen ("View death certificate") via `/api/members/[id]/death-certificate`. Every view is written to the audit log. The Karta who uploaded it, and other members, get "not found".
+- **"After go-live":** the setting `deceased.certificate_required` decides whether the certificate is required. It is **off** now, so existing deaths can be recorded without one during data loading (a certificate can still be attached). At go-live it is switched on with `database/phpmyadmin/set_death_certificate_required_on.sql` (P6 runbook step 2). From then on a request without a certificate is refused ("Attach the death certificate"), and the form marks the field as required.
+- **Migration** `20261024110000_death_certificate` (+ `down.sql`; phpMyAdmin: `add_death_certificate.sql`). It adds two nullable columns to `members` and the setting (off). It does not change existing data. **Rollback:** `down.sql` deletes the setting and drops the two columns; certificate files already stored stay in the uploads folder (prefix `death-certificates/`) until deleted by hand. Checked on a scratch database: deploy → `down.sql` → phpMyAdmin script → `prisma migrate status` up to date, `migrate diff` no difference.
+- **Tests added** in `tests/p2/F09-F13-family-karta.test.ts`: `F12 while the setting is off, a request without a certificate still goes through` and `F12 once switched on, the certificate is required; it is stored encrypted, travels with the review, and lands on the member when approved` (no file → 400; a non-image → 400; with a PNG → 202, not stored in the clear; the Karta cannot open it, an Admin can and the view is audited; after approval it is on the member). No existing test changed. **416 passed**, twice in a row on a fresh database; typecheck clean; build OK.
+- **Browser check (production build):**
+  - Setting off: the form shows "Death certificate (optional)"; the Karta submits with a PNG → "Submitted for review"; the Karta opening the file gets 404; an Operator sees "View death certificate" on the review screen, and it opens (200, image/png).
+  - Setting on: the form shows "(required)"; submitting without a file shows "Attach the death certificate", and the API returns 400.
+  - A production build without `ID_PROOF_KEY` refuses to store the file (503, "File storage is not configured"), as for ID proofs. The key is already in the P6 runbook step 3.
+- **Still open in §8:** whether the API must refuse a rejection without a reason (F15, item 3). Your reply did not say; it needs your permission to change the existing test TC-FAM-009.
+- **Finding (from before this PR, not changed):** `GET /api/approvals/[id]` returns any request to any signed-in user who knows its id. The certificate itself is safe (the viewer above checks the role), but the request's details are not. Limit it to staff and the person who submitted it? That would change an existing route, so I have not touched it.

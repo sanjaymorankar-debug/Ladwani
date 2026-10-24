@@ -371,6 +371,8 @@ model Member {
   deceasedAt         DateTime?
   deceasedPlace      String?
   deceasedNotes      String?            @db.Text
+  deathCertKey       String? // F12: encrypted death certificate (secure-files), owner's decision
+  deathCertMime      String?
   verificationStatus VerificationStatus @default(UNVERIFIED)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt

@@ -26,6 +26,7 @@ Tick each line and note anything unexpected. The automated test for each flow is
 - [ ] F10 Add a member; a "Daughter" who is male is refused; duplicate name + DOB is refused.
 - [ ] F11 Remove a member with a reason; their other family is unaffected.
 - [ ] F12 Mark a member Expired (shown as "Late"). If they were Karta, the family becomes Karta-vacant.
+- [ ] F12 Attach a death certificate to the request. The Operator/Admin opens it from the review screen; the Karta cannot open it. (On test the certificate is optional; to try the go-live rule, run `set_death_certificate_required_on.sql` and check that a request without one is refused.)
 - [ ] F13 Add a new-born: choose father and mother; the name may be "Baby of …".
 - [ ] F14/F15 A non-member requests to join; the Karta corrects the role and accepts, or rejects with a reason.
 - [ ] F16 Karta hand-over (the nominee accepts, then an Admin approves) and vacancy (the district Operator confirms).

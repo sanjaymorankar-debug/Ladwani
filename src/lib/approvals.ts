@@ -173,6 +173,15 @@ export interface DeceasedPayload {
   deceasedAt: string
   deceasedPlace?: string | null
   deceasedNotes?: string | null
+  /** F12: encrypted death certificate (storage key) and its type, if attached. */
+  certificateKey?: string | null
+  certificateMime?: string | null
+}
+
+/** F12 (owner's decision): a death certificate is required once this setting is on (switched on at go-live). */
+export async function deathCertificateRequired() {
+  const s = await prisma.setting.findUnique({ where: { key: 'deceased.certificate_required' } })
+  return s?.value === 'true' || (s?.value as unknown) === true
 }
 
 export async function applyMarkDeceased(tx: Prisma.TransactionClient, memberId: string, payload: DeceasedPayload, actorId: string) {
@@ -183,6 +192,7 @@ export async function applyMarkDeceased(tx: Prisma.TransactionClient, memberId: 
       deceasedAt: new Date(payload.deceasedAt),
       deceasedPlace: payload.deceasedPlace || null,
       deceasedNotes: payload.deceasedNotes || null,
+      ...(payload.certificateKey ? { deathCertKey: payload.certificateKey, deathCertMime: payload.certificateMime ?? null } : {}),
     },
   })
 

@@ -8,7 +8,12 @@ import { p2Fixtures, actAs, json, type Person } from './fixtures'
 import { POST as createFamily, GET as searchFamilies } from '@/app/api/families/route'
 import { POST as addMember } from '@/app/api/families/[id]/members/route'
 import { DELETE as removeMember } from '@/app/api/families/[id]/members/[memberId]/route'
-import { POST as markDeceased } from '@/app/api/members/[id]/deceased/route'
+import { POST as markDeceased, GET as deceasedForm } from '@/app/api/members/[id]/deceased/route'
+import { GET as viewDeathCert } from '@/app/api/members/[id]/death-certificate/route'
+import { PATCH as reviewApproval } from '@/app/api/approvals/[id]/route'
+import { PNG } from '../p1/fixtures'
+import fs from 'fs/promises'
+import path from 'path'
 import { POST as addNewborn } from '@/app/api/families/[id]/newborn/route'
 import { POST as joinRequest } from '@/app/api/families/[id]/join-requests/route'
 
@@ -184,6 +189,68 @@ describe('F12 Mark member as Expired', () => {
     expect(await prisma.notification.count({ where: { recipientId: elder.userId, type: 'KARTA_VACANT' } })).toBe(1)
     // Still in both trees (shown as "Late").
     expect(await prisma.familyMember.count({ where: { memberId: k.memberId, leftAt: null } })).toBe(2)
+  })
+})
+
+describe('F12 Death certificate (switched on at go-live)', () => {
+  const KEY = 'deceased.certificate_required'
+  const setRequired = (value: boolean) => prisma.setting.upsert({ where: { key: KEY }, update: { value }, create: { key: KEY, value } })
+  let before: unknown
+  beforeAll(async () => { before = (await prisma.setting.findUnique({ where: { key: KEY } }))?.value })
+  afterAll(async () => { await setRequired(before === true || before === 'true') })
+
+  const form = (fields: Record<string, string>, cert?: Buffer) => {
+    const fd = new FormData()
+    Object.entries(fields).forEach(([k, v]) => fd.append(k, v))
+    if (cert) fd.append('certificate', new Blob([new Uint8Array(cert)]), 'death.png')
+    return new Request('http://x', { method: 'POST', body: fd, headers: { 'x-forwarded-for': '203.0.113.7', 'user-agent': 'vitest' } })
+  }
+
+  it('F12 while the setting is off, a request without a certificate still goes through', async () => {
+    await setRequired(false)
+    expect(await (await deceasedForm()).json()).toEqual({ certificateRequired: false })
+    const k = await fx.adult('k12d')
+    const old = await fx.profile('old12d', { dob: '1940-01-01' })
+    await fx.family('NoCert', k, [{ p: old, role: 'father' }])
+    actAs(k)
+    expect((await markDeceased(json('http://x', 'POST', { deceasedAt: '2026-01-01' }), { params: { id: old.memberId } })).status).toBe(202)
+  })
+
+  it('F12 once switched on, the certificate is required; it is stored encrypted, travels with the review, and lands on the member when approved', async () => {
+    await setRequired(true)
+    expect(await (await deceasedForm()).json()).toEqual({ certificateRequired: true })
+    const k = await fx.adult('k12e')
+    const old = await fx.profile('old12e', { dob: '1940-01-01' })
+    await fx.family('Cert', k, [{ p: old, role: 'father' }])
+    actAs(k)
+    const refused = await markDeceased(form({ deceasedAt: '2026-01-01' }), { params: { id: old.memberId } })
+    expect(refused.status).toBe(400)
+    expect((await refused.json()).message).toBe('Attach the death certificate')
+    expect((await markDeceased(json('http://x', 'POST', { deceasedAt: '2026-01-01' }), { params: { id: old.memberId } })).status).toBe(400)
+    expect((await markDeceased(form({ deceasedAt: '2026-01-01' }, Buffer.from('not an image')), { params: { id: old.memberId } })).status).toBe(400)
+
+    expect((await markDeceased(form({ deceasedAt: '2026-01-01', deceasedPlace: 'Pune' }, PNG), { params: { id: old.memberId } })).status).toBe(202)
+    const approval = await prisma.approval.findFirstOrThrow({ where: { actionCode: 'member.mark_deceased', entityId: old.memberId } })
+    const value = approval.newValue as Record<string, string>
+    expect(value).toMatchObject({ deceasedPlace: 'Pune', certificateMime: 'image/png' })
+    const raw = await fs.readFile(path.join(path.resolve(process.env.UPLOAD_DIR || 'uploads'), value.certificateKey))
+    expect(raw.includes(PNG)).toBe(false) // not stored in the clear
+
+    // Only staff can open it — the Karta who uploaded it cannot.
+    const view = (approvalId?: string) => viewDeathCert(new Request(`http://x/api/members/${old.memberId}/death-certificate${approvalId ? `?approvalId=${approvalId}` : ''}`), { params: { id: old.memberId } })
+    actAs(k)
+    expect((await view(approval.id)).status).toBe(404)
+    actAs(admin)
+    const shown = await view(approval.id)
+    expect(shown.status).toBe(200)
+    expect(shown.headers.get('content-type')).toBe('image/png')
+    expect(Buffer.from(await shown.arrayBuffer()).equals(PNG)).toBe(true)
+    expect(await prisma.auditLog.count({ where: { action: 'member.death_certificate.view', entityId: old.memberId } })).toBe(1)
+    expect((await view()).status).toBe(404) // not on the member until approved
+
+    expect((await reviewApproval(json('http://x', 'PATCH', { action: 'approve' }), { params: { id: approval.id } })).status).toBe(200)
+    expect(await prisma.member.findUniqueOrThrow({ where: { id: old.memberId } })).toMatchObject({ status: 'DECEASED', deathCertKey: value.certificateKey, deathCertMime: 'image/png' })
+    expect((await view()).status).toBe(200)
   })
 })
 

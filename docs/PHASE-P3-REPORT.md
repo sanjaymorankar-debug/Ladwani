@@ -115,7 +115,7 @@ A browser run against the production build covered:
 - **PDF** is the browser's "Save as PDF" from the print dialog. No server-side PDF library was added (no new package).
 
 ## 8. Decisions needed
-1. **OP-02:** keep 3 generations up, or set `tree.ancestor_levels` to 2?
+1. ~~**OP-02:**~~ — decided: 3 generations up (§10).
 2. **Marriage review:** the existing §28 review still applies before a marriage takes effect, so the family requests follow the review. The workbook F23 has no review step. Remove it? It is the approval rule `member.marital_status.change`; there is no screen for it (see P2 report §9), so it would be switched off with a small migration.
 3. **Wrong-gender inverse links in existing data:** may I correct them? That would mean a script with a rollback list, run first on test.
 4. ~~**Members building the tree**~~ — decided: members may build the tree and its links (§9).
@@ -130,4 +130,10 @@ A browser run against the production build covered:
 - **Code:** `api/families/[id]/tree/parents` (Karta-only check removed), `api/tree-links` (POST for any family member; cancel also by the member who asked), `api/tree-links/candidates`, and the tree page's "Link to another family" button, now shown to every member.
 - **No migration, no data change.**
 - **Tests:** my own P3 test that expected a member to be refused for someone else's spouse side now checks the member's own spouse side only. New tests: a plain member adds ancestors for someone else in the family (the checks still apply; an outsider is still refused), and a plain member asks for a link that a non-Karta of the other family cannot accept, then cancels it. No existing test from before this PR depended on the old rule. **415 passed**, twice in a row on a fresh database; typecheck clean; build OK.
-- **Still open in §8:** OP-02 tree depth, the marriage review step, and correcting existing wrong-gender relationship rows.
+- **Still open in §8:** the marriage review step and correcting existing wrong-gender relationship rows (OP-02 is now decided, §10).
+
+## 10. Follow-up: OP-02 is 3 generations (your decision)
+- **Your answer:** the tree goes up to 3 generations above the Karta.
+- **This is what was built:** the setting `tree.ancestor_levels` defaults to 3 and the existing tests check the limit. **No code, migration or data change.**
+- **Correction to §1:** the setting is not editable on the Settings page (that page only shows the community name and tagline). Changing it later would take one SQL `UPDATE` on `settings`.
+- **Still open in §8:** the marriage review step and correcting existing wrong-gender relationship rows.
