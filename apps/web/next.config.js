@@ -15,6 +15,11 @@ if (basePath && (!basePath.startsWith('/') || basePath.endsWith('/'))) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   basePath,
+  // NEXT_OUTPUT=standalone (the dev deploy sets it) builds a self-contained
+  // server in .next/standalone with only the files it traces as needed, so the
+  // host runs `node apps/web/server.js` with no npm install. A regular install
+  // would put ~276 MB of build-only compiler binaries on the server.
+  output: process.env.NEXT_OUTPUT === 'standalone' ? 'standalone' : undefined,
   env: { NEXT_PUBLIC_BASE_PATH: basePath },
   async rewrites() {
     return [

@@ -3,6 +3,9 @@ name: CI
 on:
   push:
   pull_request:
+  # deploy-dev.yml runs this whole workflow as its gate, so what deploys is
+  # exactly what CI tested.
+  workflow_call:
 
 jobs:
   build-and-test:
@@ -64,6 +67,9 @@ jobs:
 
       - name: Booking concurrency integration test (real PostgreSQL)
         run: npm run test:integration --workspace=apps/api
+
+      - name: Deploy guard rules
+        run: bash .github/deploy/guard.test.sh
 
       - name: Build
         run: npm run build

@@ -56,6 +56,12 @@ npm run test:local
 See `docs/26-local-testing.md` for both tiers, the devstack setup, and why
 `DATABASE_URL` there must point at a throwaway database.
 
+## Deploying
+
+Pushing to `dev` deploys the web app to `devladwani.bkesari.com` (served to visitors at
+`dev.bkesari.com/ladwani/`) and the API to `devladwani-api.bkesari.com`. See
+`docs/27-dev-deploy.md`.
+
 ## Project Structure
 
 ```

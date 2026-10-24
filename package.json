@@ -16,7 +16,9 @@
     "lint": "npm run lint --workspace=apps/api && npm run lint --workspace=apps/web",
     "typecheck": "npm run typecheck --workspace=apps/api && npm run typecheck --workspace=apps/web",
     "db:generate": "npm run db:generate --workspace=apps/api",
-    "db:migrate": "npm run db:migrate --workspace=apps/api"
+    "db:migrate": "npm run db:migrate --workspace=apps/api",
+    "start:api": "npm run start --workspace=apps/api",
+    "start:web": "npm run start --workspace=apps/web"
   },
   "devDependencies": {
     "typescript": "^5.5.3"

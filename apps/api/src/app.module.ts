@@ -18,11 +18,13 @@ import { ConfigModule } from './config/config.module'
 import { AuditLogModule } from './audit-log/audit-log.module'
 import { ReportsModule } from './reports/reports.module'
 import { UploadsModule } from './uploads/uploads.module'
+import { HealthModule } from './health/health.module'
 import { AuditInterceptor } from './common/interceptors/audit.interceptor'
 
 @Module({
   imports: [
     PrismaModule,
+    HealthModule,
     AuthModule,
     FamilyModule,
     MembersModule,
