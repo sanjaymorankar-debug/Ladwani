@@ -51,6 +51,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # The hub serves the web app under BASE_PATH (/ladwani/); a bare
+      # fetch('/...') would bypass it. See the script for why.
+      - name: No bare fetch() paths in the web app
+        run: bash apps/web/scripts/check-base-path.sh
+
       - name: Unit tests (api)
         run: npm run test --workspace=apps/api
 

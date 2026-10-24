@@ -10,6 +10,11 @@ export class ApiError extends Error {
   }
 }
 
+// The API is reached through this app's own /api/v1 rewrite (next.config.js),
+// so behind a BASE_PATH the URL must carry the prefix too: Next adds it to
+// links and routing, but never to a fetch() string.
+const API_BASE = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/api/v1`
+
 let accessToken: string | null = null
 
 export function setAccessToken(token: string | null) {
@@ -30,7 +35,7 @@ export function getAccessToken(): string | null {
 
 async function request<T>(method: string, path: string, body?: unknown, retry = true): Promise<T> {
   const token = getAccessToken()
-  const res = await fetch(`/api/v1${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     method,
     credentials: 'include',
     headers: {
@@ -56,7 +61,7 @@ async function request<T>(method: string, path: string, body?: unknown, retry = 
 
 async function tryRefresh(): Promise<boolean> {
   try {
-    const res = await fetch('/api/v1/auth/refresh', { method: 'POST', credentials: 'include' })
+    const res = await fetch(`${API_BASE}/auth/refresh`, { method: 'POST', credentials: 'include' })
     if (!res.ok) return false
     const json = await res.json()
     setAccessToken(json?.data?.accessToken ?? null)
@@ -74,7 +79,7 @@ async function tryRefresh(): Promise<boolean> {
  */
 async function requestBlob(path: string, retry = true): Promise<Blob> {
   const token = getAccessToken()
-  const res = await fetch(`/api/v1${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: 'GET',
     credentials: 'include',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
