@@ -207,7 +207,7 @@ describe('MembersService', () => {
             deletedAt: null,
             gender: 'MALE',
             maritalStatus: 'UNMARRIED',
-            currentCity: { contains: 'Pune' },
+            currentCity: { contains: 'Pune', mode: 'insensitive' },
             educationLevelId: 'el-1',
           }),
         }),

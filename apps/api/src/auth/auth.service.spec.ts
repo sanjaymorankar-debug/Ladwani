@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing'
 import { JwtService } from '@nestjs/jwt'
 import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common'
 import { hash } from 'bcryptjs'
-import { AuthService } from './auth.service'
+import { AuthService, normalizeEmail } from './auth.service'
 import { PrismaService } from '../prisma/prisma.service'
 
 describe('AuthService', () => {
@@ -45,6 +45,27 @@ describe('AuthService', () => {
       await expect(service.register({ ...dto, email: 'taken@example.com' })).rejects.toBeInstanceOf(ConflictException)
     })
 
+    it('checks for a duplicate email lower-cased, since PostgreSQL compares emails exactly', async () => {
+      prisma.user.findUnique.mockResolvedValueOnce(null) // mobile check passes
+      prisma.user.findUnique.mockResolvedValueOnce({ id: 'existing' }) // email check fails
+      await expect(service.register({ ...dto, email: '  Taken@Example.COM ' })).rejects.toBeInstanceOf(ConflictException)
+      expect(prisma.user.findUnique).toHaveBeenLastCalledWith({ where: { email: 'taken@example.com' } })
+    })
+
+    it('stores the email lower-cased', async () => {
+      prisma.user.findUnique.mockResolvedValue(null)
+      prisma.role.findUnique.mockResolvedValue({ id: 'role-member', code: 'MEMBER' })
+      const tx = {
+        user: { create: jest.fn().mockResolvedValue({ id: 'user-1' }) },
+        member: { create: jest.fn().mockResolvedValue({ id: 'member-1' }) },
+        userRole: { create: jest.fn().mockResolvedValue({}) },
+        verificationToken: { create: jest.fn().mockResolvedValue({}) },
+      }
+      prisma.$transaction.mockImplementation((cb: (tx: unknown) => unknown) => cb(tx))
+      await service.register({ ...dto, email: 'Asha@Example.com' })
+      expect(tx.user.create).toHaveBeenCalledWith({ data: expect.objectContaining({ email: 'asha@example.com' }) })
+    })
+
     it('creates the user, member, role grant, and a verification token inside one transaction', async () => {
       prisma.user.findUnique.mockResolvedValue(null)
       prisma.role.findUnique.mockResolvedValue({ id: 'role-member', code: 'MEMBER' })
@@ -72,6 +93,14 @@ describe('AuthService', () => {
   })
 
   describe('login', () => {
+    it('looks the email up lower-cased and the mobile number as typed', async () => {
+      prisma.user.findFirst.mockResolvedValue(null)
+      await expect(service.login({ identifier: 'Asha@Example.com', password: 'x' })).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(prisma.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+        where: { OR: [{ email: 'asha@example.com' }, { mobile: 'Asha@Example.com' }], deletedAt: null },
+      }))
+    })
+
     it('rejects when no matching user exists', async () => {
       prisma.user.findFirst.mockResolvedValue(null)
       await expect(service.login({ identifier: '9876543210', password: 'x' })).rejects.toBeInstanceOf(UnauthorizedException)
@@ -180,5 +209,15 @@ describe('AuthService', () => {
       expect(result.user.roles).toEqual(['KARTA'])
       expect(result.accessToken).toBe('signed.jwt.token')
     })
+  })
+})
+
+describe('normalizeEmail', () => {
+  it('trims and lower-cases, and maps blank or absent to null', () => {
+    expect(normalizeEmail('  Asha@Example.COM ')).toBe('asha@example.com')
+    expect(normalizeEmail('')).toBeNull()
+    expect(normalizeEmail('   ')).toBeNull()
+    expect(normalizeEmail(undefined)).toBeNull()
+    expect(normalizeEmail(null)).toBeNull()
   })
 })

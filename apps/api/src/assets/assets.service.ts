@@ -165,7 +165,7 @@ export class AssetsService {
       deletedAt: null,
       status: filters.status || 'ACTIVE',
       category: filters.categoryCode ? { code: filters.categoryCode } : undefined,
-      city: filters.city ? { contains: filters.city } : undefined,
+      city: filters.city ? { contains: filters.city, mode: 'insensitive' } : undefined,
       areaId: filters.areaId || undefined,
       capacity: filters.minCapacity ? { gte: filters.minCapacity } : undefined,
       pricing: filters.minPrice != null || filters.maxPrice != null

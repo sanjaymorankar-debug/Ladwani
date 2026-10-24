@@ -1,5 +1,11 @@
 # Phase 5 — Deployment Guide
 
+> **Database: PostgreSQL since 2026-10-24.** This document was written for MySQL 8.
+> The app now runs on PostgreSQL (Neon in the hosted tiers). Read MySQL-specific
+> commands here (mysqldump, phpMyAdmin, InnoDB settings) as their PostgreSQL
+> equivalents (pg_dump/pg_restore, the Neon console, Neon branches and restore);
+> `docs/26-local-testing.md` describes what changed in the code.
+
 ## 1. Target Environment
 
 Deploys onto the existing Hostinger account already running `devmiladwani.agtci.com` — same MySQL 8 instance, same domain, per the migration decisions in `13-development-roadmap.md` §1. Node 20+ runtime, npm workspaces monorepo (`apps/api`, `apps/web`, `packages/shared-types`).

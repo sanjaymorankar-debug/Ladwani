@@ -1,5 +1,11 @@
 # Phase 5 — Backup Strategy
 
+> **Database: PostgreSQL since 2026-10-24.** This document was written for MySQL 8.
+> The app now runs on PostgreSQL (Neon in the hosted tiers). Read MySQL-specific
+> commands here (mysqldump, phpMyAdmin, InnoDB settings) as their PostgreSQL
+> equivalents (pg_dump/pg_restore, the Neon console, Neon branches and restore);
+> `docs/26-local-testing.md` describes what changed in the code.
+
 ## 1. What Needs Backing Up
 
 - **MySQL database** — the only stateful store this app has. Everything else (built frontend/backend artifacts, uploaded-file bytes once real object storage is wired in) is either reproducible from source or lives in externally-durable storage (R2).

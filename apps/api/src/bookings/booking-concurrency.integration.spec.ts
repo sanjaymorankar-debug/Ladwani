@@ -8,7 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service'
  * Real-database concurrency test for docs/11-booking-architecture.md §2 —
  * the roadmap explicitly calls this out as "the one to actually load-test,
  * not just unit-test." Fires N concurrent booking attempts for the exact
- * same (asset, date, slot) against a live MySQL instance and asserts the
+ * same (asset, date, slot) against a live PostgreSQL instance and asserts the
  * SELECT ... FOR UPDATE lock serializes them: exactly one wins, the rest
  * fail cleanly, and the database never ends up with two bookings holding
  * the same slot.
@@ -17,10 +17,10 @@ import { NotificationsService } from '../notifications/notifications.service'
  * creates and deletes users, assets and bookings. Locally, copy
  * apps/api/.env.test.example to apps/api/.env.test and run `npm run
  * test:local` from the repo root, which migrates the database first. In CI
- * the mysql service supplies DATABASE_URL, so `npm run test:integration`
+ * the postgres service supplies DATABASE_URL, so `npm run test:integration`
  * is enough there. Either way, not the default `npm test`.
  */
-describe('Booking concurrency (real MySQL)', () => {
+describe('Booking concurrency (real PostgreSQL)', () => {
   const prisma = new PrismaService()
   const notifications = new NotificationsService(prisma)
   const assetsService = new AssetsService(prisma, { submit: async () => ({ status: 'APPROVED' }) } as never)

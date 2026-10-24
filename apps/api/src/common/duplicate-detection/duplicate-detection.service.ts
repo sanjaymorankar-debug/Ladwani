@@ -21,7 +21,7 @@ export class DuplicateDetectionService {
 
   async checkFamily(input: { name: string; nativeVillage?: string | null; nativeDistrict?: string | null }): Promise<DuplicateMatch[]> {
     const candidates = await this.prisma.family.findMany({
-      where: { deletedAt: null, OR: [{ name: { contains: input.name } }, ...(input.nativeVillage ? [{ nativeVillage: input.nativeVillage }] : [])] },
+      where: { deletedAt: null, OR: [{ name: { contains: input.name, mode: 'insensitive' } }, ...(input.nativeVillage ? [{ nativeVillage: input.nativeVillage }] : [])] },
       select: { id: true, name: true, nativeVillage: true, nativeDistrict: true },
       take: 25,
     })
@@ -45,7 +45,7 @@ export class DuplicateDetectionService {
     nativeVillage?: string | null
   }): Promise<DuplicateMatch[]> {
     const candidates = await this.prisma.member.findMany({
-      where: { deletedAt: null, firstName: { contains: input.firstName } },
+      where: { deletedAt: null, firstName: { contains: input.firstName, mode: 'insensitive' } },
       select: { id: true, firstName: true, lastName: true, dateOfBirth: true, nativeVillage: true },
       take: 25,
     })

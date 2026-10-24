@@ -208,15 +208,15 @@ export class MembersService {
       id: filters.memberId || undefined,
       gender: filters.gender || undefined,
       maritalStatus: filters.maritalStatus || undefined,
-      currentCity: filters.city ? { contains: filters.city } : undefined,
-      currentState: filters.state ? { contains: filters.state } : undefined,
-      nativeVillage: filters.nativeVillage ? { contains: filters.nativeVillage } : undefined,
+      currentCity: filters.city ? { contains: filters.city, mode: 'insensitive' } : undefined,
+      currentState: filters.state ? { contains: filters.state, mode: 'insensitive' } : undefined,
+      nativeVillage: filters.nativeVillage ? { contains: filters.nativeVillage, mode: 'insensitive' } : undefined,
       educationLevelId: filters.educationLevelId || undefined,
       occupationId: filters.occupationId || undefined,
       dateOfBirth: this.ageRangeToDobFilter(filters.minAge, filters.maxAge),
-      OR: filters.q ? [{ firstName: { contains: filters.q } }, { lastName: { contains: filters.q } }] : undefined,
+      OR: filters.q ? [{ firstName: { contains: filters.q, mode: 'insensitive' } }, { lastName: { contains: filters.q, mode: 'insensitive' } }] : undefined,
       families: filters.familyQuery
-        ? { some: { leftAt: null, family: { OR: [{ name: { contains: filters.familyQuery } }, { registrationNumber: { contains: filters.familyQuery } }] } } }
+        ? { some: { leftAt: null, family: { OR: [{ name: { contains: filters.familyQuery, mode: 'insensitive' } }, { registrationNumber: { contains: filters.familyQuery, mode: 'insensitive' } }] } } }
         : undefined,
       memberAreas: filters.areaId ? { some: { areaId: filters.areaId } } : undefined,
       skills: filters.skillId ? { some: { skillId: filters.skillId } } : undefined,

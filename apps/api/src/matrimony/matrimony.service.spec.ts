@@ -137,7 +137,7 @@ describe('MatrimonyService', () => {
             occupationId: 'occ-1',
             member: expect.objectContaining({
               incomeRange: 'L5_10L',
-              families: { some: { leftAt: null, family: { gotra: { contains: 'Deshmukh' } } } },
+              families: { some: { leftAt: null, family: { gotra: { contains: 'Deshmukh', mode: 'insensitive' } } } },
             }),
           }),
         }),

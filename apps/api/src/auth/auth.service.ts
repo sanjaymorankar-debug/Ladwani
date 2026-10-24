@@ -27,6 +27,12 @@ export interface LoginResult {
   user: { id: string; roles: string[]; memberId: string | null }
 }
 
+/** Emails are stored lower-cased and trimmed; null when absent. */
+export function normalizeEmail(email: string | null | undefined): string | null {
+  const trimmed = email?.trim()
+  return trimmed ? trimmed.toLowerCase() : null
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -38,8 +44,13 @@ export class AuthService {
     const existingMobile = await this.prisma.user.findUnique({ where: { mobile: dto.mobile } })
     if (existingMobile) throw new ConflictException('An account with this mobile number already exists.')
 
-    if (dto.email) {
-      const existingEmail = await this.prisma.user.findUnique({ where: { email: dto.email } })
+    // Stored and compared lower-cased. MySQL's default collation made email
+    // case-insensitive for free; PostgreSQL compares exactly, so without this
+    // Asha@x.com and asha@x.com would be two accounts and a sign-in with the
+    // other capitalisation would fail.
+    const email = normalizeEmail(dto.email)
+    if (email) {
+      const existingEmail = await this.prisma.user.findUnique({ where: { email } })
       if (existingEmail) throw new ConflictException('An account with this email already exists.')
     }
 
@@ -51,7 +62,7 @@ export class AuthService {
 
     const userId = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { email: dto.email ?? null, mobile: dto.mobile, passwordHash, status: 'PENDING' },
+        data: { email, mobile: dto.mobile, passwordHash, status: 'PENDING' },
       })
 
       await tx.member.create({
@@ -99,7 +110,7 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<LoginResult> {
     const user = await this.prisma.user.findFirst({
-      where: { OR: [{ email: dto.identifier }, { mobile: dto.identifier }], deletedAt: null },
+      where: { OR: [{ email: normalizeEmail(dto.identifier) }, { mobile: dto.identifier }], deletedAt: null },
       include: { userRoles: { include: { role: true } }, member: { select: { id: true } } },
     })
     if (!user) throw new UnauthorizedException('Invalid credentials.')

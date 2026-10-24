@@ -6,7 +6,7 @@ Fresh-build community platform (family registry, family tree, matrimony, communi
 
 - **Frontend:** Next.js 14 + TypeScript (`apps/web`)
 - **Backend:** NestJS + TypeScript (`apps/api`)
-- **Database:** MySQL 8 via Prisma (`apps/api/prisma`)
+- **Database:** PostgreSQL via Prisma (`apps/api/prisma`); Neon in the hosted tiers
 - **Shared:** `packages/shared-types` — DTOs, roles/permissions, enums used by both apps
 
 ## Getting Started (local dev)
@@ -19,7 +19,7 @@ npm install
 
 ### 2. Set up the database
 
-You need a local MySQL 8 instance. Set `DATABASE_URL` in `apps/api/.env` (copy `apps/api/.env.example`), then:
+You need a local PostgreSQL (16 or later). Set `DATABASE_URL` and `DATABASE_URL_UNPOOLED` in `apps/api/.env` (copy `apps/api/.env.example`; locally both are the same URL), then:
 
 ```bash
 npm run db:generate --workspace=apps/api

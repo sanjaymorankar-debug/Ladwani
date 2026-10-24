@@ -22,7 +22,7 @@ describe('AuditLogService', () => {
         where: {
           actorId: 'user-1',
           entityType: 'family',
-          action: { contains: 'family' },
+          action: { contains: 'family', mode: 'insensitive' },
           createdAt: { gte: new Date('2026-01-01'), lte: new Date('2026-02-01') },
         },
       }),

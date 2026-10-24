@@ -98,11 +98,11 @@ export class MatrimonyService {
         gender: filters.gender || undefined,
         maritalStatus: filters.maritalStatus || undefined,
         incomeRange: filters.incomeRange || undefined,
-        currentCity: filters.city ? { contains: filters.city } : undefined,
-        nativeVillage: filters.nativeVillage ? { contains: filters.nativeVillage } : undefined,
+        currentCity: filters.city ? { contains: filters.city, mode: 'insensitive' } : undefined,
+        nativeVillage: filters.nativeVillage ? { contains: filters.nativeVillage, mode: 'insensitive' } : undefined,
         dateOfBirth: this.ageRangeToDobFilter(filters.minAge, filters.maxAge),
         skills: filters.skillId ? { some: { skillId: filters.skillId } } : undefined,
-        families: filters.subgroup ? { some: { leftAt: null, family: { gotra: { contains: filters.subgroup } } } } : undefined,
+        families: filters.subgroup ? { some: { leftAt: null, family: { gotra: { contains: filters.subgroup, mode: 'insensitive' } } } } : undefined,
       },
     }
 

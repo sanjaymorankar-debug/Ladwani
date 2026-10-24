@@ -1,5 +1,11 @@
 # Phase 2.2 — Database Architecture (Concrete)
 
+> **Database: PostgreSQL since 2026-10-24.** This document was written for MySQL 8.
+> The app now runs on PostgreSQL (Neon in the hosted tiers). Read MySQL-specific
+> commands here (mysqldump, phpMyAdmin, InnoDB settings) as their PostgreSQL
+> equivalents (pg_dump/pg_restore, the Neon console, Neon branches and restore);
+> `docs/26-local-testing.md` describes what changed in the code.
+
 ## 1. ORM: Prisma
 
 Chosen over TypeORM (NestJS's more commonly-tutorialized default) for three concrete reasons specific to this project:

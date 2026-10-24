@@ -81,7 +81,7 @@ export class FamilyService {
     return this.prisma.family.findMany({
       where: {
         deletedAt: null,
-        OR: [{ name: { contains: query } }, { registrationNumber: { contains: query } }],
+        OR: [{ name: { contains: query, mode: 'insensitive' } }, { registrationNumber: { contains: query, mode: 'insensitive' } }],
       },
       select: { id: true, name: true, registrationNumber: true, nativeVillage: true, nativeDistrict: true, verificationStatus: true, status: true },
       take: 20,

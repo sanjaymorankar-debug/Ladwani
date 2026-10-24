@@ -22,7 +22,7 @@ export class AuditLogService {
     const where: Prisma.AuditLogWhereInput = {
       actorId: query.actorId || undefined,
       entityType: query.entityType || undefined,
-      action: query.action ? { contains: query.action } : undefined,
+      action: query.action ? { contains: query.action, mode: 'insensitive' } : undefined,
       createdAt: query.from || query.to ? { gte: query.from ? new Date(query.from) : undefined, lte: query.to ? new Date(query.to) : undefined } : undefined,
     }
 

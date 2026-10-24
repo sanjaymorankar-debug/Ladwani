@@ -8,7 +8,7 @@ split the way it is.
 | | command | suites | needs a database? |
 |---|---|---|---|
 | Unit | `npm test` | 23 / 198 tests | **no** |
-| Integration | `npm run test:local` | 1 / 1 test | yes, a real MySQL |
+| Integration | `npm run test:local` | 1 / 1 test | yes, a real PostgreSQL |
 
 The split is enforced by Jest config, not convention. `apps/api/package.json`
 sets `testPathIgnorePatterns` to exclude `*.integration.spec.ts`, so the
@@ -48,7 +48,7 @@ Nothing in this repo loads `.env` at runtime — `PrismaService` is a bare
 injects that as a workflow env var. Locally, use the `.env.test` convention:
 
 ```bash
-cp apps/api/.env.test.example apps/api/.env.test   # edit if your MySQL differs
+cp apps/api/.env.test.example apps/api/.env.test   # edit if your PostgreSQL differs
 npm run test:local                                 # from the repo root
 ```
 
@@ -61,16 +61,19 @@ integration suite. It is safe to re-run.
 > failed run can leave rows behind, and a bug in the suite would run those
 > deletes against whatever you pointed it at.
 
-### With the local devstack
+### The test database
 
-`.env.test.example` already matches the shared Kesari devstack, which serves
-MySQL on `127.0.0.1:3307`:
+`.env.test.example` points at `ladwani_rebuild_test` on a local PostgreSQL at
+`127.0.0.1:5432` (user and password `postgres`). Create it once, and recreate
+it to start clean:
 
 ```bash
-devstack up                       # start MySQL + Postgres
-devstack reset ladwani-rebuild    # drop and recreate ladwani_rebuild_test
+createdb ladwani_rebuild_test      # or: dropdb ladwani_rebuild_test && createdb ...
 npm run test:local
 ```
+
+Never point it at Neon: the hosted databases are for the running sites, and
+this suite deletes rows.
 
 This branch gets its own `ladwani_rebuild_dev` / `ladwani_rebuild_test` pair
 rather than reusing `ladwani_test`. The `main` branch of this repository is a
@@ -78,10 +81,7 @@ rather than reusing `ladwani_test`. The `main` branch of this repository is a
 this branch — so pointing both at one database would have each branch's
 migrations fighting the other's tables.
 
-### Without it
-
-Any MySQL 8 will do. Create an empty database, point `DATABASE_URL` at it, and
-run `npm run test:local`.
+Any PostgreSQL 16 or later will do. CI uses 16; Neon runs 18.
 
 ## Script reference
 
@@ -110,10 +110,23 @@ Windows, and adding `dotenv` would put a runtime dependency in the tree for
 something only tests need. The non-`:local` scripts deliberately do no env
 loading, so CI's path stays the plain one.
 
-## A note on MySQL versions
+## Moving from MySQL (2026-10-24)
 
-CI runs this branch's integration test against **MySQL 8.4**. The devstack
-pins **8.0**, as does the `main` branch's CI. For this test the difference is
-immaterial — `SELECT ... FOR UPDATE` and `InnoDB` locking behave identically
-across the two — but it is a real skew worth closing if the stack ever starts
-depending on 8.4-only syntax.
+This branch ran on MySQL 8 until 2026-10-24 and now runs on PostgreSQL (Neon
+in the hosted tiers). Three things differ in ways the tests do not catch on
+their own, and are handled in the code:
+
+- **Searches.** MySQL's default collation made every `contains:` filter
+  case-insensitive; PostgreSQL compares exactly. Each filter now says
+  `mode: 'insensitive'`, so "patel" still finds "Patel".
+- **Emails.** The same collation made `A@x.com` and `a@x.com` one account.
+  Emails are now stored and looked up lower-cased (`normalizeEmail` in
+  `auth.service.ts`).
+- **Migrations.** Prisma cannot carry a migration history across providers, so
+  the MySQL history was replaced by one PostgreSQL baseline
+  (`20261024000000_postgres_baseline`), generated from the same `schema.prisma`.
+  An existing MySQL database is not migrated by it; its data would be moved
+  separately (none exists yet on the hosted tiers).
+
+`SELECT ... FOR UPDATE` in the booking lock behaves the same on both; the
+integration test above proves it on PostgreSQL.
