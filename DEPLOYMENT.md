@@ -64,7 +64,7 @@ PostgreSQL features. Moving back restored both, plus case-insensitive email:
 
 # Part 1 — The database: Neon
 
-One Neon project, one Neon branch per tier. On every branch the database is
+Its own Neon project, `bkesari-ladwani` (Singapore), one Neon branch per tier. On every branch the database is
 `ladwani`, owned by the role `bk_ladwani_app`:
 
 | Neon branch | Tier | Site |
