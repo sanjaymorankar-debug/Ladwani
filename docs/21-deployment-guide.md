@@ -16,7 +16,7 @@ Deploys onto the existing Hostinger account already running `devmiladwani.agtci.
 
 | Variable | Required | Notes |
 |---|---|---|
-| `DATABASE_URL` | Yes | MySQL connection string, e.g. `mysql://user:pass@host:3306/db` |
+| `DATABASE_URL` | Yes | PostgreSQL (Neon, pooled) connection string, e.g. `postgresql://bk_ladwani_app:pass@ep-…-pooler.ap-southeast-1.aws.neon.tech/bk_ladwani?sslmode=require` |
 | `JWT_SECRET` | Yes in production | Bootstrap now refuses to start in production without it (`main.ts`) — no fallback is used outside dev |
 | `WEB_ORIGIN` | Yes | Exact origin the API's CORS policy allows, e.g. `https://devmiladwani.agtci.com` |
 | `PORT` | No | Defaults to 4000 |
@@ -48,7 +48,7 @@ npm run start --workspace=apps/web
 
 ## 4. CI/CD
 
-`.github/workflows/ci.yml` already runs on every push: lint, typecheck, unit tests, a real MySQL-backed integration test (booking concurrency), `prisma migrate deploy` against a service container, and a production build of both apps. A green run on the `rebuild` branch is the gate for promoting to a deploy — there is no separate CD pipeline yet; deployment is the manual steps in §3 run against the target host.
+`.github/workflows/ci.yml` already runs on every push: lint, typecheck, unit tests, a real PostgreSQL-backed integration test (booking concurrency), `prisma migrate deploy` against a service container, and a production build of both apps. A green run on the `rebuild` branch is the gate for promoting to a deploy — there is no separate CD pipeline yet; deployment is the manual steps in §3 run against the target host.
 
 ## 5. Health & Observability
 
@@ -59,3 +59,14 @@ npm run start --workspace=apps/web
 
 - **No job scheduler.** Late fees, booking-expiry, and payment reconciliation are all computed at read time or manually triggered rather than cron-driven (noted at each point in the M3/M4 code). A real deployment serving traffic around the clock will eventually want a scheduler (cron, BullMQ + Redis) for reconciliation especially, since docs/19 §4 specifies a 15-minute cadence this build only supports via manual trigger.
 - **No real object storage or malware scanning.** `apps/api/src/uploads` implements the full validation/activation pipeline against a local-disk dev stand-in — see `18-file-storage-design.md` and the M5 checkpoint report for what's needed to switch on Cloudflare R2 + a real scanner.
+
+## Sign-in through the bkesari.com hub (2026-10-25)
+
+Behind the hub (`https://<tier>bkesari.com/ladwani/`) every request carries
+`X-Bkesari-Token`, a 60-second RS256 token for audience `ladwani`. The web app
+calls `POST /api/v1/auth/hub` on load; the API verifies the token against
+`HUB_JWKS_URL` (e.g. `https://dev.bkesari.com/.well-known/jwks.json`), links or
+creates the user by `users.hub_user_id`, grants the hub role (member, karta,
+operator, admin -> MEMBER, KARTA, OPERATOR, ADMIN) and issues the normal
+session. Set `HUB_JWKS_URL` on every tier. Migration `20261025000000_hub_user_id`
+adds the column.

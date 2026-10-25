@@ -26,6 +26,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function restore() {
       if (!getAccessToken()) {
+        // Behind bkesari.com the hub signs every forwarded request, so a visitor
+        // who signed in there is signed in here too, with no second password.
+        try {
+          const result = await api.post<{ accessToken: string; user: AuthUser }>('/auth/hub')
+          setAccessToken(result.accessToken)
+          window.localStorage.setItem('authUser', JSON.stringify(result.user))
+          setUser(result.user)
+        } catch {
+          // not behind the hub, or no access there: the normal login page applies
+        }
         setLoading(false)
         return
       }

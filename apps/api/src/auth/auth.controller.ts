@@ -5,6 +5,7 @@ import { AuthService, LoginResult } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
 import { VerifyOtpDto } from './dto/verify-otp.dto'
+import { HUB_TOKEN_HEADER } from './hub-token'
 
 const REFRESH_COOKIE = 'refreshToken'
 const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000
@@ -37,6 +38,17 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 15 * 60 * 1000 } })
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.auth.login(dto)
+    this.setRefreshCookie(res, result.refreshToken)
+    return { data: { accessToken: result.accessToken, user: result.user } }
+  }
+
+  /** Sign in with the hub's X-Bkesari-Token, which the hub adds to every forwarded request. */
+  @Post('hub')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 30, ttl: 60 * 1000 } })
+  async hub(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const header = req.headers[HUB_TOKEN_HEADER]
+    const result = await this.auth.hubLogin(Array.isArray(header) ? header[0] : header)
     this.setRefreshCookie(res, result.refreshToken)
     return { data: { accessToken: result.accessToken, user: result.user } }
   }

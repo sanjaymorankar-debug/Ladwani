@@ -4,6 +4,7 @@ import { ConflictException, ForbiddenException, UnauthorizedException } from '@n
 import { hash } from 'bcryptjs'
 import { AuthService, normalizeEmail } from './auth.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { HubJwks } from './hub-token'
 
 describe('AuthService', () => {
   let service: AuthService
@@ -25,6 +26,7 @@ describe('AuthService', () => {
         AuthService,
         { provide: PrismaService, useValue: prisma },
         { provide: JwtService, useValue: { sign: jest.fn(() => 'signed.jwt.token') } },
+        { provide: HubJwks, useValue: new HubJwks('http://unused') },
       ],
     }).compile()
 

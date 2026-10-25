@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
 import { VerifyOtpDto } from './dto/verify-otp.dto'
+import { HubClaims, HubJwks, HubTokenError, verifyHubToken } from './hub-token'
 
 const ACCESS_TOKEN_TTL = '15m'
 const REFRESH_TOKEN_TTL_DAYS = 30
@@ -20,6 +21,14 @@ const OTP_TTL_MINUTES = 10
 const MAX_FAILED_ATTEMPTS = 5
 const LOCK_MINUTES = 30
 const BCRYPT_COST = 12
+
+/** The hub's role for this project -> LadWani role code. */
+const HUB_ROLE_TO_CODE: Record<string, string> = {
+  member: 'MEMBER',
+  karta: 'KARTA',
+  operator: 'OPERATOR',
+  admin: 'ADMIN',
+}
 
 export interface LoginResult {
   accessToken: string
@@ -38,15 +47,79 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
+    private hubJwks: HubJwks,
   ) {}
+
+  /**
+   * Sign in with the hub's token instead of a password. The bkesari ID (`sub`)
+   * is stored as users.hub_user_id; an existing account with the same email is
+   * linked rather than duplicated. The hub's role is granted here, never
+   * removed, so roles an administrator gave inside LadWani survive.
+   */
+  async hubLogin(token: string | undefined): Promise<LoginResult> {
+    if (!token) throw new UnauthorizedException('No hub token.')
+    let claims: HubClaims
+    try {
+      claims = verifyHubToken(token, await this.hubJwks.get())
+    } catch (err) {
+      if (err instanceof HubTokenError) {
+        this.hubJwks.reset() // a rotated key shows up as an unknown key
+        throw new UnauthorizedException('Invalid hub token.')
+      }
+      throw err
+    }
+    const email = normalizeEmail(claims.email)
+    const roleCode = HUB_ROLE_TO_CODE[claims.role]
+    if (!email || !roleCode) throw new UnauthorizedException('Invalid hub token.')
+
+    const userId = await this.prisma.$transaction(async (tx) => {
+      let user = await tx.user.findFirst({ where: { OR: [{ hubUserId: claims.sub }, { email }], deletedAt: null } })
+      if (user && user.hubUserId && user.hubUserId !== claims.sub) {
+        throw new ConflictException('This email belongs to another bkesari ID.')
+      }
+      if (user && (user.status === 'SUSPENDED' || user.status === 'BLOCKED')) {
+        throw new ForbiddenException('Account suspended. Contact an administrator.')
+      }
+      if (!user) {
+        // No password: this account can only be entered through the hub.
+        user = await tx.user.create({
+          data: {
+            email, hubUserId: claims.sub, status: 'ACTIVE', emailVerified: true,
+            passwordHash: await hash(randomBytes(32).toString('hex'), BCRYPT_COST),
+          },
+        })
+        await tx.member.create({ data: { userId: user.id, firstName: email.split('@')[0], lastName: '' } })
+      } else if (!user.hubUserId) {
+        user = await tx.user.update({ where: { id: user.id }, data: { hubUserId: claims.sub, emailVerified: true } })
+      }
+      for (const code of new Set(['MEMBER', roleCode])) {
+        const role = await tx.role.findUnique({ where: { code } })
+        if (!role) continue
+        const has = await tx.userRole.findFirst({ where: { userId: user.id, roleId: role.id } })
+        if (!has) await tx.userRole.create({ data: { userId: user.id, roleId: role.id } })
+      }
+      await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+      return user.id
+    })
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { userRoles: { include: { role: true } }, member: { select: { id: true } } },
+    })
+    if (!user) throw new UnauthorizedException('Invalid hub token.')
+    const roles = user.userRoles.map((ur) => ur.role.code)
+    const memberId = user.member?.id ?? null
+    const accessToken = this.jwt.sign({ sub: user.id, roles, memberId }, { expiresIn: ACCESS_TOKEN_TTL })
+    const refreshToken = await this.issueRefreshToken(user.id)
+    return { accessToken, refreshToken, user: { id: user.id, roles, memberId } }
+  }
 
   async register(dto: RegisterDto): Promise<{ userId: string; otpForDev: string }> {
     const existingMobile = await this.prisma.user.findUnique({ where: { mobile: dto.mobile } })
     if (existingMobile) throw new ConflictException('An account with this mobile number already exists.')
 
-    // Stored and compared lower-cased. MySQL's default collation made email
-    // case-insensitive for free; PostgreSQL compares exactly, so without this
-    // Asha@x.com and asha@x.com would be two accounts and a sign-in with the
+    // Stored and compared lower-cased. PostgreSQL compares exactly, so without
+    // this Asha@x.com and asha@x.com would be two accounts and a sign-in with the
     // other capitalisation would fail.
     const email = normalizeEmail(dto.email)
     if (email) {
