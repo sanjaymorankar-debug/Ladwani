@@ -65,6 +65,19 @@ login() {
   printf '%s' "$code"
 }
 
+# links <name> <jar> <path> : the page is 200 and every root-relative href on
+# it keeps the prefix. next/link adds basePath; a plain <a href="/..."> does
+# not, and on bkesari.com would lead to the hub's root instead of this app.
+links() {
+  local name="$1" jar="$2" path="$3" code stray
+  code=$(curl -s -o "$WORK/body" -w '%{http_code}' -b "$WORK/$jar" "$URL$path") || code=000
+  if [ "$code" != 200 ]; then bad "$name" "GET $PREFIX$path: HTTP $code, expected 200"; return; fi
+  stray=$(grep -oE 'href="/[^"]*"' "$WORK/body" | sed -E 's/^href="//; s/"$//' \
+    | grep -vE "^$PREFIX(/|\$)" | sort -u | tr '\n' ' ')
+  if [ -n "$stray" ]; then bad "$name" "GET $PREFIX$path: links without $PREFIX: $stray"; return; fi
+  ok "$name"
+}
+
 enc() { node -e 'console.log(encodeURIComponent(process.argv[1]))' "$1"; }
 
 echo "Smoke: $URL (prefix $PREFIX)"
@@ -105,6 +118,9 @@ probe "member is refused the admin API"    member   "/api/admin/stats"  403
 probe "operator reaches /admin"            operator "/admin"            200 "Operator Dashboard"
 redirect "operator on an admin-only page -> $PREFIX/dashboard" operator "/admin/users" "$PREFIX/dashboard"
 probe "admin reads the admin API"          admin    "/api/admin/stats"  200
+links "member dashboard links keep $PREFIX"   member   "/dashboard"
+links "operator dashboard links keep $PREFIX" operator "/admin"
+links "admin dashboard links keep $PREFIX"    admin    "/admin"
 # Signed in, so the middleware lets the request through to Next's router:
 # files outside public/ must not exist as URLs. (Anonymous, the middleware
 # answers first with a redirect to the login page.)

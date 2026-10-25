@@ -386,6 +386,12 @@ a fresh database); S2 unchanged (5 files, 59 passed); S5 smoke 24 passed (with
 `AUTH_ADMIN_2FA=false`, above); `01-schema.sql` now has 85 tables. See
 `docs/POSTGRESQL-PORT.md`.
 
+**After PR #17 (Approval Rules page, dashboard links; 2026-10-25):** S3.4
+`npm test` is **43 files, 569 passed, 0 failed, 0 skipped**; S5 smoke is
+**27 passed** (S7.5 and S7.6 re-smoke likewise), the 3 added being the `links`
+probes in `scripts/smoke-base-path.sh` that fail on any page link without the
+prefix.
+
 ## 6. Pass criteria
 
 - **PASS**: S1–S6 and R1–R4 all ran and are green; counts at or above
