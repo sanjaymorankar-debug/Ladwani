@@ -13,7 +13,8 @@ import { getPostAccess } from '@/lib/interest-groups'
  * directory sits outside the web root, and with S3 the bucket stays private.
  * That means a leaked link can't outlive the viewer's permission.
  */
-export async function GET(req: Request, { params }: { params: { photoId: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ photoId: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 

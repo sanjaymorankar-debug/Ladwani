@@ -4,7 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { actorFor, json } from '@/lib/additional-details/http'
 
 /** The recipient accepts (shares their number) or declines. body: { action: 'accept' | 'decline' } */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const memberId = (session.user as any).memberId as string | null

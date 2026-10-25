@@ -14,7 +14,8 @@ import { settlePayment, computeSignature, activeGateway } from '@/lib/payments'
  * In MOCK mode the signature can be produced by /api/payments/[id]/mock-pay,
  * which stands in for the hosted checkout page.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
@@ -52,7 +53,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
  * would hand back. Refuses to run when a live gateway is configured, so it
  * can never be used to fake a real payment.
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   if (activeGateway() !== 'MOCK') {
     return NextResponse.json({ message: 'Not available with a live payment gateway' }, { status: 404 })
   }

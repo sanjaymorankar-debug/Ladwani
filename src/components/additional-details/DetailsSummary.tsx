@@ -25,7 +25,7 @@ export default async function DetailsSummary({ session, memberId }: { session: S
   if (!ctx.canEdit && !visible.length) return null
 
   if (!ctx.canEdit) {
-    const h = headers()
+    const h = await headers()
     await prisma.auditLog.create({
       data: {
         actorId: session.user!.id as string,

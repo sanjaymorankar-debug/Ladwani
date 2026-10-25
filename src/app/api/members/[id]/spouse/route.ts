@@ -13,7 +13,8 @@ import { legalAgeError, afterMarriage } from '@/lib/marriage'
 // F23: marriage date, legal age (18 F / 21 M), a spouse may be a new person
 // record, and once applied each spouse's family Karta is asked to add the
 // other (see marriage.ts).
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const access = await getMemberAccess(session, params.id)
   if (!access.exists) return NextResponse.json({ message: 'Not found' }, { status: 404 })

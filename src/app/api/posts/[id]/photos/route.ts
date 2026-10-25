@@ -13,7 +13,8 @@ const MAX_PER_GROUP_POST = 6
  * the post's audience only (POST_AUDIENCE). An interest-group post's photos
  * are seen by registered members of the group (up to 6), as before.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const post = await prisma.post.findUnique({ where: { id: params.id }, include: { _count: { select: { photos: true } } } })

@@ -11,7 +11,8 @@ import {
 } from '@/lib/invitations'
 
 /** Pending invitations for this member, for the Karta's own UI. */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
@@ -39,7 +40,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
  * of their family, or staff — and only while the profile has no login of its
  * own, since claiming creates that login.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
@@ -166,7 +168,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 }
 
 /** Cancels the pending invitation for this member. */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 

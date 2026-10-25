@@ -1,6 +1,6 @@
 'use client'
 import { BASE_PATH } from '@/lib/api-path'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { ArrowLeft } from 'lucide-react'
@@ -18,7 +18,8 @@ const cap = (s: string) => s.charAt(0) + s.slice(1).toLowerCase()
  * State / Country organisation an Admin or Operator appoints the office
  * bearers from its members.
  */
-export default function OrganisationPage({ params }: { params: { id: string } }) {
+export default function OrganisationPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params)
   const [data, setData] = useState<any>(null)
   const [invitee, setInvitee] = useState<{ id: string; name: string } | null>(null)
   const load = useCallback(() => {

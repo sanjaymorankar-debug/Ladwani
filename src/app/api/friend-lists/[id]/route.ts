@@ -9,7 +9,8 @@ async function ownList(session: any, id: string) {
   return list && me && list.ownerMemberId === me ? list : null
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!(await ownList(session, params.id))) return NextResponse.json({ message: 'Not found' }, { status: 404 })
   const name = String((await req.json().catch(() => ({}))).name ?? '').trim().slice(0, 80)
@@ -19,7 +20,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 /** Deleting a list leaves the friendships; posts and photos shared with it stay visible only to their owner. */
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!(await ownList(session, params.id))) return NextResponse.json({ message: 'Not found' }, { status: 404 })
   await prisma.friendListMember.deleteMany({ where: { listId: params.id } })

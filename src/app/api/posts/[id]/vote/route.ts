@@ -5,7 +5,8 @@ import { json } from '@/lib/additional-details/http'
 import { getPostAccess } from '@/lib/interest-groups'
 
 /** One vote per person per poll; voting again changes the vote. body: { optionId } */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const { post, allowed } = await getPostAccess(session, params.id)

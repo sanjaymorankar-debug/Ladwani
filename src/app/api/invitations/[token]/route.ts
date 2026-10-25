@@ -10,7 +10,8 @@ import { resolveInvitation, invitationRejectionMessage } from '@/lib/invitations
  * Not the date of birth, contact details or anything else on the record: this
  * endpoint is reachable by anyone holding the link.
  */
-export async function GET(req: Request, { params }: { params: { token: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params
   const result = await resolveInvitation(params.token)
 
   if (!result.ok || !result.invitation) {

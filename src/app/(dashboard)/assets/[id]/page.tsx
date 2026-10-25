@@ -9,7 +9,8 @@ import { formatDate } from '@/lib/utils'
 import BookingPanel from '@/components/assets/BookingPanel'
 import AssetPhotoManager from '@/components/assets/AssetPhotoManager'
 
-export default async function AssetDetailPage({ params }: { params: { id: string } }) {
+export default async function AssetDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return null
 

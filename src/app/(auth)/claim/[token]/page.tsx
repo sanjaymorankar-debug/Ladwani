@@ -1,6 +1,6 @@
 'use client'
 import { BASE_PATH } from '@/lib/api-path'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -16,7 +16,8 @@ interface InvitationInfo {
   email: string | null
 }
 
-export default function ClaimProfilePage({ params }: { params: { token: string } }) {
+export default function ClaimProfilePage(props: { params: Promise<{ token: string }> }) {
+  const params = use(props.params)
   const router = useRouter()
   const [info, setInfo] = useState<InvitationInfo | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)

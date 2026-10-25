@@ -9,7 +9,8 @@ const VALID_VISIBILITY = new Set([
   'PRIVATE', 'SAME_FAMILY', 'FRIENDS', 'FRIEND_LIST', 'REGISTERED_MEMBERS', 'SAME_AREA', 'MATRIMONY_ONLY', 'PUBLIC_COMMUNITY', 'ADMIN_OPERATOR',
 ])
 
-export async function PATCH(req: Request, { params }: { params: { id: string; photoId: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string; photoId: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const access = await getMemberAccess(session, params.id)
   if (!access.exists) return NextResponse.json({ message: 'Not found' }, { status: 404 })
@@ -67,7 +68,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string; ph
   })
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string; photoId: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string; photoId: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const access = await getMemberAccess(session, params.id)
   if (!access.exists) return NextResponse.json({ message: 'Not found' }, { status: 404 })

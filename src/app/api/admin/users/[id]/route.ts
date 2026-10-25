@@ -26,7 +26,8 @@ async function roleSnapshot(userId: string) {
 
 const ADMIN_FLOOR_MESSAGE = `At least ${MIN_ADMINS} active Admins must remain. Assign another Admin first.`
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   if (!(await adminSession())) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
 
   const user = await prisma.user.findUnique({
@@ -42,7 +43,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json({ ...user, teamAreas })
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const actorId = await adminSession()
   if (!actorId) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
 

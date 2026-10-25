@@ -7,7 +7,8 @@ import { ArrowLeft, MapPin, UsersRound, Clock, AlertTriangle } from 'lucide-reac
 import { formatDate } from '@/lib/utils'
 import GroupRosterManager from '@/components/groups/GroupRosterManager'
 
-export default async function GroupDetailPage({ params }: { params: { id: string } }) {
+export default async function GroupDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return null
 

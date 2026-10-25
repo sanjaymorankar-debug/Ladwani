@@ -13,7 +13,8 @@ import { resolveInvitation, invitationRejectionMessage, hashInvitationToken } fr
  * between the page loading and this POST is long enough for the invitation to
  * be revoked or the profile to be claimed another way.
  */
-export async function POST(req: Request, { params }: { params: { token: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params
   const precheck = await resolveInvitation(params.token)
   if (!precheck.ok || !precheck.invitation) {
     return NextResponse.json(

@@ -22,7 +22,8 @@ const isOffice = (d: string | null | undefined) => !!d && (OFFICES as readonly s
  *   resign                  — the person (an office bearer hands over first)
  *   renominate {newMemberId} — the applicant: replace an office bearer who declined (F26)
  */
-export async function POST(req: Request, { params }: { params: { id: string; memberId: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string; memberId: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const actorId = session.user.id

@@ -7,7 +7,8 @@ import { calculateAge, genderLabel, maritalLabel, MARITAL_STATUS_LABELS, GENDER_
 import PendingFamilyInvitations from '@/components/family/PendingFamilyInvitations'
 import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
-export default async function FamilyPage({ searchParams }: { searchParams?: { f?: string } }) {
+export default async function FamilyPage(props: { searchParams?: Promise<{ f?: string }> }) {
+  const searchParams = await props.searchParams
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return null
 

@@ -10,17 +10,18 @@ import { OFFICES } from '@/lib/organisations'
  * F26 certificate (stored encrypted): the applicant, the office bearers,
  * Admins, and the Operators holding a verification task for it. Audited.
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const roles = ((session.user as any).roles ?? []) as string[]
   const memberId = (session.user as any).memberId as string | null
   const org = await prisma.organisation.findUnique({ where: { id: params.id } })
   if (!org?.certificateKey) return NextResponse.json({ message: 'Not found' }, { status: 404 })
-  const officer = memberId && await prisma.organisationMember.findFirst({
+  const officer = memberId && (await prisma.organisationMember.findFirst({
     where: { organisationId: org.id, memberId, status: 'ACTIVE', designation: { in: [...OFFICES] } },
-  })
-  const operator = roles.includes('OPERATOR') && await prisma.approvalTask.findFirst({ where: { organisationId: org.id, operatorUserId: session.user.id, supersededAt: null } })
+  }))
+  const operator = roles.includes('OPERATOR') && (await prisma.approvalTask.findFirst({ where: { organisationId: org.id, operatorUserId: session.user.id, supersededAt: null } }))
   if (!roles.includes('ADMIN') && org.applicantUserId !== session.user.id && !officer && !operator) {
     return NextResponse.json({ message: 'Not found' }, { status: 404 })
   }

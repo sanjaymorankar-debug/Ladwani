@@ -10,7 +10,8 @@ async function canManageRoster(groupId: string, memberId: string | null, isStaff
   return !!group && !group.deletedAt && group.convenerMemberId === memberId
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
@@ -29,7 +30,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
  * are expected to run repeatedly — "periodically update the members" — and
  * because it needs its own duplicate/capacity checks.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
@@ -100,7 +102,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 }
 
 /** Retires a member from the roster (kept as history, not deleted). */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 

@@ -12,7 +12,8 @@ import { REGISTRATION_STATUSES } from '@/lib/account-state'
 // F02 adds PERMANENT (with a 'same as current' tick).
 const ALLOWED_TYPES = ['CURRENT', 'NATIVE', 'PERMANENT']
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const access = await getMemberAccess(session, params.id)
   if (!access.exists) return NextResponse.json({ message: 'Not found' }, { status: 404 })
@@ -25,7 +26,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 }
 
 // Upsert-by-type: a member has at most one CURRENT, one NATIVE and one PERMANENT address row.
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const access = await getMemberAccess(session, params.id)
   if (!access.exists) return NextResponse.json({ message: 'Not found' }, { status: 404 })

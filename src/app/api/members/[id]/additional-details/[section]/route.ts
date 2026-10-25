@@ -21,7 +21,8 @@ async function setup(req: Request, params: { id: string; section: string }) {
   return { session, section, ctx }
 }
 
-export async function GET(req: Request, { params }: { params: { id: string; section: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string; section: string }> }) {
+  const params = await props.params
   const s = await setup(req, params)
   if ('error' in s) return s.error
   const { session, section, ctx } = s
@@ -37,7 +38,8 @@ export async function GET(req: Request, { params }: { params: { id: string; sect
 }
 
 /** Saves one section (create or update). No operator approval is involved (rule 5). */
-export async function PUT(req: Request, { params }: { params: { id: string; section: string } }) {
+export async function PUT(req: Request, props: { params: Promise<{ id: string; section: string }> }) {
+  const params = await props.params
   const s = await setup(req, params)
   if ('error' in s) return s.error
   const { session, section, ctx } = s
@@ -103,7 +105,8 @@ export async function PUT(req: Request, { params }: { params: { id: string; sect
 }
 
 /** Deletes everything this section stored (rule 4: removed, not hidden). */
-export async function DELETE(req: Request, { params }: { params: { id: string; section: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string; section: string }> }) {
+  const params = await props.params
   const s = await setup(req, params)
   if ('error' in s) return s.error
   const { session, section, ctx } = s

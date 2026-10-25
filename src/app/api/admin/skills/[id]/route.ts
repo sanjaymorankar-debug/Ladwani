@@ -10,7 +10,8 @@ async function staffOnly() {
   return session
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   if (!(await staffOnly())) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
   const exists = await prisma.skill.findUnique({ where: { id: params.id } })
   if (!exists) return NextResponse.json({ message: 'Not found' }, { status: 404 })
@@ -33,7 +34,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 /** Deleting a skill members already hold would silently strip it from profiles - deactivate instead. */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   if (!(await staffOnly())) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
   const used = await prisma.memberSkill.count({ where: { skillId: params.id } })
   if (used > 0) {

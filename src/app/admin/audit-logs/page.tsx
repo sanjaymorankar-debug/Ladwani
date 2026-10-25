@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { FileText } from 'lucide-react'
 import { formatDate, timeAgo } from '@/lib/utils'
 
-export default async function AuditLogsPage({ searchParams = {} }: { searchParams?: Record<string, string | undefined> }) {
+export default async function AuditLogsPage(props: { searchParams?: Promise<Record<string, string | undefined>> }) {
+  const searchParams = (await props.searchParams) ?? {}
   const session = await getServerSession(authOptions)
   const roles = (session?.user as any)?.roles as string[] ?? []
   if (!roles.includes('ADMIN')) redirect('/dashboard')

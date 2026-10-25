@@ -6,7 +6,8 @@ import { recordAudit } from '@/lib/audit'
 import { canModeratePost } from '@/lib/posts'
 
 /** F36: delete one's own comment (or a moderator removes it). */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const comment = await prisma.comment.findUnique({ where: { id: params.id }, include: { post: true } })

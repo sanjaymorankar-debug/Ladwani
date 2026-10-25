@@ -1,6 +1,6 @@
 'use client'
 import { BASE_PATH } from '@/lib/api-path'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type JSX } from 'react'
 import toast from 'react-hot-toast'
 import { Plus, ChevronRight, ChevronDown } from 'lucide-react'
 

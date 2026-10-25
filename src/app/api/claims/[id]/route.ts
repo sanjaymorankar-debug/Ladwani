@@ -8,7 +8,8 @@ import { recordAudit } from '@/lib/audit'
 import { notifyUser } from '@/lib/notify'
 
 /** F17 — the Karta (or an Admin) confirms or rejects a claim: { decision: 'CONFIRM' | 'REJECT', note } (a rejection gives the reason). */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const claim = await prisma.profileClaim.findUnique({ where: { id: params.id } })

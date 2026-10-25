@@ -7,7 +7,8 @@ import { actorFor, json } from '@/lib/additional-details/http'
 import { INTEREST_GROUP_TYPE, getGroupAccess, leaveGroup } from '@/lib/interest-groups'
 
 /** Join a group by choice. Leaving and re-joining is always the member's call. */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const memberId = (session.user as any).memberId as string | null
@@ -40,7 +41,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 }
 
 /** Leave (Step 3 rule 4). Never deletes the hobby, and the system will not re-add you. */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const memberId = (session.user as any).memberId as string | null
@@ -54,7 +56,8 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 }
 
 /** My settings in this group. body: { notifyMode?: 'DAILY_DIGEST' | 'EVERY_POST', isMuted?: boolean, acceptRules?: true } */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const access = await getGroupAccess(session, params.id)

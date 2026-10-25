@@ -7,7 +7,8 @@ import { treeAccess, buildTree } from '@/lib/tree'
  * F25 tree view. Members of the family (and Admins) get the whole tree;
  * members of a linked family only the connecting branch; others nothing.
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const { mode, viewerMemberId } = await treeAccess(session, params.id)

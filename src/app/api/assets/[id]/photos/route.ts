@@ -14,7 +14,8 @@ async function canManageAsset(session: any, assetId: string) {
   return { exists: true, allowed: isStaff || (!!memberId && memberId === asset.ownerMemberId) }
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
@@ -26,7 +27,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json({ photos })
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
@@ -69,7 +71,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   return NextResponse.json({ message: 'Photo uploaded', photoId: photo.id }, { status: 201 })
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 

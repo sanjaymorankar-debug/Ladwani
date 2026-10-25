@@ -12,7 +12,8 @@ import { queryDirectory } from '@/lib/directory'
  * District teams. Scope is applied in the database query (src/lib/directory.ts),
  * so the page can only ever render rows the viewer is entitled to.
  */
-export default async function TeamDirectoryPage({ searchParams }: { searchParams: { q?: string; page?: string } }) {
+export default async function TeamDirectoryPage(props: { searchParams: Promise<{ q?: string; page?: string }> }) {
+  const searchParams = await props.searchParams
   const session = await getServerSession(authOptions)
   const scope = await getViewerScope(session?.user?.id as string | undefined)
   if (scope.level === 'NONE') redirect('/dashboard')

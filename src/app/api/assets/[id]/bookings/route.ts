@@ -6,7 +6,8 @@ import { createPayment, quoteBookingPaise, reference } from '@/lib/payments'
 import { requireActiveAccount } from '@/lib/account-state'
 
 /** Existing bookings + blackouts, so the UI can show what's taken. */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
@@ -36,7 +37,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   })
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   // F01: a DRAFT / unapproved account may only fill in its own profile.

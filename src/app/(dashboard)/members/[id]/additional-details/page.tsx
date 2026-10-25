@@ -4,7 +4,8 @@ import DetailsWizard from '@/components/additional-details/DetailsWizard'
 
 // Additional Details wizard. Access is decided by the API the wizard calls —
 // the member, or the parent/Karta for children and members without a login.
-export default function AdditionalDetailsPage({ params }: { params: { id: string } }) {
+export default async function AdditionalDetailsPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-center gap-2">

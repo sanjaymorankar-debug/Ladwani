@@ -6,7 +6,8 @@ import { recordAudit } from '@/lib/audit'
 import { createRound, currentRound, liveTasks, KIND } from '@/lib/verification'
 
 /** F26 after a send-back: the applicant resubmits; a new round goes to the same Operators when still eligible. */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const org = await prisma.organisation.findUnique({ where: { id: params.id } })

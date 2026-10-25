@@ -8,7 +8,8 @@ import { getMemberAccess } from '@/lib/member-auth'
 // extra personal details and the geo-tagged current address. Saved through
 // PATCH /api/members/[id]. Only people who may edit the member can read it —
 // it includes income and exact location.
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const access = await getMemberAccess(session, params.id)
   if (!access.exists) return NextResponse.json({ message: 'Not found' }, { status: 404 })

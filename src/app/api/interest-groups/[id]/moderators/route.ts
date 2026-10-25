@@ -15,7 +15,8 @@ async function canAssign(session: any, group: { district: string | null }) {
   return scope.isAdmin || (!!group.district && scope.districts.includes(group.district.toLowerCase()))
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const access = await getGroupAccess(session, params.id)
@@ -32,7 +33,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 }
 
 /** body: { memberId, action?: 'assign' | 'revoke' } */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const access = await getGroupAccess(session, params.id)

@@ -25,7 +25,8 @@ const ACTION_LABELS: Record<string, string> = {
   'family.merge': 'Merge Families',
 }
 
-export default async function ApprovalsPage({ searchParams }: { searchParams: { status?: string } }) {
+export default async function ApprovalsPage(props: { searchParams: Promise<{ status?: string }> }) {
+  const searchParams = await props.searchParams
   const session = await getServerSession(authOptions)
   const roles = (session?.user as any)?.roles as string[] ?? []
   if (!roles.includes('ADMIN') && !roles.includes('OPERATOR')) redirect('/dashboard')

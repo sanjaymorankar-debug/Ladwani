@@ -11,7 +11,8 @@ import { GROUP_POST_TYPES, getGroupAccess, groupHasMinors, groupPostTypeId, noti
  *
  * GET ?kind=POST|QUESTION|KNOWLEDGE|EVENT|POLL
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const access = await getGroupAccess(session, params.id)
@@ -65,7 +66,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 }
 
 /** body: { kind, title?, content, linkUrl?, eventDate?, pollOptions?: string[] } */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const access = await getGroupAccess(session, params.id)

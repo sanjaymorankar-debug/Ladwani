@@ -13,7 +13,8 @@ async function visiblePost(session: any, id: string) {
   return post && (await canSeePost(session, post)) ? post : null
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   if (!(await visiblePost(session, params.id))) return NextResponse.json({ message: 'Post not found' }, { status: 404 })
@@ -34,7 +35,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json({ comments })
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   // F01: a DRAFT / unapproved account may only fill in its own profile.

@@ -5,7 +5,8 @@ import { treeAccess, buildTree } from '@/lib/tree'
 import { getFamilyAccess } from '@/lib/family-auth'
 import FamilyTreeClient from './TreeClient'
 
-export default async function FamilyTreePage({ params }: { params: { id: string } }) {
+export default async function FamilyTreePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return null
 

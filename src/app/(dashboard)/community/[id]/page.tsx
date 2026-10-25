@@ -8,7 +8,8 @@ import { timeAgo, getInitials } from '@/lib/utils'
 import CommentSection from './CommentSection'
 import { canViewPost, AUTHOR_SELECT } from '@/lib/posts'
 
-export default async function PostDetailPage({ params }: { params: { id: string } }) {
+export default async function PostDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return null
 

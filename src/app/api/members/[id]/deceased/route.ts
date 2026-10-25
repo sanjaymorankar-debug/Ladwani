@@ -23,7 +23,8 @@ export async function GET() {
  * certificate: JPG / PNG / WebP / PDF, up to 5 MB, stored encrypted). It is
  * required while the setting `deceased.certificate_required` is on.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const access = await getMemberAccess(session, params.id)
   if (!access.exists) return NextResponse.json({ message: 'Not found' }, { status: 404 })

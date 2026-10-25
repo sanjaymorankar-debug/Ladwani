@@ -13,7 +13,8 @@ import { recordAudit } from '@/lib/audit'
  * sensitive field: once the account is ACTIVE a change goes to two operators;
  * while under review it is locked; before submission it saves directly.
  */
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const access = await getMemberAccess(session, params.id)
   if (!access.exists) return NextResponse.json({ message: 'Not found' }, { status: 404 })

@@ -15,7 +15,8 @@ import { syncMemberGroups } from '@/lib/interest-groups'
  *
  * body: { agree: true, type?: 'ADDITIONAL_DETAILS' | 'MINOR_GROUPS', version }
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const ctx = await getDetailsContext(session, params.id)
@@ -57,7 +58,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   return json({ groups, message: 'Thank you', consent: { id: record.id, version: record.version, grantedAt: record.grantedAt } }, 201)
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const ctx = await getDetailsContext(session, params.id)
