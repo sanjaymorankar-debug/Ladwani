@@ -131,7 +131,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<{ sta
                       <span>By <strong>{submitterName}</strong></span>
                       <span>{timeAgo(approval.submittedAt)}</span>
                       {approval.reason && (
-                        <span className="text-gray-400 truncate max-w-xs">"{approval.reason}"</span>
+                        <span className="text-gray-400 truncate max-w-xs">&quot;{approval.reason}&quot;</span>
                       )}
                     </div>
                     {approval.oldValue && approval.newValue && (

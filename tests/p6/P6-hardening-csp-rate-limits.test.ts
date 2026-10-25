@@ -81,6 +81,8 @@ describe('P6 hardening: rate limits', () => {
 
 describe('P6 hardening: Content-Security-Policy', () => {
   it('P6 pages carry a CSP that blocks other sites\' scripts, plugins, framing and <base>; API routes do not', async () => {
+    // next.config.js is CommonJS; load it the way Next does.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const config = require('../../next.config.js')
     const rules: { source: string; headers: { key: string; value: string }[] }[] = await config.headers()
     const csp = rules.flatMap((r) => r.headers.map((h) => ({ source: r.source, ...h }))).find((h) => h.key === 'Content-Security-Policy')!

@@ -157,7 +157,7 @@ duration for each.
 | S1.4 | static: schema valid | `node scripts/with-env.js .env.test npx prisma validate` | "The schema at prisma/schema.prisma is valid" |
 | S1.5 | static: still PostgreSQL | `grep -qE '^\s*provider\s*=\s*"postgresql"' prisma/schema.prisma && grep -qE '^provider\s*=\s*"postgresql"' prisma/migrations/migration_lock.toml && grep -qE '^\s*directUrl\s*=\s*env\("DATABASE_URL_UNPOOLED"\)' prisma/schema.prisma` | exit 0 |
 | S1.6 | static: API URLs carry BASE_PATH | `bash scripts/check-base-path.sh` | "All of this app's API URLs carry BASE_PATH." |
-| S1.7 | static: lint | not run: see Known gaps | — |
+| S1.7 | static: lint | `npm run lint` | exit 0: 0 errors (warnings, mostly `@typescript-eslint/no-explicit-any`, are report-only) |
 | S2 | unit | `node scripts/with-env.js .env.test npx vitest run tests/additional-details-rules.test.ts tests/profile-details.test.ts tests/db-url.test.ts tests/next-config.test.ts tests/base-path-redirects.test.ts` | all pass, counts per Baseline |
 | S3.1 | integration: migrate | `npm run test:migrate` | "All migrations have been successfully applied" or "No pending migrations to apply" |
 | S3.2 | integration: seeds | `node scripts/with-env.js .env.test npm run db:seed && node scripts/with-env.js .env.test npm run db:seed:uat` | both exit 0 |
@@ -362,7 +362,7 @@ Measured 2026-10-24 on branch `claude/fervent-bell-wcmmdu` (base commit
 | Level | Count | Time |
 |---|---|---|
 | S1.1–S1.6 static (syntax, workflows, typecheck, `prisma validate`, provider + `directUrl`, BASE_PATH) | all pass | ~11 s |
-| S1.7 lint | does not run (Known gaps) | — |
+| S1.7 lint | since ESLint 9 (2026-10-25): 0 errors, 990 warnings (918 `no-explicit-any`) | ~8 s |
 | S2 unit | 5 files, 59 passed | 4.6 s |
 | S3.1–S3.3 migrate, both seeds, `migrate diff` | pass: no pending migrations, no difference | ~22 s |
 | S3.4 `npm test` | **21 files, 332 passed, 0 failed, 0 skipped** | 55 s |
@@ -476,16 +476,11 @@ VERDICT: PASS | FAIL | BLOCKED
 
 ## 9. Known gaps
 
-- **Lint does not run.** Verified: `npx eslint` (ESLint 8.57.1) fails on
-  `eslint.config.mjs` importing `eslint/config`, which only ESLint 9 exports,
-  and the config spreads eslint-config-next 15+'s flat exports;
-  `npm run lint` (`next lint`, Next 14.2) finds no `.eslintrc` and stops at an
-  interactive prompt. Proposed fix, not applied: delete `eslint.config.mjs`
-  and add `.eslintrc.json` containing `{ "extends": "next/core-web-vitals" }`
-  (Next 14's own format). A trial run with exactly that config found 9 errors,
-  all `react/no-unescaped-entities`, and 13 warnings (10
-  `react-hooks/exhaustive-deps`); fix those, then add `npm run lint` to S1.7
-  and to CI.
+- **Lint reports warnings only for `any`.** Since ESLint 9 (`eslint.config.mjs`
+  loads `next/core-web-vitals` and `next/typescript` through `FlatCompat`),
+  `npm run lint` runs in S1.7, CI and the deploy gate, and `next build` lints
+  too. `@typescript-eslint/no-explicit-any` is set to `warn`: the codebase uses
+  `any` in ~900 places, so it is reported, not enforced.
 - **No browser end-to-end tests.** Client-only behaviour (the login page's
   `router.push`, the SessionProvider's `basePath`, forms) is covered through
   the pure helpers it uses and the HTTP-level smoke run, not a browser.

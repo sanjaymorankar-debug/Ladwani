@@ -95,13 +95,13 @@ export default function NewGroupForm({ areas }: { areas: { id: string; name: str
               <label className="form-label">Review roster every (days)</label>
               <input type="number" value={form.rosterReviewIntervalDays} onChange={(e) => set('rosterReviewIntervalDays', e.target.value)}
                 className="form-input" placeholder="180" />
-              <p className="text-xs text-gray-400 mt-1">You'll be reminded to confirm the list is current</p>
+              <p className="text-xs text-gray-400 mt-1">You&apos;ll be reminded to confirm the list is current</p>
             </div>
           </div>
         </div>
 
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-sm text-amber-800">
-          Your group is reviewed by a community operator before it's visible to others. You're added as its convener automatically.
+          Your group is reviewed by a community operator before it&apos;s visible to others. You&apos;re added as its convener automatically.
         </div>
 
         <button onClick={submit} disabled={busy}

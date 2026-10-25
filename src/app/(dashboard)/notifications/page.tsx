@@ -34,7 +34,7 @@ export default async function NotificationsPage() {
       {notifications.length === 0 ? (
         <div className="card text-center py-12">
           <Bell className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-          <p className="text-gray-500">You're all caught up!</p>
+          <p className="text-gray-500">You&apos;re all caught up!</p>
           <p className="text-gray-400 text-sm mt-1">New notifications will appear here.</p>
         </div>
       ) : (

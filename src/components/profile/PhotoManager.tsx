@@ -139,7 +139,7 @@ export default function PhotoManager({ memberId }: { memberId: string }) {
         {uploading ? 'Uploading...' : 'Upload Photo'}
         <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={onFileChange} disabled={uploading} className="hidden" />
       </label>
-      <p className="text-xs text-gray-400">JPEG, PNG or WEBP, up to 8MB. New uploads default to "Only me" — change visibility per photo above.</p>
+      <p className="text-xs text-gray-400">JPEG, PNG or WEBP, up to 8MB. New uploads default to &quot;Only me&quot; — change visibility per photo above.</p>
     </div>
   )
 }

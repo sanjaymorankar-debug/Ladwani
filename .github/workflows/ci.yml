@@ -4,9 +4,6 @@ name: CI
 # real Prisma queries and constraints (including the bookings exclusion
 # constraint and CITEXT emails), so a PostgreSQL service container matching
 # production is provided rather than a mock.
-#
-# Lint is not run: `next lint` is interactive under Next 14 and eslint.config.mjs
-# targets a newer eslint-config-next. Add it back once that config is fixed.
 on:
   push:
     # Not dev: a push there runs this same suite inside deploy-dev.yml's gate,
@@ -84,6 +81,10 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      # Errors fail the job; warnings (mostly `any`) are reported only.
+      - name: Lint
+        run: npm run lint
 
       # Through with-env.js, which sets DATABASE_URL_UNPOOLED (the schema's
       # directUrl) to DATABASE_URL: CI has one database, Neon has two URLs.

@@ -10,7 +10,8 @@ import { PATCH as patchArea } from '@/app/api/admin/areas/[id]/route'
 
 const fx = p0Fixtures('p0loc')
 type P = Awaited<ReturnType<typeof fx.person>>
-let admin: P, operator: P, created: string[] = []
+let admin: P, operator: P
+const created: string[] = []
 
 const post = async (body: unknown, who: P = admin) => {
   actAs({ userId: who.userId, roles: who.roles, memberId: who.memberId })
