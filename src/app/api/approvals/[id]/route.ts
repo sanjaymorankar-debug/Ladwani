@@ -6,9 +6,14 @@ import { afterMemberExpired, closeKartaTransfer } from '@/lib/family-rules'
 import { applySpouseLink, applyMarkDeceased, applyKartaChange, applyAddressChange, type SpouseLinkPayload } from '@/lib/approvals'
 import { afterMarriage } from '@/lib/marriage'
 
+/** One request in full: staff only (owner's decision). Members see their own through GET /api/approvals?mine. */
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  const roles: string[] = (session.user as any)?.roles ?? []
+  if (!roles.includes('ADMIN') && !roles.includes('OPERATOR')) {
+    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+  }
 
   const approval = await prisma.approval.findUnique({
     where: { id: params.id },

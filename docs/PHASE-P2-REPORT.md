@@ -141,7 +141,7 @@ No new environment keys.
   - Setting off: the form shows "Death certificate (optional)"; the Karta submits with a PNG → "Submitted for review"; the Karta opening the file gets 404; an Operator sees "View death certificate" on the review screen, and it opens (200, image/png).
   - Setting on: the form shows "(required)"; submitting without a file shows "Attach the death certificate", and the API returns 400.
   - A production build without `ID_PROOF_KEY` refuses to store the file (503, "File storage is not configured"), as for ID proofs. The key is already in the P6 runbook step 3.
-- **Finding (from before this PR, not changed):** `GET /api/approvals/[id]` returns any request to any signed-in user who knows its id. The certificate itself is safe (the viewer above checks the role), but the request's details are not. Limit it to staff and the person who submitted it? That would change an existing route, so I have not touched it.
+- **Finding (from before this PR) — fixed on your decision (§12):** `GET /api/approvals/[id]` returned any request to any signed-in user who knew its id.
 
 ## 11. Follow-up: every rejection gives a reason (your decision)
 - **Rule:** when someone reviewing a request turns it down, the API now refuses to do so without a reason (blank or spaces count as none). The reason is stored and sent to the person, as before.
@@ -166,3 +166,9 @@ No new environment keys.
   - In F36, a moderator's reject without a reason → 400.
 
   **429 passed**, twice in a row on a fresh database; typecheck clean; build OK.
+
+## 12. Follow-up: one review request is readable by staff only (your decision)
+- **Before:** `GET /api/approvals/[id]` returned a whole request (its old and new values, e.g. a death certificate's file key or a changed name) to any signed-in user who knew the id.
+- **Now:** only Admins and Operators get it; anyone else gets 403. Your words were "staff", so the person who sent the request cannot open it this way either. Members still see their own requests in the list (`GET /api/approvals?mine`), which was already limited to what they submitted. The only screen that opens a single request is the Admin review screen, so no member screen changes.
+- **No migration, no data change.** No existing test read a single request.
+- **Checks added** to my own test `F12 once switched on, the certificate is required …` in `tests/p2/F09-F13-family-karta.test.ts`: the Karta who sent the request gets 403 and an Admin gets 200. **432 passed**, twice in a row on a fresh database; typecheck clean; build OK.

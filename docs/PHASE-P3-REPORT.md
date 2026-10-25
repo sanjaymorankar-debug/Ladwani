@@ -116,7 +116,7 @@ A browser run against the production build covered:
 
 ## 8. Decisions needed
 1. ~~**OP-02:**~~ — decided: 3 generations up (§10).
-2. **Marriage review:** the existing §28 review still applies before a marriage takes effect, so the family requests follow the review. The workbook F23 has no review step. Remove it? It is the approval rule `member.marital_status.change`; there is no screen for it (see P2 report §9), so it would be switched off with a small migration.
+2. ~~**Marriage review**~~ — decided: kept (§12).
 3. ~~**Wrong-gender inverse links in existing data**~~ — decided: correct them (§11).
 4. ~~**Members building the tree**~~ — decided: members may build the tree and its links (§9).
 
@@ -151,3 +151,10 @@ A browser run against the production build covered:
   - Apply retypes a mother stored as "father" (same row, new type), switches off a wrong "daughter" twin of an existing "son" row, leaves "father's elder brother" alone, and a second run changes nothing.
   - Rollback restores every row and drops the backup table.
 - **No code or schema change.**
+
+## 12. Follow-up: marriages keep the Operator review (your decision)
+- **Your answer:** keep it. A marriage recorded by a member or their Karta first passes the date and legal-age checks (18 F / 21 M). It then waits in the §28 review queue (rule `member.marital_status.change`) until an Operator or Admin approves it. Only then are both people marked Married and linked, and each spouse's family Karta is asked to add the other partner (the F23 family requests).
+- **Why it matters:** without it, one member could mark another registered member as married without that person agreeing, and so take them off the marriage bureau.
+- **Differs from the workbook:** F23 has no review step; this is a deliberate difference, like the Karta hand-over review (P2 §9).
+- **No code, migration or data change.** This was already the behaviour, covered by the existing marriage tests (`tests/uat/marital-karta.test.ts`, `tests/p3/F22-F25-links-marriage-view.test.ts`).
+- **P3 has no open decisions left.**
