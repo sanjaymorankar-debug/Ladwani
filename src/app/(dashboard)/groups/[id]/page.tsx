@@ -84,7 +84,7 @@ export default async function GroupDetailPage(props: { params: Promise<{ id: str
         {canManage && reviewDue && (
           <div className="mt-4 bg-amber-50 border border-amber-100 rounded-xl p-3 text-sm text-amber-800 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-            It's been a while since this roster was confirmed — check the list below is still current.
+            It&apos;s been a while since this roster was confirmed — check the list below is still current.
           </div>
         )}
       </div>

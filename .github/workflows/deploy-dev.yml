@@ -101,6 +101,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Errors fail the job; warnings (mostly `any`) are reported only.
+      - name: Lint
+        run: npm run lint
+
       # Through with-env.js, which sets DATABASE_URL_UNPOOLED (the schema's
       # directUrl) to DATABASE_URL: CI has one database, Neon has two URLs.
       - name: Check the Prisma schema is valid

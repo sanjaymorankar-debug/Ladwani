@@ -49,7 +49,7 @@ export async function GET(req: Request) {
     incoming = await prisma.treeLinkRequest.findMany({ where: { toFamilyId: familyId, status: { in: ['PENDING', 'OPERATOR_REVIEW'] } }, orderBy: { createdAt: 'asc' } })
     outgoing = await prisma.treeLinkRequest.findMany({ where: { fromFamilyId: familyId, status: { in: OPEN } }, orderBy: { createdAt: 'asc' } })
   }
-  let review: any[] = []
+  const review: any[] = []
   if (roles.includes('OPERATOR') || roles.includes('ADMIN')) {
     const waiting = await prisma.treeLinkRequest.findMany({ where: { status: 'OPERATOR_REVIEW' }, orderBy: { createdAt: 'asc' }, take: 100 })
     for (const l of waiting) {

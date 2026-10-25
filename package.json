@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
@@ -60,6 +60,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
     "@types/bcryptjs": "^2.4.6",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^22.0.0",
@@ -67,7 +68,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "autoprefixer": "^10.4.19",
-    "eslint": "^8.57.0",
+    "eslint": "^9.39.5",
     "eslint-config-next": "15.5.28",
     "mysql2": "^3.24.2",
     "postcss": "^8.5.23",
