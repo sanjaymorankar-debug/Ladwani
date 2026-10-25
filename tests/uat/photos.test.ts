@@ -98,6 +98,46 @@ describe('TC-PHOTO — member photos', () => {
     expect((await res.json()).message).toMatch(/not a readable image/i)
   })
 
+  it('TC-PHOTO-003b an image cut short after its header is rejected (400), and nothing is stored', async () => {
+    const m = await account('MEMBER-01')
+    actAs({ userId: m.userId, roles: m.roles, memberId: m.memberId })
+    const before = await prisma.photo.count({ where: { memberId: m.memberId } })
+    const img = sharp({ create: { width: 600, height: 400, channels: 3, background: { r: 10, g: 120, b: 200 } } })
+    for (const [type, buf] of [
+      ['image/jpeg', await img.clone().jpeg().toBuffer()],
+      ['image/png', await img.clone().png().toBuffer()],
+      ['image/webp', await img.clone().webp().toBuffer()],
+    ] as const) {
+      const cut = new File([new Uint8Array(buf.subarray(0, Math.floor(buf.length / 2)))], 'cut', { type })
+      const res = await uploadMemberPhoto(formOf(cut) as any, { params: { id: m.memberId } })
+      expect(res.status, type).toBe(400)
+      expect((await res.json()).message, type).toMatch(/not a readable image/i)
+    }
+    expect(await prisma.photo.count({ where: { memberId: m.memberId } })).toBe(before)
+  })
+
+  it('TC-PHOTO-003c real JPEG and WEBP uploads are accepted and resized, not only PNG', async () => {
+    const m = await account('MEMBER-01')
+    actAs({ userId: m.userId, roles: m.roles, memberId: m.memberId })
+    const { getObject } = await import('@/lib/storage')
+    const img = sharp({ create: { width: 2000, height: 1000, channels: 3, background: { r: 90, g: 160, b: 40 } } })
+    for (const [type, buf] of [
+      ['image/jpeg', await img.clone().jpeg().toBuffer()],
+      ['image/webp', await img.clone().webp().toBuffer()],
+    ] as const) {
+      const res = await uploadMemberPhoto(formOf(new File([new Uint8Array(buf)], 'p', { type })) as any, { params: { id: m.memberId } })
+      expect(res.status, type).toBe(201)
+      const { photo } = await res.json()
+      uploadedPhotoIds.push(photo.id)
+      const saved = await prisma.photo.findUniqueOrThrow({ where: { id: photo.id } })
+      expect([saved.width, saved.height], type).toEqual([2000, 1000])
+      const optimized = await sharp((await getObject(saved.optimizedKey!)).body).metadata()
+      expect([optimized.format, optimized.width, optimized.height], type).toEqual(['jpeg', 1600, 800])
+      const thumb = await sharp((await getObject(saved.thumbnailKey!)).body).metadata()
+      expect([thumb.width, thumb.height], type).toEqual([300, 300])
+    }
+  })
+
   it('TC-PHOTO-004 an oversized file is rejected', async () => {
     const m = await account('MEMBER-01')
     actAs({ userId: m.userId, roles: m.roles, memberId: m.memberId })
