@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Edit, Shield, Bell, Lock, User } from 'lucide-react'
 import { profileCompleteness } from '@/lib/registration'
 import { calculateAge, genderLabel, maritalLabel, formatDate, GENDER_LABELS, MARITAL_STATUS_LABELS, getInitials } from '@/lib/utils'
+import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions)
@@ -16,7 +17,7 @@ export default async function ProfilePage() {
     include: {
       member: {
         include: {
-          education: { where: { isHighest: true }, take: 1 },
+          education: { where: { isHighest: true }, take: 1, select: EDUCATION_CORE_SELECT },
           employment: { where: { isCurrent: true }, take: 1 },
           skills: { include: { skill: { select: { name: true } } }, take: 6 },
           families: { include: { family: { select: { id: true, name: true } } }, take: 1 },
@@ -42,6 +43,7 @@ export default async function ProfilePage() {
 
   const settingsLinks = [
     { href: '/members/' + (member?.id ?? '') + '/edit', icon: Edit, label: 'Edit Profile', desc: 'Update your personal information' },
+    { href: '/members/' + (member?.id ?? '') + '/additional-details', icon: User, label: 'Additional Details', desc: 'Optional details for support and interest groups' },
     { href: '/profile/privacy', icon: Lock, label: 'Privacy Settings', desc: 'Control who sees your information' },
     { href: '/settings/notifications', icon: Bell, label: 'Notification Preferences', desc: 'Manage email and app notifications' },
     { href: '/settings/password', icon: Shield, label: 'Account Security', desc: 'Change password and security settings' },

@@ -48,6 +48,12 @@ describe('TC-AUTH — registration', () => {
     expect(res.status).toBe(409)
   })
 
+  it('TC-AUTH-003b an email differing only in letter case is the same account', async () => {
+    const res = await register({ ...base, email: NEW.toUpperCase(), mobile: '9811110007' })
+    expect(res.status).toBe(409)
+    expect(await prisma.user.count({ where: { email: NEW } })).toBe(1)
+  })
+
   it('TC-AUTH-004 invalid email is rejected', async () => {
     const res = await register({ ...base, email: 'not-an-email', mobile: '9811110003' })
     expect(res.status).toBe(400)
@@ -88,6 +94,12 @@ describe('TC-LOGIN — authentication', () => {
   it('TC-LOGIN-001 valid credentials succeed', async () => {
     const karta = await account('KARTA-01')
     const res = await validateLogin(karta.email, UAT_PASSWORD)
+    expect(res.ok).toBe(true)
+  })
+
+  it('TC-LOGIN-001b the email is matched case-insensitively', async () => {
+    const karta = await account('KARTA-01')
+    const res = await validateLogin(karta.email.toUpperCase(), UAT_PASSWORD)
     expect(res.ok).toBe(true)
   })
 

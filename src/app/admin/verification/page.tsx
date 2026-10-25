@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ClipboardCheck, Loader2 } from 'lucide-react'
@@ -10,7 +11,7 @@ export default function VerificationQueuePage() {
   const [tasks, setTasks] = useState<any[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
-    fetch('/api/verification/tasks').then(async (r) => {
+    fetch(`${BASE_PATH}/api/verification/tasks`).then(async (r) => {
       const j = await r.json()
       if (!r.ok) setError(j.message ?? 'Not available'); else setTasks(j.tasks)
     })

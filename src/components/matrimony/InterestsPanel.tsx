@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 
@@ -17,10 +18,10 @@ function Contact({ c }: { c: any }) {
 /** F38 interests — received (accept / decline, also as Karta), sent (withdraw); contact shown once accepted. */
 export default function InterestsPanel() {
   const [data, setData] = useState<{ sent: any[]; received: any[] } | null>(null)
-  const load = () => fetch('/api/matrimony/interests').then((r) => r.json()).then(setData)
+  const load = () => fetch(`${BASE_PATH}/api/matrimony/interests`).then((r) => r.json()).then(setData)
   useEffect(() => { load() }, [])
   const act = async (id: string, action: string) => {
-    const res = await fetch(`/api/matrimony/interests/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
+    const res = await fetch(`${BASE_PATH}/api/matrimony/interests/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
     const json = await res.json()
     if (!res.ok) return toast.error(json.message)
     toast.success(action === 'accept' ? 'Accepted — contact details are shared' : 'Done'); load()

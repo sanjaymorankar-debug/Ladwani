@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 
 /** Search registered members by name (the redacted directory search) and pick one. */
@@ -7,7 +8,7 @@ export default function MemberPicker({ label, value, onPick }: { label: string; 
   const [results, setResults] = useState<any[]>([])
   const search = async () => {
     if (!q.trim()) return
-    const d = await (await fetch(`/api/search?q=${encodeURIComponent(q)}`)).json()
+    const d = await (await fetch(`${BASE_PATH}/api/search?q=${encodeURIComponent(q)}`)).json()
     setResults(d.members ?? [])
   }
   return (

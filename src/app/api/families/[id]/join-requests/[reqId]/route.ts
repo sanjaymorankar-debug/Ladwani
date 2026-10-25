@@ -46,6 +46,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string; re
     return NextResponse.json({ message: "Only this family's Karta can respond to join requests" }, { status: 403 })
   }
 
+  // F15 (owner's decision): turning down a request to join gives a reason.
+  // Someone declining an invitation they received need not explain.
+  if (decision === 'REJECT' && joinRequest.direction !== 'KARTA_INVITE' && !String(body.note ?? '').trim()) {
+    return NextResponse.json({ message: 'Give a reason for rejecting the request' }, { status: 400 })
+  }
+
   // F15: on accept the Karta may correct the claimed relationship role.
   let roleCode = joinRequest.relationshipTypeCode
   let relativeTo = joinRequest.relatedToMemberId

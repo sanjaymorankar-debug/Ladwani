@@ -10,7 +10,7 @@ import { POST as addMember } from '@/app/api/families/[id]/members/route'
 import { DELETE as removeMember } from '@/app/api/families/[id]/members/[memberId]/route'
 import { POST as markDeceased, GET as deceasedForm } from '@/app/api/members/[id]/deceased/route'
 import { GET as viewDeathCert } from '@/app/api/members/[id]/death-certificate/route'
-import { PATCH as reviewApproval } from '@/app/api/approvals/[id]/route'
+import { PATCH as reviewApproval, GET as readApproval } from '@/app/api/approvals/[id]/route'
 import { PNG } from '../p1/fixtures'
 import fs from 'fs/promises'
 import path from 'path'
@@ -235,6 +235,13 @@ describe('F12 Death certificate (switched on at go-live)', () => {
     expect(value).toMatchObject({ deceasedPlace: 'Pune', certificateMime: 'image/png' })
     const raw = await fs.readFile(path.join(path.resolve(process.env.UPLOAD_DIR || 'uploads'), value.certificateKey))
     expect(raw.includes(PNG)).toBe(false) // not stored in the clear
+
+    // The request itself is for staff only (owner's decision) — not even the Karta who sent it.
+    const read = () => readApproval(new Request(`http://x/api/approvals/${approval.id}`), { params: { id: approval.id } })
+    actAs(k)
+    expect((await read()).status).toBe(403)
+    actAs(admin)
+    expect((await read()).status).toBe(200)
 
     // Only staff can open it — the Karta who uploaded it cannot.
     const view = (approvalId?: string) => viewDeathCert(new Request(`http://x/api/members/${old.memberId}/death-certificate${approvalId ? `?approvalId=${approvalId}` : ''}`), { params: { id: old.memberId } })

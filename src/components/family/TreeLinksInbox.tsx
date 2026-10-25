@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -16,12 +17,12 @@ export default function TreeLinksInbox({ familyId }: { familyId?: string }) {
   const [data, setData] = useState<{ incoming: any[]; outgoing: any[]; review: any[] } | null>(null)
   const [choice, setChoice] = useState<Record<string, Record<string, string>>>({})
   const load = useCallback(() => {
-    fetch(`/api/tree-links${familyId ? `?familyId=${familyId}` : ''}`).then((r) => (r.ok ? r.json() : null)).then(setData).catch(() => {})
+    fetch(`${BASE_PATH}/api/tree-links${familyId ? `?familyId=${familyId}` : ''}`).then((r) => (r.ok ? r.json() : null)).then(setData).catch(() => {})
   }, [familyId])
   useEffect(() => { load() }, [load])
 
   const act = async (id: string, body: object) => {
-    const res = await fetch(`/api/tree-links/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const res = await fetch(`${BASE_PATH}/api/tree-links/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const json = await res.json()
     if (!res.ok) return toast.error(json.message)
     toast.success(json.message); load()

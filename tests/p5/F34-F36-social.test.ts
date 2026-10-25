@@ -211,6 +211,7 @@ describe('F36 Posts to groups', () => {
     const body = await prisma.organisation.create({ data: { kind: 'DISTRICT_BODY', bodyKey: `DISTRICT_BODY:${geo.district}`, areaId: geo.district, name: 'Body', status: 'ACTIVE' } })
     await prisma.organisationMember.create({ data: { organisationId: body.id, memberId: b.memberId, designation: 'PRESIDENT', status: 'ACTIVE' } })
     actAs(b)
+    expect((await moderate(json('http://x', 'PATCH', { action: 'reject' }), { params: { id: postId } })).status).toBe(400) // a rejection gives a reason (owner's decision)
     expect((await moderate(json('http://x', 'PATCH', { action: 'approve' }), { params: { id: postId } })).status).toBe(200)
     expect(await sees(b, postId)).toBe(true)
     expect(await sees(c, postId)).toBe(false) // another district

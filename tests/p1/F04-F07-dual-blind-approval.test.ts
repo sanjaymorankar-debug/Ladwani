@@ -72,7 +72,7 @@ describe('F04 Assignment of two approvers', () => {
     for (const t of tasks) {
       expect([opA.userId, opB.userId, opC.userId]).toContain(t.operatorUserId)
       expect(t.districtAreaId).toBe(geo.district)
-      expect(await prisma.notification.count({ where: { recipientId: t.operatorUserId!, type: 'APPROVAL_TASK', data: { path: '$.taskId', equals: t.id } } })).toBe(1)
+      expect(await prisma.notification.count({ where: { recipientId: t.operatorUserId!, type: 'APPROVAL_TASK', data: { path: ['taskId'], equals: t.id } } })).toBe(1)
     }
     expect(tasks.map((t) => t.operatorUserId)).not.toContain(opFar.userId)
   })

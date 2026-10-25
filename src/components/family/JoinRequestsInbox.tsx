@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { UserPlus, Check, X, UserCheck } from 'lucide-react'
@@ -35,7 +36,7 @@ export default function JoinRequestsInbox({ familyId }: { familyId: string }) {
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = async () => {
-    const res = await fetch(`/api/families/${familyId}/join-requests`)
+    const res = await fetch(`${BASE_PATH}/api/families/${familyId}/join-requests`)
     if (res.ok) {
       const data = await res.json()
       setRequests(data.requests ?? [])
@@ -54,7 +55,7 @@ export default function JoinRequestsInbox({ familyId }: { familyId: string }) {
     setBusyId(r.id)
     try {
       const corrected = roles[r.id] && roles[r.id] !== r.relationshipTypeCode
-      const res = await fetch(`/api/families/${familyId}/join-requests/${r.id}`, {
+      const res = await fetch(`${BASE_PATH}/api/families/${familyId}/join-requests/${r.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision, note, ...(decision === 'APPROVE' && corrected ? { relationshipTypeCode: roles[r.id] } : {}) }),
@@ -71,8 +72,10 @@ export default function JoinRequestsInbox({ familyId }: { familyId: string }) {
   }
 
   const decideClaim = async (id: string, decision: 'CONFIRM' | 'REJECT') => {
+    const note = decision === 'REJECT' ? window.prompt('Reason for rejecting (shown to the person)')?.trim() : undefined
+    if (decision === 'REJECT' && !note) return
     setBusyId(id)
-    const res = await fetch(`/api/claims/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision }) })
+    const res = await fetch(`${BASE_PATH}/api/claims/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, note }) })
     const json = await res.json()
     setBusyId(null)
     if (!res.ok) return toast.error(json.message)

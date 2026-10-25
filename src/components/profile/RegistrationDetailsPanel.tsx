@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { MapPin } from 'lucide-react'
@@ -20,12 +21,12 @@ export default function RegistrationDetailsPanel({ memberId }: { memberId: strin
   const [sameAsCurrent, setSameAsCurrent] = useState(false)
 
   const load = useCallback(() => {
-    fetch(`/api/members/${memberId}/addresses`).then((r) => r.json()).then((d) => {
+    fetch(`${BASE_PATH}/api/members/${memberId}/addresses`).then((r) => r.json()).then((d) => {
       setAddresses(d.addresses ?? [])
       const perm = (d.addresses ?? []).find((a: any) => a.addressType === 'PERMANENT')
       setSameAsCurrent(!!perm?.sameAsCurrent)
     })
-    fetch(`/api/members/${memberId}`).then((r) => r.json()).then((m) => {
+    fetch(`${BASE_PATH}/api/members/${memberId}`).then((r) => r.json()).then((m) => {
       if (m.nativeVillage) setMulGaon({ village: m.nativeVillage, district: m.nativeDistrict, state: m.nativeState })
     })
   }, [memberId])
@@ -51,7 +52,7 @@ export default function RegistrationDetailsPanel({ memberId }: { memberId: strin
         <p className="text-sm"><span className="font-medium">Mul Gaon:</span> {mulGaon ? [mulGaon.village, mulGaon.district, mulGaon.state].filter(Boolean).join(', ') : 'Not set'}</p>
         <AreaCascadePicker idPrefix="mulgaon" onChange={setMulGaonPick} />
         <button type="button" className="btn-secondary text-sm" disabled={!mulGaonPick}
-          onClick={() => send(`/api/members/${memberId}/mul-gaon`, 'PUT', { areaId: mulGaonPick }, 'Mul Gaon saved')}>Save Mul Gaon</button>
+          onClick={() => send(`${BASE_PATH}/api/members/${memberId}/mul-gaon`, 'PUT', { areaId: mulGaonPick }, 'Mul Gaon saved')}>Save Mul Gaon</button>
         <p className="text-xs text-gray-400">Once your account is verified, a Mul Gaon change is checked again by two operators.</p>
       </section>
 
@@ -59,7 +60,7 @@ export default function RegistrationDetailsPanel({ memberId }: { memberId: strin
         <p className="text-sm"><span className="font-medium">Current address:</span> {place(current)}</p>
         <AreaCascadePicker idPrefix="current" onChange={setCurrentPick} />
         <button type="button" className="btn-secondary text-sm" disabled={!currentPick}
-          onClick={() => send(`/api/members/${memberId}/addresses`, 'PUT', {
+          onClick={() => send(`${BASE_PATH}/api/members/${memberId}/addresses`, 'PUT', {
             addressType: 'CURRENT', areaId: currentPick, line1: current?.line1, line2: current?.line2, pincode: current?.pincode,
           }, 'Current address village / city saved')}>Set current village / city</button>
         <p className="text-xs text-gray-400">House and street are edited in the address section above.</p>
@@ -81,7 +82,7 @@ export default function RegistrationDetailsPanel({ memberId }: { memberId: strin
           </>
         )}
         <button type="button" className="btn-secondary text-sm" disabled={!sameAsCurrent && !permPick}
-          onClick={() => send(`/api/members/${memberId}/addresses`, 'PUT', sameAsCurrent
+          onClick={() => send(`${BASE_PATH}/api/members/${memberId}/addresses`, 'PUT', sameAsCurrent
             ? { addressType: 'PERMANENT', sameAsCurrent: true }
             : { addressType: 'PERMANENT', areaId: permPick, line1: permLine, pincode: permPin }, 'Permanent address saved')}>
           Save permanent address

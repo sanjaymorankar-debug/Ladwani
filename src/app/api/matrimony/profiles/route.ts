@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   const p = (k: string) => url.searchParams.get(k)
   const memberWhere: any = { status: 'ACTIVE' }
   if (p('gender')) memberWhere.gender = p('gender')
-  if (p('city')) memberWhere.currentCity = { contains: p('city') }
+  if (p('city')) memberWhere.currentCity = { contains: p('city'), mode: 'insensitive' }
   if (p('minAge') || p('maxAge')) {
     const now = new Date()
     memberWhere.dateOfBirth = {}
@@ -34,8 +34,8 @@ export async function GET(req: NextRequest) {
     if (p('minAge')) memberWhere.dateOfBirth.lte = new Date(now.getFullYear() - parseInt(p('minAge')!), now.getMonth(), now.getDate())
   }
   if (p('education')) memberWhere.education = { some: { level: p('education') } }
-  if (p('occupation')) memberWhere.OR = [{ occupationCategory: { contains: p('occupation') } }, { employmentStatus: { contains: p('occupation') } }]
-  if (p('gotra')) memberWhere.families = { some: { leftAt: null, family: { gotra: { contains: p('gotra') } } } }
+  if (p('occupation')) memberWhere.OR = [{ occupationCategory: { contains: p('occupation'), mode: 'insensitive' } }, { employmentStatus: { contains: p('occupation'), mode: 'insensitive' } }]
+  if (p('gotra')) memberWhere.families = { some: { leftAt: null, family: { gotra: { contains: p('gotra'), mode: 'insensitive' } } } }
   if (p('district')) {
     const talukas = await prisma.area.findMany({ where: { parentId: p('district')! }, select: { id: true } })
     const villages = await prisma.area.findMany({ where: { parentId: { in: talukas.map((t) => t.id) } }, select: { id: true } })

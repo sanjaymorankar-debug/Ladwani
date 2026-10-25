@@ -16,6 +16,7 @@ import { SENSITIVE_FIELDS, openChangeRequest } from '@/lib/verification'
 import { REGISTRATION_STATUSES } from '@/lib/account-state'
 import { validateSettlement, chainText } from '@/lib/locations'
 import { recordAudit } from '@/lib/audit'
+import { EDUCATION_CORE_SELECT, BUSINESS_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 const MARITAL_STATUSES = ['UNMARRIED', 'MARRIED', 'WIDOWED', 'DIVORCED', 'SEPARATED', 'NOT_STATED']
 const GENDERS = ['MALE', 'FEMALE', 'OTHER', 'NOT_STATED']
@@ -27,9 +28,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const member = await prisma.member.findUnique({
     where: { id: params.id, deletedAt: null },
     include: {
-      education: true,
+      education: { select: EDUCATION_CORE_SELECT },
       employment: { include: { incomeRange: true } },
-      businesses: true,
+      businesses: { select: BUSINESS_CORE_SELECT },
       skills: { include: { skill: true } },
     },
   })

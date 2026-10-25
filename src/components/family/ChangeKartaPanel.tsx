@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { Crown } from 'lucide-react'
@@ -16,7 +17,7 @@ export default function ChangeKartaPanel({ familyId, candidates }: { familyId: s
     if (!target) return toast.error('Choose the new Karta')
     setBusy(true)
     try {
-      const res = await fetch(`/api/families/${familyId}/karta`, {
+      const res = await fetch(`${BASE_PATH}/api/families/${familyId}/karta`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newKartaMemberId: target, reason }),

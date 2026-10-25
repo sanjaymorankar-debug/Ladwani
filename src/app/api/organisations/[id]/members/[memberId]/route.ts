@@ -64,6 +64,9 @@ export async function POST(req: Request, { params }: { params: { id: string; mem
           await tx.organisationMember.update({ where: { id: m.id }, data: { designation: post, pendingDesignation: null, termStart: new Date(), termEnd: null } })
         })
         await audit('handover.accept', { designation: m.designation }, { designation: post })
+        // Filling a vacant post (e.g. a group copied without a Treasurer) can
+        // complete an approved organisation's three office bearers.
+        await maybeActivate(org.id)
         await syncPromotions(org.id, actorId)
         return NextResponse.json({ message: `You are now ${post.toLowerCase()}` })
       }
@@ -74,6 +77,7 @@ export async function POST(req: Request, { params }: { params: { id: string; mem
     case 'reject': {
       if (!(await manage())) return NextResponse.json({ message: 'Only the President or Secretary decides' }, { status: 403 })
       if (m.status !== 'REQUESTED') return NextResponse.json({ message: 'No open request' }, { status: 409 })
+      if (body.action === 'reject' && !String(body.reason ?? '').trim()) return NextResponse.json({ message: 'Give a reason' }, { status: 400 })
       const status = body.action === 'approve' ? 'ACTIVE' : 'DECLINED'
       await prisma.organisationMember.update({ where: { id: m.id }, data: { status, joinedAt: status === 'ACTIVE' ? new Date() : null, endReason: status === 'DECLINED' ? (body.reason ?? null) : null } })
       await audit(body.action, { status: 'REQUESTED' }, { status })

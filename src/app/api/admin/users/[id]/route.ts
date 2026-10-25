@@ -37,7 +37,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     },
   })
   if (!user) return NextResponse.json({ message: 'Not found' }, { status: 404 })
-  return NextResponse.json(user)
+  // Districts and states for scoping the community-team roles.
+  const teamAreas = await prisma.area.findMany({ where: { type: { in: ['DISTRICT', 'STATE'] }, isActive: true }, select: { id: true, name: true, type: true }, orderBy: { name: 'asc' } })
+  return NextResponse.json({ ...user, teamAreas })
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {

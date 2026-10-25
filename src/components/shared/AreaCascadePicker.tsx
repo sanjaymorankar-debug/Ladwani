@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 
 interface AreaOption { id: string; name: string; type: string }
@@ -28,7 +29,7 @@ export default function AreaCascadePicker({ onChange, idPrefix = 'area', upTo }:
   const [chosen, setChosen] = useState<string[]>(['', '', '', ''])
 
   const load = (level: number, parentId?: string) =>
-    fetch(parentId ? `/api/areas?parentId=${parentId}` : '/api/areas')
+    fetch(parentId ? `${BASE_PATH}/api/areas?parentId=${parentId}` : `${BASE_PATH}/api/areas`)
       .then((r) => r.json())
       .then((d) => setOptions((prev) => {
         const next = [...prev]

@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Crown } from 'lucide-react'
@@ -10,10 +11,10 @@ import { Crown } from 'lucide-react'
  */
 export default function VacancyConfirmList() {
   const [data, setData] = useState<{ nominations: any[]; vacancies: any[] } | null>(null)
-  const load = () => fetch('/api/karta-transfers').then((r) => r.json()).then(setData).catch(() => {})
+  const load = () => fetch(`${BASE_PATH}/api/karta-transfers`).then((r) => r.json()).then(setData).catch(() => {})
   useEffect(() => { load() }, [])
   const act = async (id: string, body: object) => {
-    const res = await fetch(`/api/karta-transfers/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const res = await fetch(`${BASE_PATH}/api/karta-transfers/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const json = await res.json()
     if (!res.ok) return toast.error(json.message)
     toast.success(json.message); load()

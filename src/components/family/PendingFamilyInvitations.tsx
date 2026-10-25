@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Users, Loader2, Check, X } from 'lucide-react'
@@ -21,7 +22,7 @@ export default function PendingFamilyInvitations() {
   const [loading, setLoading] = useState(true)
 
   const load = () =>
-    fetch('/api/my/family-invitations')
+    fetch(`${BASE_PATH}/api/my/family-invitations`)
       .then((r) => (r.ok ? r.json() : { invitations: [] }))
       .then((d) => setInvitations(d.invitations ?? []))
       .catch(() => {})
@@ -32,7 +33,7 @@ export default function PendingFamilyInvitations() {
   const respond = async (inv: Invitation, decision: 'APPROVE' | 'REJECT') => {
     setBusyId(inv.id)
     try {
-      const res = await fetch(`/api/families/${inv.familyId}/join-requests/${inv.id}`, {
+      const res = await fetch(`${BASE_PATH}/api/families/${inv.familyId}/join-requests/${inv.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision }),

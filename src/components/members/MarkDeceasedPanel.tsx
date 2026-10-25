@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -15,7 +16,7 @@ export default function MarkDeceasedPanel({ memberId, memberName }: { memberId: 
 
   useEffect(() => {
     if (!open) return
-    fetch(`/api/members/${memberId}/deceased`).then((r) => r.json()).then((j) => setCertRequired(!!j.certificateRequired)).catch(() => {})
+    fetch(`${BASE_PATH}/api/members/${memberId}/deceased`).then((r) => r.json()).then((j) => setCertRequired(!!j.certificateRequired)).catch(() => {})
   }, [open, memberId])
 
   const submit = async () => {
@@ -27,7 +28,7 @@ export default function MarkDeceasedPanel({ memberId, memberName }: { memberId: 
       const fd = new FormData()
       Object.entries(form).forEach(([k, v]) => fd.append(k, v))
       if (certificate) fd.append('certificate', certificate)
-      const res = await fetch(`/api/members/${memberId}/deceased`, { method: 'POST', body: fd })
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/deceased`, { method: 'POST', body: fd })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message)
       toast.success(json.message)

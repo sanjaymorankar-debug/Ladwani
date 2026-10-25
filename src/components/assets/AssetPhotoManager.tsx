@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Camera, Trash2, Loader2, Upload } from 'lucide-react'
@@ -8,7 +9,7 @@ interface AssetPhoto { id: string; caption: string | null }
 function Thumb({ photoId }: { photoId: string }) {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
-    fetch(`/api/photos/${photoId}/url?variant=thumbnail`)
+    fetch(`${BASE_PATH}/api/photos/${photoId}/url?variant=thumbnail`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setUrl(d.url))
       .catch(() => {})
@@ -27,7 +28,7 @@ export default function AssetPhotoManager({ assetId, canManage }: { assetId: str
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = () =>
-    fetch(`/api/assets/${assetId}/photos`)
+    fetch(`${BASE_PATH}/api/assets/${assetId}/photos`)
       .then((r) => r.json())
       .then((d) => setPhotos(d.photos ?? []))
       .catch(() => {})
@@ -41,7 +42,7 @@ export default function AssetPhotoManager({ assetId, canManage }: { assetId: str
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const res = await fetch(`/api/assets/${assetId}/photos`, { method: 'POST', body: fd })
+      const res = await fetch(`${BASE_PATH}/api/assets/${assetId}/photos`, { method: 'POST', body: fd })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message)
       toast.success('Photo added')
@@ -55,7 +56,7 @@ export default function AssetPhotoManager({ assetId, canManage }: { assetId: str
   }
 
   const remove = async (photoId: string) => {
-    await fetch(`/api/assets/${assetId}/photos?photoId=${photoId}`, { method: 'DELETE' })
+    await fetch(`${BASE_PATH}/api/assets/${assetId}/photos?photoId=${photoId}`, { method: 'DELETE' })
     setPhotos((p) => p.filter((x) => x.id !== photoId))
   }
 

@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   const [own, active] = await Promise.all([
     prisma.organisation.findMany({ where: { id: { in: ids } }, orderBy: { createdAt: 'desc' } }),
     prisma.organisation.findMany({
-      where: { status: 'ACTIVE', ...(q ? { name: { contains: q } } : {}) }, orderBy: [{ kind: 'asc' }, { name: 'asc' }], take: 100,
+      where: { status: 'ACTIVE', ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}) }, orderBy: [{ kind: 'asc' }, { name: 'asc' }], take: 100,
       select: { id: true, name: true, kind: true, areaId: true, purpose: true, town: true },
     }),
   ])

@@ -1,8 +1,9 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn, getSession } from 'next-auth/react'
-import { resolveDashboardPath } from '@/lib/dashboard-routing'
+import { resolveCallbackPath, resolveDashboardPath } from '@/lib/dashboard-routing'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -24,7 +25,13 @@ function LoginForm() {
   // An explicit callbackUrl (from a protected-route redirect, or from the
   // "finish signing up" link after registration) always wins; otherwise we
   // pick the dashboard that matches the user's role once we have a session.
-  const explicitCallbackUrl = searchParams.get('callbackUrl')
+  // It may carry the basePath (the middleware's redirect adds it) and must
+  // stay on this site; resolveCallbackPath normalises both.
+  const explicitCallbackUrl = resolveCallbackPath(
+    searchParams.get('callbackUrl'),
+    BASE_PATH,
+    typeof window === 'undefined' ? undefined : window.location.origin,
+  )
   const [showPwd, setShowPwd] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   // F32: Admin accounts get an emailed second-factor code after the password.
@@ -58,7 +65,7 @@ function LoginForm() {
       // Pre-flight check first: NextAuth collapses every authorize() failure
       // into a generic "CredentialsSignin" error, so we can't tell suspended
       // from locked from wrong-password through signIn() alone.
-      const checkRes = await fetch('/api/auth/login-check', {
+      const checkRes = await fetch(`${BASE_PATH}/api/auth/login-check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier: data.identifier, password: data.password }),
@@ -78,7 +85,7 @@ function LoginForm() {
         identifier: data.identifier,
         password: data.password,
         redirect: false,
-        callbackUrl: explicitCallbackUrl ?? '/dashboard',
+        callbackUrl: `${BASE_PATH}${explicitCallbackUrl ?? '/dashboard'}`,
       })
       if (res?.error) {
         toast.error('Something went wrong. Please try again.')

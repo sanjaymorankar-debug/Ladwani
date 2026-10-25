@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Heart, Eye, EyeOff, Edit, Loader2, ArrowLeft } from 'lucide-react'
@@ -13,7 +14,7 @@ export default function MyMatrimonyProfilePage() {
   const [details, setDetails] = useState({ expectations: '', horoscope: '', contactPreference: 'SELF', heightCm: '' })
 
   useEffect(() => {
-    fetch('/api/matrimony/profiles/mine')
+    fetch(`${BASE_PATH}/api/matrimony/profiles/mine`)
       .then((r) => r.json())
       .then((d) => {
         setProfile(d.profile); setEligibility(d.eligibility ?? { ok: true })
@@ -26,7 +27,7 @@ export default function MyMatrimonyProfilePage() {
     if (!profile) return
     setIsToggling(true)
     try {
-      const res = await fetch(`/api/matrimony/profiles/${profile.id}`, {
+      const res = await fetch(`${BASE_PATH}/api/matrimony/profiles/${profile.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isVisible: !profile.isVisible }),
@@ -40,7 +41,7 @@ export default function MyMatrimonyProfilePage() {
   }
 
   const saveDetails = async () => {
-    const res = await fetch(`/api/matrimony/profiles/${profile.id}`, {
+    const res = await fetch(`${BASE_PATH}/api/matrimony/profiles/${profile.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...details, heightCm: details.heightCm ? Number(details.heightCm) : null }),
     })

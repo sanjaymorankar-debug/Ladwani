@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { canViewPhoto, canGetOriginal } from '@/lib/photo-access'
 import { getObject } from '@/lib/storage'
+import { getPostAccess } from '@/lib/interest-groups'
 
 /**
  * Streams a stored image, re-checking visibility on every request.
@@ -25,6 +26,11 @@ export async function GET(req: Request, { params }: { params: { photoId: string 
   // (photo-access.ts); a reported-and-hidden photo only its uploader and staff.
   if (!(await canViewPhoto(session, photo))) {
     return NextResponse.json({ message: photo.status === 'ACTIVE' ? 'Forbidden' : 'Not found' }, { status: photo.status === 'ACTIVE' ? 403 : 404 })
+  }
+
+  // Photos on interest-group posts are visible only inside that group.
+  if (photo.postId && !(await getPostAccess(session, photo.postId)).allowed) {
+    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
   }
 
   const { searchParams } = new URL(req.url)

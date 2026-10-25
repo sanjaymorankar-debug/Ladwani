@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -34,8 +35,8 @@ export default function VerificationPage() {
   const [claims, setClaims] = useState<{ matches: any[]; claims: any[] }>({ matches: [], claims: [] })
 
   const load = useCallback(() => {
-    fetch('/api/claims').then((r) => (r.ok ? r.json() : { matches: [], claims: [] })).then(setClaims).catch(() => {})
-    return fetch('/api/verification').then((r) => r.json()).then(setData)
+    fetch(`${BASE_PATH}/api/claims`).then((r) => (r.ok ? r.json() : { matches: [], claims: [] })).then(setClaims).catch(() => {})
+    return fetch(`${BASE_PATH}/api/verification`).then((r) => r.json()).then(setData)
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -58,13 +59,13 @@ export default function VerificationPage() {
     if (!proof || !signed) return toast.error('Choose both files')
     const form = new FormData()
     form.set('idType', idType); form.set('idNumber', idNumber); form.set('proof', proof); form.set('selfSigned', signed)
-    if (await call('/api/verification/id-proof', { method: 'POST', body: form })) { setIdNumber(''); setProof(null); setSigned(null) }
+    if (await call(`${BASE_PATH}/api/verification/id-proof`, { method: 'POST', body: form })) { setIdNumber(''); setProof(null); setSigned(null) }
   }
   const sendCode = async () => {
-    if (await call('/api/verification/declaration', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'send-otp' }) })) setCodeSent(true)
+    if (await call(`${BASE_PATH}/api/verification/declaration`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'send-otp' }) })) setCodeSent(true)
   }
   const agreeAndSubmit = () =>
-    call('/api/verification/declaration', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'agree', agree, otp }) })
+    call(`${BASE_PATH}/api/verification/declaration`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'agree', agree, otp }) })
 
   if (!data) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-saffron-500" /></div>
   const s = STATUS_TEXT[data.status] ?? STATUS_TEXT.DRAFT
@@ -93,7 +94,7 @@ export default function VerificationPage() {
             <div key={m.memberId} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-3">
               <span><strong>{m.name}</strong>{m.birthYear ? `, born ${m.birthYear}` : ''}{m.mulGaon ? ` · ${m.mulGaon}` : ''} · {m.families.map((f: any) => f.name).join(', ')} family</span>
               <button type="button" className="btn-primary text-xs" disabled={busy}
-                onClick={() => call('/api/claims', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId: m.memberId }) })}>This is me</button>
+                onClick={() => call(`${BASE_PATH}/api/claims`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId: m.memberId }) })}>This is me</button>
             </div>
           ))}
         </div>
@@ -123,8 +124,8 @@ export default function VerificationPage() {
               <li key={p.id} className="flex items-center justify-between">
                 <span>{p.idType.replace('_', ' ')} · {p.masked}{p.status === 'PENDING_CHANGE' ? ' (new — awaiting verification)' : ''}</span>
                 <span className="flex gap-3">
-                  <a className="text-saffron-600" href={`/api/id-proofs/${p.id}/file?kind=proof`} target="_blank" rel="noreferrer">Proof</a>
-                  <a className="text-saffron-600" href={`/api/id-proofs/${p.id}/file?kind=selfSigned`} target="_blank" rel="noreferrer">Self-signed</a>
+                  <a className="text-saffron-600" href={`${BASE_PATH}/api/id-proofs/${p.id}/file?kind=proof`} target="_blank" rel="noreferrer">Proof</a>
+                  <a className="text-saffron-600" href={`${BASE_PATH}/api/id-proofs/${p.id}/file?kind=selfSigned`} target="_blank" rel="noreferrer">Self-signed</a>
                 </span>
               </li>
             ))}

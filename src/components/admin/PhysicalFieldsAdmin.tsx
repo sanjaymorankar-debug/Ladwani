@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 
@@ -15,14 +16,14 @@ export default function PhysicalFieldsAdmin() {
   const [config, setConfig] = useState<Record<string, boolean> | null>(null)
 
   useEffect(() => {
-    fetch('/api/settings/physical-fields').then((r) => r.json()).then((d) => setConfig(d.config))
+    fetch(`${BASE_PATH}/api/settings/physical-fields`).then((r) => r.json()).then((d) => setConfig(d.config))
   }, [])
 
   const toggle = async (key: string) => {
     if (!config) return
     const next = { ...config, [key]: !config[key] }
     setConfig(next)
-    const res = await fetch('/api/settings/physical-fields', {
+    const res = await fetch(`${BASE_PATH}/api/settings/physical-fields`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(next),

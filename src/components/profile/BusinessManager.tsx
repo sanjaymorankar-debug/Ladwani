@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Building2, Plus, Trash2, Globe } from 'lucide-react'
@@ -28,7 +29,7 @@ export default function BusinessManager({ memberId }: { memberId: string }) {
   const [form, setForm] = useState(EMPTY)
 
   const load = () =>
-    fetch(`/api/members/${memberId}`)
+    fetch(`${BASE_PATH}/api/members/${memberId}`)
       .then((r) => r.json())
       .then((d) => setRecords(d.businesses ?? []))
 
@@ -40,7 +41,7 @@ export default function BusinessManager({ memberId }: { memberId: string }) {
     if (!form.businessName.trim()) return toast.error('Business name is required')
     setBusy(true)
     try {
-      const res = await fetch(`/api/members/${memberId}/business`, {
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/business`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -57,7 +58,7 @@ export default function BusinessManager({ memberId }: { memberId: string }) {
   }
 
   const toggleActive = async (r: BusinessRecord) => {
-    const res = await fetch(`/api/members/${memberId}/business/${r.id}`, {
+    const res = await fetch(`${BASE_PATH}/api/members/${memberId}/business/${r.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isActive: !r.isActive }),
@@ -67,7 +68,7 @@ export default function BusinessManager({ memberId }: { memberId: string }) {
   }
 
   const remove = async (id: string) => {
-    await fetch(`/api/members/${memberId}/business/${id}`, { method: 'DELETE' })
+    await fetch(`${BASE_PATH}/api/members/${memberId}/business/${id}`, { method: 'DELETE' })
     setRecords((r) => r.filter((x) => x.id !== id))
   }
 

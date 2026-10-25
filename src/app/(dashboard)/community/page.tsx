@@ -14,7 +14,8 @@ export default async function CommunityFeedPage() {
   const [posts, postTypes] = await Promise.all([
     prisma.post.findMany({
       // F36: only posts whose audience includes the viewer (and their own); authors' names only.
-      where: await feedWhere(session),
+      // Interest-group posts stay inside their group.
+      where: { AND: [await feedWhere(session), { groupId: null }] },
       include: {
         author: AUTHOR_SELECT,
         postType: { select: { label: true, icon: true, code: true } },
@@ -23,7 +24,7 @@ export default async function CommunityFeedPage() {
       orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
       take: 30,
     }),
-    prisma.postType.findMany({ where: { isActive: true }, orderBy: { code: 'asc' } }),
+    prisma.postType.findMany({ where: { isActive: true, NOT: { code: { startsWith: 'GROUP_' } } }, orderBy: { code: 'asc' } }),
   ])
 
   return (

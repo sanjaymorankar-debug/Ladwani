@@ -26,9 +26,10 @@ Tick each line and note anything unexpected. The automated test for each flow is
 - [ ] F10 Add a member; a "Daughter" who is male is refused; duplicate name + DOB is refused.
 - [ ] F11 Remove a member with a reason; their other family is unaffected.
 - [ ] F12 Mark a member Expired (shown as "Late"). If they were Karta, the family becomes Karta-vacant.
-- [ ] F12 Attach a death certificate to the request. The Operator/Admin opens it from the review screen; the Karta cannot open it. (On test the certificate is optional; to try the go-live rule, run `set_death_certificate_required_on.sql` and check that a request without one is refused.)
+- [ ] F12 Attach a death certificate to the request. The Operator/Admin opens it from the review screen; the Karta cannot open it. (On test the certificate is optional; to try the go-live rule, run `scripts/postgres/set-death-certificate-required-on.sql` and check that a request without one is refused.)
 - [ ] F13 Add a new-born: choose father and mother; the name may be "Baby of …".
 - [ ] F14/F15 A non-member requests to join; the Karta corrects the role and accepts, or rejects with a reason.
+- [ ] F15/F17/F27/F36 Try to reject a join request, a claim, an organisation join request and a post without a reason: each is refused until a reason is given. Declining an invitation needs none.
 - [ ] F16 Karta hand-over (the nominee accepts, then an Admin approves) and vacancy (the district Operator confirms).
 - [ ] F17 A new registrant finds their Karta-made profile, says "This is me", and the Karta confirms the merge.
 - [ ] F18 The district Operator changes a member's role with a remark.
@@ -42,11 +43,14 @@ Tick each line and note anything unexpected. The automated test for each flow is
 - [ ] F24 Someone in two families sees "My Families" with a role in each.
 - [ ] F25 Tree: zoom, collapse, person card, jump icon, Print / Save as PDF. Someone from an unrelated family gets "not found".
 
+- [ ] F21 (data fix, test branch) Run `scripts/postgres/data-fixes/fix_relationship_gender_preview.sql`, check the list, run `..._apply.sql`: the listed people now show the right relationship (e.g. mother, not father). `..._rollback.sql` puts them back.
+
 ## P4 — Organisations
 - [ ] F26 Create a local organisation: name, start date, taluka (State › District › Taluka), town, President / Secretary / Chairman and other members (certificate optional). Everyone named accepts; two Operators of the district approve → ACTIVE.
 - [ ] F27 Invite / accept, request / approve, hand the President post over (the new holder accepts), set a term.
 - [ ] F28 Once active, its President, Secretary and Chairman appear as members of the LadWani District organisation automatically (no nomination), and get the District team view.
 - [ ] F29–F30 An Admin or an Operator of the district appoints the District organisation's President / Secretary / Chairman (they accept) → they appear in the State organisation; the same from State to Country (Country: Admin only).
+- [ ] F26 (groups) Admin → Settings → Convert Groups to Organisations: check the preview (taluka, town, posts, people not carried over), press Copy, accept as the invited members, approve as two Operators; fill a vacant post by hand-over → ACTIVE. Undo removes copies not yet active; the groups are unchanged.
 - [ ] F31 Hand a local post to someone else → the old holder's seats above end and their access goes; the new holder goes up instead.
 
 ## P5 — Social and bureau

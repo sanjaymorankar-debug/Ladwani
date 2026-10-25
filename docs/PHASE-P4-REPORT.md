@@ -1,5 +1,7 @@
 # Phase P4 — Organisations and LadWani bodies: delivery report
 
+> **Database update (25 Oct 2026):** LadWani runs on **PostgreSQL** (Neon). This report was written when the work was on MySQL; its phpMyAdmin scripts and MySQL migrations were replaced by one PostgreSQL migration and `scripts/postgres/`. See [`POSTGRESQL-PORT.md`](POSTGRESQL-PORT.md); its steps replace the MySQL ones below.
+
 Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as P0–P3).
 
 ## 1. Gap analysis (Phase = P4, flows F26–F31)
@@ -111,7 +113,7 @@ There are no new environment keys. The existing `ID_PROOF_KEY` encrypts certific
 
 ## 8. Decisions needed
 1. ~~**OP-06**~~ — decided: the old council design is replaced by Taluka → District → State → Country (§9).
-2. **Community groups vs organisations:** keep both, or later turn mandals into organisations? Doing that would rename CONVENER to PRESIDENT in existing rows and needs your yes. *(Not answered yet; groups are untouched.)*
+2. ~~**Community groups vs organisations**~~ — decided: groups are copied into organisations; the groups themselves are kept (§10).
 3. ~~**Body Presidents**~~ — decided: an Admin, or an Operator of the area, appoints each LadWani organisation's President, Secretary and Chairman from its members (§9).
 
 ## 9. Follow-up: local (taluka) organisations and automatic promotion (your decisions)
@@ -159,4 +161,42 @@ There are no new environment keys. The existing `ID_PROOF_KEY` encrypts certific
   **414 passed** twice in a row on a fresh database; typecheck clean; build OK.
 - **Browser check (production build):** the "Create a local organisation" form shows Organisation name, Start date, State › District › Taluka (no village level), City / town, President / Secretary / Chairman and "Add a member", with no Treasurer.
 
-**Still open:** turning community groups (mandals) into organisations (decision 2 above).
+**Then decided:** turning community groups (mandals) into organisations (§10).
+
+## 10. Follow-up: community groups become local organisations (your decisions)
+**What you decided:**
+- Turn groups into organisations.
+- Each copy is checked by two Operators.
+- Keep both: the group is not changed.
+- Map the roles and leave a missing post vacant.
+- Work out the taluka where possible, and list the groups where it is not.
+
+**How it works:** an Admin opens **Settings → Convert Groups to Organisations** (`/admin/group-conversion`). The screen lists every ACTIVE group with what its organisation will look like, and has **Copy N ready group(s)** and **Undo copies not yet active** buttons. Nothing is copied until the Admin presses Copy. Run it on test first.
+
+| Group | Organisation |
+|---|---|
+| Name, description | Name, purpose |
+| Convener / Secretary / Treasurer | President / Secretary / Chairman. If two people hold the same role, the earlier one gets the post and the other becomes a Member. A role nobody holds stays **vacant**. |
+| Other roster members | Members |
+| Place | **Taluka:** the group's own taluka (or city), or the taluka above its village. **Town:** the village / town, or the taluka's name. A group placed at district level or above, or with no place, is listed as "Needs a taluka" and not copied. Set its place on the group and copy again. |
+| Created on | Start date |
+| Status ACTIVE | A new organisation, PENDING_APPROVAL. Groups that are pending, rejected or inactive are not copied. |
+
+- **People:** only registered members (active, with an active login) are carried over, as for any organisation. Profiles without a login are listed under "Not carried over".
+- **Who applies:** the convener is the applicant and is President at once, as when someone names themselves on the form. Everyone else is invited, is notified, and accepts or declines on the Organisations page. With no convener, the Admin running the copy is the applicant.
+- **Checks:** the usual two-Operator round of the district (F26). The organisation becomes ACTIVE once both Operators approve and all three posts are filled and accepted. Its office bearers then move up to the District organisation (F28).
+- **Vacant post:** the President or Secretary (or an Admin) hands the post to an active member, who accepts. **Fixed on the way:** accepting a hand-over did not re-check activation, so an approved organisation whose last post was filled this way would have stayed pending. It now activates.
+- **Undo:** removes every copy that is not ACTIVE yet, with its invitations and verification tasks. An ACTIVE copy is kept: it is a real organisation by then, with seats on the District body, and is ended like any other. Groups are never touched. A removed copy can be made again.
+- **Safe to run twice:** each group is copied at most once (`organisations.sourceGroupId` is unique).
+- **Audited:** `organisation.convert_from_group` (with vacant posts and the people not carried over) and `organisation.convert_from_group.undo`.
+- **Migration** `20261025090000_group_conversion` (+ `down.sql`; phpMyAdmin: `add_group_conversion.sql`) adds one nullable column `organisations.sourceGroupId` with a unique index, and no data changes. **Rollback:** press Undo first, then `down.sql` drops the index and the column. Checked on a scratch database: deploy → `down.sql` → phpMyAdmin script → `prisma migrate status` up to date, `migrate diff` no difference.
+- **Tests added:** `tests/p4/F26-groups-to-organisations.test.ts`, 5 tests:
+  - Admin only.
+  - The preview maps roles, derives taluka and town from a village, uses the creation date, skips a profile without a login, lists district-level and unplaced groups, and ignores a pending group.
+  - Apply creates a pending organisation (the convener is President; the others are invited and notified), two Operator tasks, and an audit entry. The group is unchanged, and a second run copies nothing.
+  - A vacant Chairman: approved but not active until the post is taken by hand-over, then active with 3 seats on the District body.
+  - Undo removes the pending copy and keeps the active one and every group.
+
+  No existing test changed. **427 passed**, twice in a row on a fresh database; typecheck clean; build OK.
+- **Browser check (production build):** Admin → Settings → Convert Groups to Organisations shows a sample group: "Ready · Taluka: Daskroi · Town: Aslali", with President and Secretary mapped and "Chairman: vacant". After Copy it shows "Copied" with a link that opens the new organisation. A member calling the API gets 403.
+- **Differs from what I offered:** I said "an Admin/Operator" fills a vacant post. In fact an Admin or the organisation's own President / Secretary fills it. Operators appoint posts only on the LadWani District / State bodies (your earlier decision), so I did not widen that.

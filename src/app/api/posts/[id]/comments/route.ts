@@ -3,13 +3,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireActiveAccount } from '@/lib/account-state'
-import { canViewPost, AUTHOR_SELECT } from '@/lib/posts'
+import { AUTHOR_SELECT } from '@/lib/posts'
+import { canSeePost } from '@/lib/post-access'
 
-// Comments follow the post: only its audience reads or writes them, and only
-// authors' names are returned (never the user record).
+// Comments follow the post: only its audience (or, in an interest group, its
+// members) reads or writes them, and only authors' names are returned.
 async function visiblePost(session: any, id: string) {
   const post = await prisma.post.findUnique({ where: { id } })
-  return post && (await canViewPost(session, post)) ? post : null
+  return post && (await canSeePost(session, post)) ? post : null
 }
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
