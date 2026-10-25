@@ -19,9 +19,10 @@ export default function PostModerationQueue({ posts }: { posts: PendingPost[] })
   const [resolved, setResolved] = useState<string[]>([])
 
   const act = async (id: string, action: 'approve' | 'reject' | 'hide') => {
+    const note = action === 'reject' ? window.prompt('Reason for rejecting (shown to the author):')?.trim() : undefined
+    if (action === 'reject' && !note) return
     setBusyId(id)
     try {
-      const note = action === 'reject' ? window.prompt('Reason for rejecting (shown to the author):') ?? undefined : undefined
       const res = await fetch(`/api/posts/${id}/moderate`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

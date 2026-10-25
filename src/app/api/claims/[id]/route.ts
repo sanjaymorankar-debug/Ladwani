@@ -7,7 +7,7 @@ import { mergeClaim } from '@/lib/claims'
 import { recordAudit } from '@/lib/audit'
 import { notifyUser } from '@/lib/notify'
 
-/** F17 — the Karta (or an Admin) confirms or rejects a claim: { decision: 'CONFIRM' | 'REJECT', note? }. */
+/** F17 — the Karta (or an Admin) confirms or rejects a claim: { decision: 'CONFIRM' | 'REJECT', note } (a rejection gives the reason). */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -19,6 +19,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const body = await req.json().catch(() => ({}))
   if (body.decision === 'REJECT') {
+    if (!String(body.note ?? '').trim()) return NextResponse.json({ message: 'Give a reason for rejecting the claim' }, { status: 400 })
     await prisma.profileClaim.update({ where: { id: claim.id }, data: { status: 'REJECTED', decidedBy: session.user.id, decidedAt: new Date(), note: body.note ?? null } })
     await recordAudit({ actorId: session.user.id, action: 'member.claim.reject', entityType: 'profile_claim', entityId: claim.id, oldValue: { status: 'PENDING' }, newValue: { status: 'REJECTED', note: body.note ?? null } }, req)
     await notifyUser({ userId: claim.userId, type: 'PROFILE_CLAIM', title: 'Your profile claim was not confirmed', body: body.note ?? undefined })

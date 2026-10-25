@@ -117,7 +117,7 @@ A browser run against the production build covered:
 - **Deliverable "Production release"** — ⏳ waiting for your instruction (production not touched).
 
 ## 9. Decisions needed
-1. **Production go-live:** when, and who runs the steps above?
+1. ~~**Production go-live**~~ — your answer: everything stays on **test only** until you say otherwise. Production is not touched.
 2. ~~**Content-Security-Policy and rate limiting**~~ — decided: build them (§11).
 3. ~~**Operator access to global counts**~~ — decided: Admin only (§10).
 

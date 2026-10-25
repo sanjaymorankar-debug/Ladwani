@@ -119,7 +119,7 @@ No new environment keys.
 ## 8. Decisions needed
 1. ~~**Admin review of a Karta change.**~~ — decided: keep it (§9).
 2. ~~**Review queue for marking Expired.**~~ — decided: the review stays, and a death certificate is added (§10).
-3. **Reject without a reason (F15).** The workbook says reject with a reason. The inbox now asks for one, but the API still accepts a rejection without it, because the existing test TC-FAM-009 rejects without a note and expects success. Enforce it in the API? That test would then need a note added.
+3. ~~**Reject without a reason (F15)**~~ — decided: every rejection gives a reason (§11).
 4. **"Removed from friend lists" (F12)** waits for P5, because no friend/connection table exists yet.
 
 ## 9. Follow-up: the Admin review of Karta hand-overs stays (your decision)
@@ -141,5 +141,28 @@ No new environment keys.
   - Setting off: the form shows "Death certificate (optional)"; the Karta submits with a PNG → "Submitted for review"; the Karta opening the file gets 404; an Operator sees "View death certificate" on the review screen, and it opens (200, image/png).
   - Setting on: the form shows "(required)"; submitting without a file shows "Attach the death certificate", and the API returns 400.
   - A production build without `ID_PROOF_KEY` refuses to store the file (503, "File storage is not configured"), as for ID proofs. The key is already in the P6 runbook step 3.
-- **Still open in §8:** whether the API must refuse a rejection without a reason (F15, item 3). Your reply did not say; it needs your permission to change the existing test TC-FAM-009.
 - **Finding (from before this PR, not changed):** `GET /api/approvals/[id]` returns any request to any signed-in user who knows its id. The certificate itself is safe (the viewer above checks the role), but the request's details are not. Limit it to staff and the person who submitted it? That would change an existing route, so I have not touched it.
+
+## 11. Follow-up: every rejection gives a reason (your decision)
+- **Rule:** when someone reviewing a request turns it down, the API now refuses to do so without a reason (blank or spaces count as none). The reason is stored and sent to the person, as before.
+
+| Where | Action | Before |
+|---|---|---|
+| Family join request (F15) | Karta rejects | reason optional in the API (the inbox already asked) |
+| Review queue §28 (`/api/approvals/[id]`): Karta change, Expired, spouse link, … | reject, **send back** | optional |
+| Profile claim (F17) | Karta rejects | optional, and the inbox did not ask |
+| Organisation join request (F27) | President / Secretary rejects | optional in the API (the page already asked) |
+| Post moderation (F36) | reject | optional; an empty prompt was sent |
+| Already required | Operator verification reject / send back (F04–F07), tree-link reject (F22), data-deletion reject (F40) | unchanged |
+
+- **Not included on purpose:** a person declining something offered *to them*: an invitation to a family, a Karta or office nomination, a friend request, a marriage interest. That is their own choice, and asking them to explain would be intrusive (and for the bureau, unkind). Hiding a live post keeps its optional note.
+- **Screens:** the claim "Reject" button now asks for the reason; post moderation stops if the reason prompt is empty; the review screen labels the note "required to reject or send back" and checks it before sending.
+- **No migration, no data change.**
+- **Existing test changed (your permission):** `TC-FAM-009` in `tests/uat/family.test.ts` now sends a note (`'Not a member of this family'`) with its rejection. Nothing else in it changed.
+- **Tests added / extended (all mine, in this PR):**
+  - `F15 every rejection gives a reason …; someone declining an invitation they received need not` (join request without / with blank reason → 400 and still pending; invitee declines without one → 200; review queue reject and send back without a note → 400).
+  - `F17 rejecting a claim gives a reason`.
+  - In F27, a President's reject without a reason → 400.
+  - In F36, a moderator's reject without a reason → 400.
+
+  **429 passed**, twice in a row on a fresh database; typecheck clean; build OK.

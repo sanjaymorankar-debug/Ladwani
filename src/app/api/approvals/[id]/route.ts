@@ -40,6 +40,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     escalate: 'ESCALATED',
   }
 
+  // Owner's decision: every rejection (and send-back) gives the reason.
+  if ((action === 'reject' || action === 'return') && !String(note ?? '').trim()) {
+    return NextResponse.json({ message: 'Give the reason in the note' }, { status: 400 })
+  }
+
   const existing = await prisma.approval.findUnique({ where: { id: params.id } })
   if (!existing) return NextResponse.json({ message: 'Not found' }, { status: 404 })
   if (existing.status !== 'SUBMITTED' && existing.status !== 'UNDER_REVIEW') {

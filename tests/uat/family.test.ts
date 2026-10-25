@@ -165,7 +165,7 @@ describe('TC-FAM — family and Karta', () => {
 
     actAs({ userId: karta.userId, roles: ['KARTA'], memberId: karta.memberId })
     const res = await patchJoinRequest(
-      jsonReq('http://x', 'PATCH', { decision: 'REJECT' }) as any,
+      jsonReq('http://x', 'PATCH', { decision: 'REJECT', note: 'Not a member of this family' }) as any,
       { params: { id: karta.familyId!, reqId: requestId } }
     )
     expect(res.status).toBe(200)

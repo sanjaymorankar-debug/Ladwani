@@ -72,6 +72,23 @@ describe('F14 Request to join / F15 Karta accepts or rejects', () => {
     expect(await prisma.familyJoinRequest.count({ where: { familyId: famId, memberId: asker.memberId, status: 'REJECTED' } })).toBe(2)
   })
 
+  it('F15 every rejection gives a reason (owner\'s decision); someone declining an invitation they received need not', async () => {
+    const asker = await fx.adult('rr14')
+    const { requestId } = await (await ask(asker)).json()
+    expect((await decide(k, requestId, { decision: 'REJECT' })).status).toBe(400)
+    expect((await decide(k, requestId, { decision: 'REJECT', note: '   ' })).status).toBe(400)
+    expect((await prisma.familyJoinRequest.findUniqueOrThrow({ where: { id: requestId } })).status).toBe('PENDING')
+    const invitee = await fx.adult('ri14')
+    const invite = await prisma.familyJoinRequest.create({ data: { familyId: famId, memberId: invitee.memberId, direction: 'KARTA_INVITE', requestedBy: k.userId } })
+    expect((await decide(invitee, invite.id, { decision: 'REJECT' })).status).toBe(200)
+    // The review queue (§28) too: reject and send back need the reason before anything else.
+    actAs(admin)
+    for (const action of ['reject', 'return']) {
+      expect((await approveGeneric(json('http://x', 'PATCH', { action }), { params: { id: 'no-such-approval' } })).status).toBe(400)
+      expect((await approveGeneric(json('http://x', 'PATCH', { action, note: 'Wrong family' }), { params: { id: 'no-such-approval' } })).status).toBe(404)
+    }
+  })
+
   it('F15 a request unanswered for 30 days expires — on read and by the daily cron', async () => {
     const asker = await fx.adult('e14')
     const { requestId } = await (await ask(asker)).json()
@@ -199,6 +216,13 @@ describe('F17 Claim a non-login profile', () => {
     const claim = await prisma.profileClaim.findFirstOrThrow({ where: { userId: me.userId } })
     actAs(me)
     expect((await claimDecide(json('http://x', 'POST', { decision: 'CONFIRM' }), { params: { id: claim.id } })).status).toBe(403)
+  })
+
+  it('F17 rejecting a claim gives a reason (owner\'s decision)', async () => {
+    const claim = await prisma.profileClaim.findFirstOrThrow({ where: { userId: me.userId } })
+    actAs(k)
+    expect((await claimDecide(json('http://x', 'POST', { decision: 'REJECT' }), { params: { id: claim.id } })).status).toBe(400)
+    expect((await prisma.profileClaim.findUniqueOrThrow({ where: { id: claim.id } })).status).toBe('PENDING')
   })
 
   it('F17 on confirm the records merge: one person, with the login, the family links and the registration data', async () => {

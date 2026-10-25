@@ -29,6 +29,7 @@ Tick each line and note anything unexpected. The automated test for each flow is
 - [ ] F12 Attach a death certificate to the request. The Operator/Admin opens it from the review screen; the Karta cannot open it. (On test the certificate is optional; to try the go-live rule, run `set_death_certificate_required_on.sql` and check that a request without one is refused.)
 - [ ] F13 Add a new-born: choose father and mother; the name may be "Baby of …".
 - [ ] F14/F15 A non-member requests to join; the Karta corrects the role and accepts, or rejects with a reason.
+- [ ] F15/F17/F27/F36 Try to reject a join request, a claim, an organisation join request and a post without a reason: each is refused until a reason is given. Declining an invitation needs none.
 - [ ] F16 Karta hand-over (the nominee accepts, then an Admin approves) and vacancy (the district Operator confirms).
 - [ ] F17 A new registrant finds their Karta-made profile, says "This is me", and the Karta confirms the merge.
 - [ ] F18 The district Operator changes a member's role with a remark.

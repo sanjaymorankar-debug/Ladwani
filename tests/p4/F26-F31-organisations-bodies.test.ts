@@ -179,6 +179,7 @@ describe('F27 Manage organisation members and designations', () => {
     actAs(m2)
     expect((await addMember(json('http://x', 'POST', {}), { params: { id: orgId } })).status).toBe(201)
     expect((await act(m1, m2.memberId, { action: 'approve' })).status).toBe(403)
+    expect((await act(pres, m2.memberId, { action: 'reject' })).status).toBe(400) // a rejection gives a reason (owner's decision)
     expect((await act(pres, m2.memberId, { action: 'approve' })).status).toBe(200)
     expect(await membership(orgId, m2.memberId)).toMatchObject({ status: 'ACTIVE', designation: 'MEMBER' })
     expect(await prisma.notification.count({ where: { recipientId: m2.userId, type: 'ORGANISATION_MEMBER' } })).toBe(1)

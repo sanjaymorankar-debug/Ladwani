@@ -71,8 +71,10 @@ export default function JoinRequestsInbox({ familyId }: { familyId: string }) {
   }
 
   const decideClaim = async (id: string, decision: 'CONFIRM' | 'REJECT') => {
+    const note = decision === 'REJECT' ? window.prompt('Reason for rejecting (shown to the person)')?.trim() : undefined
+    if (decision === 'REJECT' && !note) return
     setBusyId(id)
-    const res = await fetch(`/api/claims/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision }) })
+    const res = await fetch(`/api/claims/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, note }) })
     const json = await res.json()
     setBusyId(null)
     if (!res.ok) return toast.error(json.message)

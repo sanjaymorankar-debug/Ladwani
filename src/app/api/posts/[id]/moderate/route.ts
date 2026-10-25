@@ -27,6 +27,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const from = action === 'hide' ? ['PUBLISHED'] : ['PENDING_APPROVAL']
   if (!from.includes(post.status)) return NextResponse.json({ message: `A ${post.status.toLowerCase().replace('_', ' ')} post cannot be ${action}d` }, { status: 409 })
 
+  if (action === 'reject' && !String(body.note ?? '').trim()) return NextResponse.json({ message: 'Give a reason for rejecting the post' }, { status: 400 })
+
   const status = action === 'approve' ? 'PUBLISHED' : action === 'reject' ? 'REJECTED' : 'HIDDEN'
 
   const updated = await prisma.$transaction(async (tx) => {

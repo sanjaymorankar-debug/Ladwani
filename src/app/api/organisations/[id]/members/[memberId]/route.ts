@@ -77,6 +77,7 @@ export async function POST(req: Request, { params }: { params: { id: string; mem
     case 'reject': {
       if (!(await manage())) return NextResponse.json({ message: 'Only the President or Secretary decides' }, { status: 403 })
       if (m.status !== 'REQUESTED') return NextResponse.json({ message: 'No open request' }, { status: 409 })
+      if (body.action === 'reject' && !String(body.reason ?? '').trim()) return NextResponse.json({ message: 'Give a reason' }, { status: 400 })
       const status = body.action === 'approve' ? 'ACTIVE' : 'DECLINED'
       await prisma.organisationMember.update({ where: { id: m.id }, data: { status, joinedAt: status === 'ACTIVE' ? new Date() : null, endReason: status === 'DECLINED' ? (body.reason ?? null) : null } })
       await audit(body.action, { status: 'REQUESTED' }, { status })
