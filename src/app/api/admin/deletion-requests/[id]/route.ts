@@ -8,7 +8,8 @@ import { recordAudit } from '@/lib/audit'
 import { notifyUser } from '@/lib/notify'
 
 /** F40: the Admin completes (anonymises) or rejects (with a reason) a deletion request. */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id || !(await isActiveAdmin(session.user.id))) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
   const body = await req.json().catch(() => ({}))

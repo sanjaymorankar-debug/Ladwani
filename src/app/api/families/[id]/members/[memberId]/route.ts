@@ -19,7 +19,8 @@ import { roleGenderError, operatorCoversFamily, kartaUserIdOf } from '@/lib/fami
  */
 const REASONS = ['WRONGLY_ADDED', 'MOVED_OUT', 'DUPLICATE']
 
-export async function DELETE(req: Request, { params }: { params: { id: string; memberId: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string; memberId: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const access = await getFamilyAccess(session, params.id)
@@ -67,7 +68,8 @@ export async function DELETE(req: Request, { params }: { params: { id: string; m
   return NextResponse.json({ message: 'Member removed from this family' })
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string; memberId: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string; memberId: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const roles = ((session.user as any).roles ?? []) as string[]

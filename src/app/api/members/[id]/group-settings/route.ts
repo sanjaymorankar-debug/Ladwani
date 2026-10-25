@@ -7,7 +7,8 @@ import { actorFor, json } from '@/lib/additional-details/http'
 import { syncMemberGroups } from '@/lib/interest-groups'
 
 /** "Do not auto-add me to groups" (Step 3 rule 4). body: { autoAddToGroups: boolean } */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const ctx = await getDetailsContext(session, params.id)
@@ -33,7 +34,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   return json({ message: 'Saved', autoAddToGroups: body.autoAddToGroups, groups })
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const ctx = await getDetailsContext(session, params.id)

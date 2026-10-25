@@ -5,7 +5,8 @@ import { actorFor, json } from '@/lib/additional-details/http'
 import { getGroupAccess, leaveGroup } from '@/lib/interest-groups'
 
 /** Moderator or staff removes a member (Step 3 rule 10). They are not re-added automatically. */
-export async function DELETE(req: Request, { params }: { params: { id: string; memberId: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string; memberId: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const access = await getGroupAccess(session, params.id)

@@ -4,7 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getMemberAccess } from '@/lib/member-auth'
 
-export async function DELETE(req: Request, { params }: { params: { id: string; recordId: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string; recordId: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const access = await getMemberAccess(session, params.id)
   if (!access.exists) return NextResponse.json({ message: 'Not found' }, { status: 404 })

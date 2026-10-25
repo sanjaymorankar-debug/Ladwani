@@ -7,7 +7,8 @@ import { applySpouseLink, applyMarkDeceased, applyKartaChange, applyAddressChang
 import { afterMarriage } from '@/lib/marriage'
 
 /** One request in full: staff only (owner's decision). Members see their own through GET /api/approvals?mine. */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const roles: string[] = (session.user as any)?.roles ?? []
@@ -26,7 +27,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json(approval)
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 

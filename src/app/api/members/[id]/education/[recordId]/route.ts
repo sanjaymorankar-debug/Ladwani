@@ -10,7 +10,8 @@ async function checkAccess(memberId: string) {
   return access
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string; recordId: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string; recordId: string }> }) {
+  const params = await props.params
   const access = await checkAccess(params.id)
   if (!access.exists) return NextResponse.json({ message: 'Not found' }, { status: 404 })
   if (!access.authorized) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
@@ -45,7 +46,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string; re
   return NextResponse.json({ message: 'Updated', record: updated })
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string; recordId: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string; recordId: string }> }) {
+  const params = await props.params
   const access = await checkAccess(params.id)
   if (!access.exists) return NextResponse.json({ message: 'Not found' }, { status: 404 })
   if (!access.authorized) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })

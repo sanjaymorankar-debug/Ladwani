@@ -24,7 +24,8 @@ async function involvement(session: any, id: string) {
  * sees an ACTIVE organisation's summary (name, taluka, town, start date,
  * office bearers).
  */
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const { org, full, mine } = await involvement(session, params.id)
@@ -63,7 +64,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 }
 
 /** F26: the applicant corrects details after a send-back (then resubmits). */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const org = await prisma.organisation.findUnique({ where: { id: params.id } })

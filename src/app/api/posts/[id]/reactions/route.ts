@@ -7,7 +7,8 @@ import { canSeePost } from '@/lib/post-access'
 
 const REACTIONS = ['LIKE', 'LOVE', 'SUPPORT', 'CELEBRATE', 'CONDOLENCE']
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   // F01: a DRAFT / unapproved account may only fill in its own profile.
@@ -27,7 +28,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   return NextResponse.json({ message: 'Reacted' })
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 

@@ -12,7 +12,8 @@ import { canManageOrganisation, userIdOfMember } from '@/lib/organisations'
  *   { memberId }  President / Secretary invites a person (they accept).
  *   {}            the signed-in user asks to join (President / Secretary accepts).
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const notActive = await requireActiveAccount(session.user.id)

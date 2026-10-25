@@ -7,7 +7,8 @@ import { canManageFamily } from '@/lib/family-auth'
 import { roleGenderError, joinRequestExpired } from '@/lib/family-rules'
 import { recordAudit } from '@/lib/audit'
 
-export async function PATCH(req: Request, { params }: { params: { id: string; reqId: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string; reqId: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 

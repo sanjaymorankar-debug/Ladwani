@@ -12,7 +12,8 @@ import { getPostAccess } from '@/lib/interest-groups'
  * Interest-group posts: staff, or that group's moderators. A FLAGGED post
  * (hidden after reports) is restored with approve or kept down with hide.
  */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 

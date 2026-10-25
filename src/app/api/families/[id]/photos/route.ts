@@ -11,7 +11,8 @@ import { validatePhotoUpload, uploadPhoto, deletePhotoObjects, isStorageConfigur
  * Family photos are shown on the family card, which any signed-in member can
  * see, so they are stored as REGISTERED_MEMBERS.
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
@@ -23,7 +24,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json({ photoId: family.familyPhotoId })
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   if (!(await canManageFamily(session, params.id))) {

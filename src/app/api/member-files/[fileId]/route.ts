@@ -7,7 +7,8 @@ import { canViewSection, getDetailsContext } from '@/lib/additional-details/acce
 import { auditView, json } from '@/lib/additional-details/http'
 
 /** Streams a marksheet or certificate after re-checking the owning section's visibility. */
-export async function GET(req: Request, { params }: { params: { fileId: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ fileId: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const file = await prisma.memberFile.findUnique({ where: { id: params.fileId } })

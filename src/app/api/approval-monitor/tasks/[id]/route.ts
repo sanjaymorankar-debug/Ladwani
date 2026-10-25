@@ -5,7 +5,8 @@ import { isActiveAdmin } from '@/lib/scope'
 import { reassignTask, reopenTask } from '@/lib/verification'
 
 /** F07 step 4 — Admin only: { action: 'reassign', operatorUserId } or { action: 'reopen' }. */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id || !(await isActiveAdmin(session.user.id))) {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 })

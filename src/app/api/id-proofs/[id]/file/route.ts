@@ -12,7 +12,8 @@ import { readDecrypted } from '@/lib/secure-files'
  * an Operator while holding an undecided task for that person. Every view is
  * audit-logged. ?kind=proof (default) or ?kind=selfSigned.
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 

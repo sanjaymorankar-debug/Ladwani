@@ -8,7 +8,8 @@ import { profileFields } from '@/lib/bureau-fields'
 import { recordAudit } from '@/lib/audit'
 
 /** F38 limited profile (no contact details). Owners and their Karta also see their own full record. */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const me = (session.user as any).memberId as string | null
@@ -31,7 +32,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
  * login) may turn the listing on — only when eligible; the family Karta is
  * told. Anyone with access may turn it off; an Admin may only turn it off.
  */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => ({}))

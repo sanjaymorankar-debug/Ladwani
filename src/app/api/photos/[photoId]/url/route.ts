@@ -15,7 +15,8 @@ import { activeStorageDriver } from '@/lib/storage'
  * streaming route. Either way visibility is checked here first, and again on
  * the streaming route, so the link can't be passed around to bypass privacy.
  */
-export async function GET(req: Request, { params }: { params: { photoId: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ photoId: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 

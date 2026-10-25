@@ -11,7 +11,8 @@ import { recordAudit } from '@/lib/audit'
 /** F34 family album: members add photos; each chooses Only me / Family / Friends / a friend list / Community. */
 const ALBUM_VISIBILITY = ['PRIVATE', 'SAME_FAMILY', 'FRIENDS', 'FRIEND_LIST', 'REGISTERED_MEMBERS']
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const rows = await prisma.photo.findMany({
@@ -30,7 +31,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   })
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const notActive = await requireActiveAccount(session.user.id)

@@ -8,7 +8,8 @@ import { roleGenderError, expireStaleJoinRequests } from '@/lib/family-rules'
 
 // Karta/staff view of pending requests to join this family, and of the
 // invitations this family has sent out that are still awaiting a reply.
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   if (!(await canManageFamily(session, params.id))) {
@@ -60,7 +61,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
  *    there was no way to reach them. A Karta still cannot add an existing
  *    account-holder unilaterally — only ask.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   // F01: a DRAFT / unapproved account may only fill in its own profile.

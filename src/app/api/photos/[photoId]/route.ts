@@ -10,7 +10,8 @@ import { recordAudit } from '@/lib/audit'
  * F34: delete a family-album or post photo — its uploader, the family's Karta
  * (album) or an Admin. Member gallery photos keep their own route.
  */
-export async function DELETE(req: Request, { params }: { params: { photoId: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ photoId: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const photo = await prisma.photo.findUnique({ where: { id: params.photoId } })

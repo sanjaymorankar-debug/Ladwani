@@ -12,7 +12,8 @@ import { backfillInterest } from '@/lib/interest-groups'
  *
  * body: { action: 'approve' | 'reject' | 'merge' | 'update', mergeIntoId?, name?, category?, isSport?, isChildSafe?, isActive? }
  */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const roles = (((session?.user as any)?.roles ?? []) as string[])
   if (!roles.includes('ADMIN')) return json({ message: 'Forbidden' }, 403)

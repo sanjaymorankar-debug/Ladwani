@@ -17,7 +17,8 @@ import { bloodRelated } from '@/lib/relations'
  * OP-07: a minor's data needs parental consent — recorded against the Karta
  * who adds the child. Family members are told.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const notActive = await requireActiveAccount(session.user.id)

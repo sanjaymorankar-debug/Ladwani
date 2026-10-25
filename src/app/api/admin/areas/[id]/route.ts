@@ -10,7 +10,8 @@ import { isActiveAdmin } from '@/lib/scope'
  * families, groups and role mappings may point at an area, so it is retired
  * with isActive=false instead and stays valid for existing references.
  */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const actorId = session?.user?.id as string | undefined
   if (!actorId || !(await isActiveAdmin(actorId))) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })

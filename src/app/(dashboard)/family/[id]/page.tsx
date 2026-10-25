@@ -17,7 +17,8 @@ import FamilyAlbum from '@/components/family/FamilyAlbum'
 import JoinFamilyPanel from '@/components/family/JoinFamilyPanel'
 import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
-export default async function FamilyDetailPage({ params }: { params: { id: string } }) {
+export default async function FamilyDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return null
 

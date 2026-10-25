@@ -9,7 +9,8 @@ async function load(id: string) {
   return prisma.post.findUnique({ where: { id } })
 }
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const post = await load(params.id)
@@ -26,7 +27,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
  * moderation (a community post by a member, or a District / State / National
  * post) goes back for approval.
  */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const post = await load(params.id)
@@ -46,7 +48,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 /** F36: the author deletes their own post (or a moderator removes it). Kept for history. */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const post = await load(params.id)

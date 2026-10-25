@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { Prisma, ApprovalStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { withdrawMatrimonyOnMarriage } from '@/lib/matrimony'
 import { UNMARRIED_FLOW_RESET } from '@/lib/profile-details'
@@ -15,6 +15,18 @@ export async function requiresApproval(actionCode: string): Promise<boolean> {
   const rule = await prisma.approvalRule.findUnique({ where: { actionCode } })
   if (!rule || !rule.isActive) return true
   return rule.requiresApproval
+}
+
+const APPROVAL_STATUSES = new Set<string>(Object.values(ApprovalStatus))
+
+/**
+ * The approval queue's `?status=` filter (/admin/approvals). Only a real
+ * ApprovalStatus filters; anything else (a typed or stale URL) shows the
+ * default open queue instead of failing Prisma's enum validation with a 500.
+ */
+export function approvalQueueWhere(status: string | undefined): Prisma.ApprovalWhereInput {
+  if (status && APPROVAL_STATUSES.has(status)) return { status: status as ApprovalStatus }
+  return { status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'ESCALATED'] } }
 }
 
 export interface SpouseLinkPayload {

@@ -11,7 +11,8 @@ async function ownList(session: any, id: string) {
 }
 
 /** F35: add a friend to a list (only friends can be in a list). */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const list = await ownList(session, params.id)
   if (!list) return NextResponse.json({ message: 'Not found' }, { status: 404 })
@@ -24,7 +25,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   return NextResponse.json({ message: 'Added' }, { status: 201 })
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const list = await ownList(session, params.id)
   if (!list) return NextResponse.json({ message: 'Not found' }, { status: 404 })

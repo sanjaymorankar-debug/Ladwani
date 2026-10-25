@@ -16,7 +16,8 @@ import { applyLink, completeResolution, alertRequester, alertOperators, type Con
  *   { action: 'resolve', resolution } / { action: 'reject', reason } —
  *        Operator of either family's district (or Admin) once in OPERATOR_REVIEW.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const roles = ((session.user as any).roles ?? []) as string[]
@@ -67,7 +68,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   if (link.status === 'OPERATOR_REVIEW' && (body.action === 'resolve' || body.action === 'reject')) {
-    const covers = await operatorCoversFamily(actorId, roles, link.fromFamilyId) || await operatorCoversFamily(actorId, roles, link.toFamilyId)
+    const covers = (await operatorCoversFamily(actorId, roles, link.fromFamilyId)) || (await operatorCoversFamily(actorId, roles, link.toFamilyId))
     if (!covers) return NextResponse.json({ message: 'Only an Operator of either family\'s district decides this' }, { status: 403 })
     const role = roles.includes('ADMIN') ? 'ADMIN' : 'OPERATOR'
     if (body.action === 'reject') {

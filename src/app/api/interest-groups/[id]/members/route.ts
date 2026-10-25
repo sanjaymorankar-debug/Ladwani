@@ -11,7 +11,8 @@ import { getGroupAccess } from '@/lib/interest-groups'
  * profile. "Mentor" marks members who said they can teach or guide. Members
  * under 18 are left out of district sub-group lists.
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const access = await getGroupAccess(session, params.id)

@@ -15,7 +15,8 @@ import { recordAudit } from '@/lib/audit'
  * (ApprovalRule family.karta.change, §28) applies when it is switched on. An
  * Admin acting here applies the change directly.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const access = await getFamilyAccess(session, params.id)

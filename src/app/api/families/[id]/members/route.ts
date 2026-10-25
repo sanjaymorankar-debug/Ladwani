@@ -9,7 +9,8 @@ import { requireActiveAccount } from '@/lib/account-state'
 import { roleGenderError, familyUserIds } from '@/lib/family-rules'
 import { recordAudit } from '@/lib/audit'
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   if (!(await canViewFamily(session, params.id))) {
@@ -26,7 +27,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json({ members: members.map((fm: any) => ({ ...fm.member, isKarta: fm.isKarta })) })
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   // F01: a DRAFT / unapproved account may only fill in its own profile.

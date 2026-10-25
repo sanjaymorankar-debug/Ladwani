@@ -9,7 +9,8 @@ import { dropFromLists } from '@/lib/friends'
  * F35: accept | decline (the person asked), cancel (the asker), remove (either
  * friend — they are silently taken out of every friend list).
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const me = (session?.user as any)?.memberId as string | null
   if (!session?.user?.id || !me) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })

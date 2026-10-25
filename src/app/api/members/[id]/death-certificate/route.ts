@@ -10,7 +10,8 @@ import { recordAudit } from '@/lib/audit'
  * `?approvalId=` it reads the one attached to a pending Expired request;
  * otherwise the one on the member's record. Audited.
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const roles = ((session.user as any).roles ?? []) as string[]

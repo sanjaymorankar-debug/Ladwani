@@ -3,12 +3,15 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   const roles: string[] = (session?.user as any)?.roles ?? []
   if (!roles.includes('ADMIN')) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
+  const existing = await prisma.relationshipType.findUnique({ where: { id: params.id }, select: { id: true } })
+  if (!existing) return NextResponse.json({ message: 'Not found' }, { status: 404 })
   const type = await prisma.relationshipType.update({
     where: { id: params.id },
     data: {

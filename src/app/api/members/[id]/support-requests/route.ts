@@ -5,7 +5,8 @@ import { getDetailsContext } from '@/lib/additional-details/access'
 import { actorFor, json } from '@/lib/additional-details/http'
 
 /** The member's own support requests (the editor's view). */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const ctx = await getDetailsContext(session, params.id)
@@ -16,7 +17,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 }
 
 /** Withdraw a shared request at any time (rule 3). body: { requestId } */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const ctx = await getDetailsContext(session, params.id)

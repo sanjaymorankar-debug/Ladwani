@@ -9,7 +9,8 @@ import { recordAudit } from '@/lib/audit'
  * F38: the recipient — or their Karta — accepts or declines; the sender (or
  * their Karta) withdraws. On acceptance both sides get the other's contact.
  */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 

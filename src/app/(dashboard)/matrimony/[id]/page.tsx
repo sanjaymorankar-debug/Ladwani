@@ -10,7 +10,8 @@ import SendInterestButton from '@/components/matrimony/SendInterestButton'
 import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 /** F38 limited profile: no contact details, income as a band, same-Gotra flagged. */
-export default async function BureauProfilePage({ params }: { params: { id: string } }) {
+export default async function BureauProfilePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return null
   if (!(await canBrowse(session))) notFound()

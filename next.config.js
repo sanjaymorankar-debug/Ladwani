@@ -91,7 +91,6 @@ const nextConfig = {
     // fetches with the same value the server routes on.
     NEXT_PUBLIC_BASE_PATH: basePath,
   },
-  optimizeFonts: false,
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'agtci.com' },

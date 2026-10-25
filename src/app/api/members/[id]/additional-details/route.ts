@@ -14,7 +14,8 @@ import { auditView, json } from '@/lib/additional-details/http'
  * needs. Anyone else gets only the sections whose visibility includes them,
  * and the view is audit-logged.
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return json({ message: 'Unauthorized' }, 401)
   const ctx = await getDetailsContext(session, params.id)
