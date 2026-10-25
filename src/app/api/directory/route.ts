@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { tooManyRequests, LIMITS } from '@/lib/rate-limit'
 import { getViewerScope } from '@/lib/scope'
 import { queryDirectory } from '@/lib/directory'
 
@@ -12,6 +13,8 @@ import { queryDirectory } from '@/lib/directory'
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  const limited = tooManyRequests([`search:${session.user?.id}`, LIMITS.search])
+  if (limited) return limited
 
   const scope = await getViewerScope(session.user.id)
   const url = new URL(req.url)

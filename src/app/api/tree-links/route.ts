@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { canManageFamily } from '@/lib/family-auth'
+import { canManageFamily, canViewFamily } from '@/lib/family-auth'
 import { requireActiveAccount } from '@/lib/account-state'
 import { recordAudit } from '@/lib/audit'
 import { operatorCoversFamily } from '@/lib/family-rules'
@@ -60,9 +60,11 @@ export async function GET(req: Request) {
 }
 
 /**
- * POST — the Karta of the family whose tree holds `fromMemberId` asks the
- * Karta of `toFamilyId` to link it to `toMemberId`. When fields conflict,
- * the requester proposes which side is right for each.
+ * POST — a member (or the Karta) of the family whose tree holds
+ * `fromMemberId` asks the Karta of `toFamilyId` to link it to `toMemberId`
+ * (owner's decision: members may build the tree and its links; the other
+ * family's Karta still decides). When fields conflict, the requester
+ * proposes which side is right for each.
  */
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
@@ -71,8 +73,8 @@ export async function POST(req: Request) {
   if (notActive) return notActive
   const body = await req.json().catch(() => ({}))
   const { fromFamilyId, fromMemberId, toFamilyId, toMemberId } = body as Record<string, string>
-  if (!fromFamilyId || !(await canManageFamily(session, fromFamilyId))) {
-    return NextResponse.json({ message: "Only this family's Karta can link its tree to another family" }, { status: 403 })
+  if (!fromFamilyId || !(await canViewFamily(session, fromFamilyId))) {
+    return NextResponse.json({ message: 'Only members of this family can link its tree to another family' }, { status: 403 })
   }
   if (!toFamilyId || toFamilyId === fromFamilyId) return NextResponse.json({ message: 'Choose another family' }, { status: 400 })
   const [fromM, toM] = await Promise.all([

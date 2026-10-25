@@ -116,6 +116,12 @@ export default function ApprovalDetailPage() {
                 </div>
               )}
             </div>
+            {approval.actionCode === 'member.mark_deceased' && approval.newValue?.certificateKey && (
+              <a href={`/api/members/${approval.entityId}/death-certificate?approvalId=${approval.id}`} target="_blank" rel="noopener noreferrer"
+                className="text-sm text-saffron-600 hover:underline inline-flex items-center gap-1">
+                View death certificate <ArrowUpRight className="w-3.5 h-3.5" />
+              </a>
+            )}
           </div>
         )}
       </div>

@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server'
 import { hash, compare } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { randomInt } from 'crypto'
 import { sendEmail, passwordResetEmailTemplate } from '@/lib/email'
+import { requestIp } from '@/lib/audit'
+import { tooManyRequests, LIMITS } from '@/lib/rate-limit'
 
 export async function POST(req: Request) {
   try {
     const { mobile, email, otp, newPassword, step } = await req.json()
     const identifier = mobile ?? email
+    // P6: counted per account before the lookup, so unknown accounts are
+    // limited the same way (no enumeration) and a new IP doesn't reset it.
+    const who = String(identifier ?? '').toLowerCase()
+    const limited = step === 'request'
+      ? tooManyRequests([`reset-request:${who}`, LIMITS.resetRequest], [`reset-request-ip:${requestIp(req) ?? 'unknown'}`, LIMITS.resetRequestIp])
+      : step === 'confirm' ? tooManyRequests([`reset-confirm:${who}`, LIMITS.resetConfirm]) : null
+    if (limited) return limited
 
     const user = await prisma.user.findFirst({
       where: mobile ? { mobile } : { email },
@@ -20,7 +30,7 @@ export async function POST(req: Request) {
 
     if (step === 'request') {
       // Generate and store OTP
-      const otp = Math.floor(100000 + Math.random() * 900000).toString()
+      const otp = randomInt(100000, 1000000).toString()
       const otpHash = await hash(otp, 10)
 
       await prisma.verificationToken.create({
@@ -38,7 +48,7 @@ export async function POST(req: Request) {
         await sendEmail({ to: user.email, ...template })
       }
 
-      console.log(`[DEV] Password reset OTP for ${identifier}: ${otp}`)
+      if (process.env.NODE_ENV !== 'production') console.log(`[DEV] Password reset OTP for ${identifier}: ${otp}`)
       return NextResponse.json({ message: 'OTP sent successfully' })
     }
 

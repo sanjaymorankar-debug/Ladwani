@@ -32,7 +32,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   if (body.action === 'cancel') {
     if (!['PLACEHOLDER', 'PENDING'].includes(link.status)) return NextResponse.json({ message: 'This link can no longer be cancelled' }, { status: 409 })
-    if (!(await canManageFamily(session, link.fromFamilyId))) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    // The member who asked, or their family's Karta, may cancel.
+    if (link.requestedBy !== actorId && !(await canManageFamily(session, link.fromFamilyId))) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
     await prisma.treeLinkRequest.update({ where: { id: link.id }, data: { status: 'CANCELLED', decidedBy: actorId, decidedAt: new Date() } })
     await audit('cancel', { status: 'CANCELLED' })
     return NextResponse.json({ message: 'Link cancelled' })

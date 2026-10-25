@@ -9,8 +9,11 @@ import { randomInt } from 'crypto'
 import { validateSettlement, chainText } from '@/lib/locations'
 import { requestIp } from '@/lib/audit'
 import { notifyUser } from '@/lib/notify'
+import { tooManyRequests, LIMITS } from '@/lib/rate-limit'
 
 export async function POST(req: Request) {
+  const limited = tooManyRequests([`register:${requestIp(req) ?? 'unknown'}`, LIMITS.register])
+  if (limited) return limited
   try {
     const body = await req.json()
     const parsed = registerSchema.safeParse({ ...body, confirmPassword: body.password, consentAccepted: true })

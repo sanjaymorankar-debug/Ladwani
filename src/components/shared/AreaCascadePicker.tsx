@@ -18,10 +18,12 @@ const LEVELS = [
 
 export default function AreaCascadePicker({ onChange, idPrefix = 'area', upTo }: {
   onChange: (areaId: string) => void; idPrefix?: string
-  /** Stop at the district (F26 organisations): State › District only. */
-  upTo?: 'DISTRICT'
+  /** Stop early: at the district (State › District), or at the taluka (F26 local organisations: State › District › Taluka). */
+  upTo?: 'DISTRICT' | 'TALUKA'
 }) {
-  const levels = upTo === 'DISTRICT' ? LEVELS.slice(0, 2).map((l, i) => (i === 1 ? { ...l, types: ['DISTRICT'] } : l)) : LEVELS
+  const levels = upTo === 'DISTRICT' ? LEVELS.slice(0, 2).map((l, i) => (i === 1 ? { ...l, types: ['DISTRICT'] } : l))
+    : upTo === 'TALUKA' ? LEVELS.slice(0, 3).map((l, i) => (i === 1 ? { ...l, types: ['DISTRICT'] } : l))
+    : LEVELS
   const [options, setOptions] = useState<AreaOption[][]>([[], [], [], []])
   const [chosen, setChosen] = useState<string[]>(['', '', '', ''])
 
@@ -42,7 +44,7 @@ export default function AreaCascadePicker({ onChange, idPrefix = 'area', upTo }:
     setChosen(next)
     const picked = options[level].find((o) => o.id === id)
     // A city can stand in for the lower levels.
-    if (picked && (picked.type === 'VILLAGE' || picked.type === 'CITY' || (upTo === 'DISTRICT' && picked.type === 'DISTRICT'))) {
+    if (picked && (picked.type === 'VILLAGE' || picked.type === 'CITY' || (upTo === 'DISTRICT' && picked.type === 'DISTRICT') || (upTo === 'TALUKA' && picked.type === 'TALUKA'))) {
       onChange(id)
       setOptions((prev) => prev.map((o, i) => (i > level ? [] : o)))
       return

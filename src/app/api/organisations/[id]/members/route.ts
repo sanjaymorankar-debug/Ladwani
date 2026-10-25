@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (notActive) return notActive
   const org = await prisma.organisation.findUnique({ where: { id: params.id } })
   if (!org || org.status !== 'ACTIVE') return NextResponse.json({ message: 'Organisation not found or not active' }, { status: 404 })
-  if (org.kind !== 'LOCAL') return NextResponse.json({ message: 'LadWani bodies are joined by nomination' }, { status: 400 })
+  if (org.kind !== 'LOCAL') return NextResponse.json({ message: 'LadWani bodies are joined automatically: the office bearers of the organisations below sit on them' }, { status: 400 })
   const body = await req.json().catch(() => ({}))
   const self = (session.user as any).memberId as string | null
   const invite = !!body.memberId && body.memberId !== self

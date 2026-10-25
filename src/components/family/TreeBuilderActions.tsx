@@ -36,8 +36,8 @@ function PersonFields({ label, value, onChange, withGender }: { label: string; v
  * Tree builder from a person's card: add parents (F19 ancestors, F20 spouse
  * side), add a sibling (F21), link to the same person in another family (F22).
  */
-export default function TreeBuilderActions({ familyId, person, canEdit, onChanged }: {
-  familyId: string; person: Person; canEdit: boolean; onChanged: () => void
+export default function TreeBuilderActions({ familyId, person, onChanged }: {
+  familyId: string; person: Person; onChanged: () => void
 }) {
   const [open, setOpen] = useState<'parents' | 'sibling' | 'link' | null>(null)
   const [father, setFather] = useState<any>({ alive: true })
@@ -94,7 +94,7 @@ export default function TreeBuilderActions({ familyId, person, canEdit, onChange
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn-secondary text-xs" onClick={() => setOpen(open === 'parents' ? null : 'parents')}>Add parents</button>
         <button type="button" className="btn-secondary text-xs" onClick={() => setOpen(open === 'sibling' ? null : 'sibling')}>Add sibling</button>
-        {canEdit && <button type="button" className="btn-secondary text-xs" onClick={() => { setOpen(open === 'link' ? null : 'link'); setTarget(null); setConflicts(null) }}>Link to another family</button>}
+        <button type="button" className="btn-secondary text-xs" onClick={() => { setOpen(open === 'link' ? null : 'link'); setTarget(null); setConflicts(null) }}>Link to another family</button>
       </div>
 
       {open === 'parents' && (

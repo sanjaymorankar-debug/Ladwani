@@ -111,7 +111,7 @@ export default function FamilyTreeClient({ familyId, familyName, nodes, edges, m
               </Link>
             )}
             {mode === 'FULL' && isMember && (
-              <TreeBuilderActions familyId={familyId} person={selected} canEdit={canEdit} onChanged={() => router.refresh()} />
+              <TreeBuilderActions familyId={familyId} person={selected} onChanged={() => router.refresh()} />
             )}
           </aside>
         )}

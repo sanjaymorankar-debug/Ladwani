@@ -4,16 +4,17 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 /**
- * F22 step 2 — people in another family that a Karta may link to: name,
- * gender and birth year only (the limited family view of F14).
+ * F22 step 2 — people in another family that a family member may link to
+ * (owner's decision: not only the Karta): name, gender and birth year only
+ * (the limited family view of F14).
  */
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   const memberId = (session.user as any).memberId as string | null
   const roles = ((session.user as any).roles ?? []) as string[]
-  const isKarta = memberId && await prisma.familyMember.findFirst({ where: { memberId, isKarta: true, leftAt: null } })
-  if (!isKarta && !roles.includes('ADMIN')) return NextResponse.json({ message: 'Only a Karta links trees' }, { status: 403 })
+  const inAFamily = memberId && await prisma.familyMember.findFirst({ where: { memberId, leftAt: null } })
+  if (!inAFamily && !roles.includes('ADMIN')) return NextResponse.json({ message: 'Only family members link trees' }, { status: 403 })
 
   const url = new URL(req.url)
   const familyId = url.searchParams.get('familyId') ?? ''

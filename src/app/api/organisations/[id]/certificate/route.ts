@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { readDecrypted } from '@/lib/secure-files'
 import { recordAudit } from '@/lib/audit'
+import { OFFICES } from '@/lib/organisations'
 
 /**
  * F26 certificate (stored encrypted): the applicant, the office bearers,
@@ -17,7 +18,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const org = await prisma.organisation.findUnique({ where: { id: params.id } })
   if (!org?.certificateKey) return NextResponse.json({ message: 'Not found' }, { status: 404 })
   const officer = memberId && await prisma.organisationMember.findFirst({
-    where: { organisationId: org.id, memberId, status: 'ACTIVE', designation: { in: ['PRESIDENT', 'SECRETARY', 'TREASURER'] } },
+    where: { organisationId: org.id, memberId, status: 'ACTIVE', designation: { in: [...OFFICES] } },
   })
   const operator = roles.includes('OPERATOR') && await prisma.approvalTask.findFirst({ where: { organisationId: org.id, operatorUserId: session.user.id, supersededAt: null } })
   if (!roles.includes('ADMIN') && org.applicantUserId !== session.user.id && !officer && !operator) {

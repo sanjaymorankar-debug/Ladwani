@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { Flower2 } from 'lucide-react'
@@ -10,17 +10,24 @@ export default function MarkDeceasedPanel({ memberId, memberName }: { memberId: 
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({ deceasedAt: '', deceasedPlace: '', deceasedNotes: '' })
+  const [certificate, setCertificate] = useState<File | null>(null)
+  const [certRequired, setCertRequired] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    fetch(`/api/members/${memberId}/deceased`).then((r) => r.json()).then((j) => setCertRequired(!!j.certificateRequired)).catch(() => {})
+  }, [open, memberId])
 
   const submit = async () => {
     if (!form.deceasedAt) return toast.error('Date of death is required')
+    if (certRequired && !certificate) return toast.error('Attach the death certificate')
     if (!confirm(`Record that ${memberName} has passed away? This deactivates any login and cannot be easily undone.`)) return
     setBusy(true)
     try {
-      const res = await fetch(`/api/members/${memberId}/deceased`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
+      const fd = new FormData()
+      Object.entries(form).forEach(([k, v]) => fd.append(k, v))
+      if (certificate) fd.append('certificate', certificate)
+      const res = await fetch(`/api/members/${memberId}/deceased`, { method: 'POST', body: fd })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message)
       toast.success(json.message)
@@ -46,6 +53,11 @@ export default function MarkDeceasedPanel({ memberId, memberName }: { memberId: 
             className="form-input text-sm" placeholder="Place (optional)" />
           <textarea value={form.deceasedNotes} onChange={(e) => setForm({ ...form, deceasedNotes: e.target.value })}
             className="form-input text-sm sm:col-span-2" rows={2} placeholder="Notes (optional)" />
+          <label className="text-sm text-gray-600 sm:col-span-2">
+            Death certificate {certRequired ? '(required)' : '(optional)'} — JPG, PNG, WebP or PDF, up to 5 MB
+            <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
+              onChange={(e) => setCertificate(e.target.files?.[0] ?? null)} className="block mt-1 text-sm" />
+          </label>
           <button type="button" onClick={submit} disabled={busy} className="btn-primary text-sm sm:col-span-2 disabled:opacity-60">
             Submit
           </button>

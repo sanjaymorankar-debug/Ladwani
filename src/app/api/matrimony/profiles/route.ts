@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { tooManyRequests, LIMITS } from '@/lib/rate-limit'
 import { prisma } from '@/lib/prisma'
 import { visibleMatrimonyWhere } from '@/lib/matrimony'
 import { requireActiveAccount } from '@/lib/account-state'
@@ -15,6 +16,8 @@ import { profileFields } from '@/lib/bureau-fields'
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  const limited = tooManyRequests([`search:${session.user?.id}`, LIMITS.search])
+  if (limited) return limited
   if (!(await canBrowse(session))) {
     return NextResponse.json({ message: 'Only members listed in the marriage bureau, and their Karta, can browse it.' }, { status: 403 })
   }
