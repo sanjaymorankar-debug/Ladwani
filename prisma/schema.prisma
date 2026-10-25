@@ -1587,6 +1587,7 @@ model Organisation {
   decisionNote       String?   @db.Text
   applicantUserId    String?
   bodyKey            String?   @unique // "<kind>:<areaId>" for LadWani bodies
+  sourceGroupId      String?   @unique // copied from this community group (P4 follow-up)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 

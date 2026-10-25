@@ -47,6 +47,7 @@ Tick each line and note anything unexpected. The automated test for each flow is
 - [ ] F27 Invite / accept, request / approve, hand the President post over (the new holder accepts), set a term.
 - [ ] F28 Once active, its President, Secretary and Chairman appear as members of the LadWani District organisation automatically (no nomination), and get the District team view.
 - [ ] F29–F30 An Admin or an Operator of the district appoints the District organisation's President / Secretary / Chairman (they accept) → they appear in the State organisation; the same from State to Country (Country: Admin only).
+- [ ] F26 (groups) Admin → Settings → Convert Groups to Organisations: check the preview (taluka, town, posts, people not carried over), press Copy, accept as the invited members, approve as two Operators; fill a vacant post by hand-over → ACTIVE. Undo removes copies not yet active; the groups are unchanged.
 - [ ] F31 Hand a local post to someone else → the old holder's seats above end and their access goes; the new holder goes up instead.
 
 ## P5 — Social and bureau

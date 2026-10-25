@@ -97,6 +97,7 @@ A browser run against the production build covered:
    - `set_address_changes_instant.sql`
    - `add_p4_taluka_chain.sql`
    - `add_death_certificate.sql`
+   - `add_group_conversion.sql` (then, when ready: Admin → Settings → Convert Groups to Organisations; test first; P4 report §10)
    - **production only, at go-live:** `set_death_certificate_required_on.sql` (from then on an Expired request needs a death certificate; P2 report §10)
 
    Then run `npm run db:seed` (reference data only; it does not overwrite real data). **Never run `db:seed:uat` on production.**

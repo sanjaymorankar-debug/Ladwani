@@ -64,6 +64,9 @@ export async function POST(req: Request, { params }: { params: { id: string; mem
           await tx.organisationMember.update({ where: { id: m.id }, data: { designation: post, pendingDesignation: null, termStart: new Date(), termEnd: null } })
         })
         await audit('handover.accept', { designation: m.designation }, { designation: post })
+        // Filling a vacant post (e.g. a group copied without a Treasurer) can
+        // complete an approved organisation's three office bearers.
+        await maybeActivate(org.id)
         await syncPromotions(org.id, actorId)
         return NextResponse.json({ message: `You are now ${post.toLowerCase()}` })
       }
