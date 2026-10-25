@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
+import { BASE_PATH } from '@/lib/api-path'
 
 interface Rule {
   id: string
@@ -18,7 +19,7 @@ export default function ApprovalRulesAdmin({ initialRules }: { initialRules: Rul
 
   const toggle = async (r: Rule) => {
     setSaving(r.id)
-    const res = await fetch(`/api/admin/approval-rules/${r.id}`, {
+    const res = await fetch(`${BASE_PATH}/api/admin/approval-rules/${r.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ requiresApproval: !r.requiresApproval }),
