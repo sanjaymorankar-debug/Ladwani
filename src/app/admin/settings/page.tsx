@@ -3,7 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
-import { Settings, ChevronRight, Users2, TreePine, Globe, Heart, Shield, Bell } from 'lucide-react'
+import { Settings, ChevronRight, Users2, TreePine, Globe, Shield } from 'lucide-react'
 
 export default async function AdminSettingsPage() {
   const session = await getServerSession(authOptions)
@@ -35,20 +35,12 @@ export default async function AdminSettingsPage() {
       icon: Globe, desc: 'Set up geographic community groups and areas',
     },
     {
-      title: 'Matrimony Settings', href: '/admin/matrimony',
-      icon: Heart, desc: 'Configure matrimonial module visibility and contact rules',
-    },
-    {
       title: 'Approval Rules', href: '/admin/approval-rules',
-      icon: Shield, desc: 'Define which actions require approval and from whom',
+      icon: Shield, desc: 'Choose which actions need review before they take effect',
     },
     {
-      title: 'User Roles', href: '/admin/roles',
-      icon: Users2, desc: 'Manage role permissions and assign operators',
-    },
-    {
-      title: 'Notification Templates', href: '/admin/notifications',
-      icon: Bell, desc: 'Customise email and notification templates',
+      title: 'User Roles', href: '/admin/users',
+      icon: Users2, desc: 'Assign roles and map Operators and teams to their area',
     },
   ]
 
