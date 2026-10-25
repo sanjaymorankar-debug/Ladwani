@@ -100,10 +100,41 @@ It runs after their baseline and their `member_email_citext` migration. It has t
 - **Backups:** `scripts/backup.sh` now uses `pg_dump` with `BACKUP_DATABASE_URL`, the direct URL. Hostinger shared hosting may not have `pg_dump`, so run it from a machine that does, such as a VPS or a CI job.
   - Restore only into a new, empty database: `scripts/restore.sh`, then `scripts/verify-restore.sh`.
   - Neon also keeps point-in-time history. On this project the retention window is short, 6 hours, so the dump is still your own copy.
-- **The Neon `test` branch is empty.** Its database `bk_ladwani` has no tables yet, so nothing on it could be previewed. Migrating it is the first step of the test-site setup, and only on your instruction.
+- **The Neon `test` branch: applied 25 Oct 2026, on your instruction.** See §7.
 
 ## 6. Still to do (yours)
 
 - Review PR #10 against its new base. PR #15 (`claude/fervent-bell-wcmmdu` → `main`) still has to land first, or PR #10 can be retargeted to `main` once it has.
 - CI runs on pull requests into `main`, `staging` and `dev` only, so it does not run on PR #10 while its base is the PostgreSQL branch. The checks above were run locally, the same way CI runs them.
 - Production stays untouched until you say so.
+
+## 7. The Neon `test` branch
+
+By 25 Oct, `bk_ladwani` on the `test` branch held another app's schema: the `claude/hub-v1` "Mi Samaj" monorepo.
+- It has 74 tables and the migrations `20261024000000_postgres_baseline` and `20261025000000_hub_user_id`.
+- Its only data is 5 roles and 16 relationship types; it has no users.
+
+So, on your decision, this app got **its own database on that branch, `bk_ladwani_workbook`**, owned by `bk_ladwani_app`. **`bk_ladwani` was not touched.**
+
+**How it was applied.** This build container cannot reach Neon on port 5432, so `prisma migrate deploy` could not run from it.
+- `scripts/postgres/01-schema.sql` and `02-reference-data.sql` were sent through Neon's HTTPS SQL endpoint, as one transaction of 395 statements.
+- `01-schema.sql` also records the three migrations in `_prisma_migrations`, with the same checksums as the files in `prisma/migrations/`. A later `prisma migrate deploy`, run from somewhere that can reach port 5432, therefore applies only newer migrations.
+
+**Checked after applying.** The result was compared with a local database built by `prisma migrate deploy` + `npm run db:seed`, which `prisma migrate diff` reports equal to the schema. The two match in:
+- tables (85);
+- every column, with its type, nullability, default and generated expression;
+- every index (175) and constraint;
+- every enum value;
+- the extensions (`citext`, `btree_gist`);
+- the migration record;
+- the reference rows: 9 roles, 50 relationship types, 9 settings, 19 permissions, 62 role permissions, 13 approval rules, 15 areas.
+
+**Data.** There is no member data: one Admin login and no families. That Admin is the documented one (`admin@miladwani.com`, password in `DEPLOYMENT.md` Part 3 step 4). **Change its password at the first sign-in.**
+
+**Data fix.** The wrong-gender relationship preview (`scripts/postgres/data-fixes/fix_relationship_gender_preview.sql`) was run there and found 0 rows. The database has no relationships yet. Nothing was applied.
+
+**To point the test site at it:** take the `test` branch connection strings for database `bk_ladwani_workbook` (role `bk_ladwani_app`):
+- `DATABASE_URL`: the pooled URL;
+- `DATABASE_URL_UNPOOLED`: the direct URL.
+
+The `production` and `dev` branches were not touched.
