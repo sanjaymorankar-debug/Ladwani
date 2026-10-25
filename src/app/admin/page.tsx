@@ -101,9 +101,7 @@ export default async function AdminDashboardPage() {
           <div className="space-y-2">
             {[
               { href: '/admin/approvals', label: 'Review Approvals' },
-              { href: '/admin/families', label: 'Manage Families' },
-              { href: '/admin/members', label: 'Manage Members' },
-              { href: '/admin/posts', label: 'Moderate Posts' },
+              { href: '/admin/moderation', label: 'Review Reported Content' },
             ].map((a) => (
               <a key={a.href} href={a.href} className="flex items-center justify-between text-sm py-2 text-saffron-600 hover:text-saffron-700 border-b border-gray-50 last:border-0">
                 {a.label}
@@ -121,7 +119,6 @@ export default async function AdminDashboardPage() {
             <div className="space-y-2">
               {[
                 { href: '/admin/users', label: 'User Management' },
-                { href: '/admin/roles', label: 'Roles & Permissions' },
                 { href: '/admin/audit-logs', label: 'Audit Logs' },
                 { href: '/admin/data-requests', label: 'Data Requests & Consents' },
                 { href: '/reports', label: 'Reports' },
