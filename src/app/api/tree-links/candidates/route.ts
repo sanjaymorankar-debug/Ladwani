@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   const rows = await prisma.familyMember.findMany({
     where: {
       familyId, leftAt: null,
-      member: { deletedAt: null, ...(q ? { OR: [{ firstName: { contains: q } }, { lastName: { contains: q } }] } : {}) },
+      member: { deletedAt: null, ...(q ? { OR: [{ firstName: { contains: q, mode: 'insensitive' } }, { lastName: { contains: q, mode: 'insensitive' } }] } : {}) },
     },
     select: { member: { select: { id: true, firstName: true, lastName: true, gender: true, dateOfBirth: true, status: true } } },
     take: 30,

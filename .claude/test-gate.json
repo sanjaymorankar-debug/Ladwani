@@ -1,0 +1,6 @@
+{
+  "projects": [
+    {"name": "ladwani", "agent": "ladwani-tester", "spec": "TEST_SPEC.md", "paths": ["."]}
+  ],
+  "ignore": ["**/*.md", "docs/**", ".claude/**", "**/*.xlsx", "**/*.docx", "**/*.pdf"]
+}

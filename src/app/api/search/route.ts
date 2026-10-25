@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { tooManyRequests, LIMITS } from '@/lib/rate-limit'
 import { prisma } from '@/lib/prisma'
 import { redactMembersForViewer } from '@/lib/visibility'
+import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
@@ -24,17 +25,17 @@ export async function GET(req: Request) {
 
   if (q) {
     where.OR = [
-      { firstName: { contains: q } },
-      { lastName: { contains: q } },
-      { currentCity: { contains: q } },
-      { nativeVillage: { contains: q } },
-      { occupationCategory: { contains: q } },
+      { firstName: { contains: q, mode: 'insensitive' } },
+      { lastName: { contains: q, mode: 'insensitive' } },
+      { currentCity: { contains: q, mode: 'insensitive' } },
+      { nativeVillage: { contains: q, mode: 'insensitive' } },
+      { occupationCategory: { contains: q, mode: 'insensitive' } },
     ]
   }
 
   if (gender) where.gender = gender
   if (maritalStatus) where.maritalStatus = maritalStatus
-  if (city) where.currentCity = { contains: city }
+  if (city) where.currentCity = { contains: city, mode: 'insensitive' }
 
   if (minAge || maxAge) {
     const now = new Date()
@@ -51,7 +52,7 @@ export async function GET(req: Request) {
     prisma.member.findMany({
       where,
       include: {
-        education: { where: { isHighest: true }, take: 1 },
+        education: { where: { isHighest: true }, take: 1, select: EDUCATION_CORE_SELECT },
         families: { include: { family: { select: { name: true } } }, take: 1 },
       },
       take: 30,

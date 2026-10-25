@@ -44,7 +44,7 @@ describe('F14 Request to join / F15 Karta accepts or rejects', () => {
     const res = await ask(asker, { relationshipTypeCode: 'brother', relatedToMemberId: k.memberId })
     expect(res.status).toBe(201)
     expect((await ask(asker)).status).toBe(409)
-    expect(await prisma.notification.count({ where: { recipientId: k.userId, data: { path: '$.familyId', equals: famId } } })).toBeGreaterThan(0)
+    expect(await prisma.notification.count({ where: { recipientId: k.userId, data: { path: ['familyId'], equals: famId } } })).toBeGreaterThan(0)
   })
 
   it('F14 the claimed role must suit the person', async () => {

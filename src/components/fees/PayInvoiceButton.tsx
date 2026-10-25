@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -12,7 +13,7 @@ export default function PayInvoiceButton({ invoiceId, amountPaise }: { invoiceId
     setBusy(true)
     try {
       // 1. Ask the server to open a payment for this invoice.
-      const startRes = await fetch('/api/fees', {
+      const startRes = await fetch(`${BASE_PATH}/api/fees`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invoiceId }),
@@ -22,12 +23,12 @@ export default function PayInvoiceButton({ invoiceId, amountPaise }: { invoiceId
 
       // 2. Checkout. In MOCK mode the server issues the signed payload a real
       //    gateway would return; with a live gateway its SDK runs here.
-      const credsRes = await fetch(`/api/payments/${startJson.payment.id}/settle`)
+      const credsRes = await fetch(`${BASE_PATH}/api/payments/${startJson.payment.id}/settle`)
       if (!credsRes.ok) throw new Error('Payment gateway is not available')
       const creds = await credsRes.json()
 
       // 3. The server verifies and decides — the browser never declares success.
-      const res = await fetch(`/api/payments/${startJson.payment.id}/settle`, {
+      const res = await fetch(`${BASE_PATH}/api/payments/${startJson.payment.id}/settle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gatewayPaymentId: creds.gatewayPaymentId, signature: creds.signature }),

@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Activity, Loader2 } from 'lucide-react'
@@ -12,7 +13,7 @@ export default function ApprovalMonitorPage() {
 
   const load = useCallback(() => {
     const q = new URLSearchParams(Object.entries(filters).filter(([, v]) => v) as [string, string][])
-    fetch(`/api/approval-monitor?${q}`).then(async (r) => {
+    fetch(`${BASE_PATH}/api/approval-monitor?${q}`).then(async (r) => {
       const j = await r.json()
       if (!r.ok) setError(j.message); else setData(j)
     })
@@ -20,7 +21,7 @@ export default function ApprovalMonitorPage() {
   useEffect(() => { load() }, [load])
 
   const act = async (taskId: string, body: object) => {
-    const res = await fetch(`/api/approval-monitor/tasks/${taskId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const res = await fetch(`${BASE_PATH}/api/approval-monitor/tasks/${taskId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const j = await res.json()
     if (!res.ok) return toast.error(j.message)
     toast.success(j.message); load()

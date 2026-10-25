@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 
@@ -7,15 +8,15 @@ export default function DataRequestsPage() {
   const [requests, setRequests] = useState<any[]>([])
   const [consents, setConsents] = useState<any[]>([])
   const [f, setF] = useState({ q: '', type: '', from: '', to: '' })
-  const load = () => fetch('/api/admin/deletion-requests').then(async (r) => r.ok && setRequests((await r.json()).requests))
+  const load = () => fetch(`${BASE_PATH}/api/admin/deletion-requests`).then(async (r) => r.ok && setRequests((await r.json()).requests))
   const qs = () => new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]).toString()
-  const search = () => fetch(`/api/admin/consents?${qs()}`).then(async (r) => r.ok && setConsents((await r.json()).consents))
+  const search = () => fetch(`${BASE_PATH}/api/admin/consents?${qs()}`).then(async (r) => r.ok && setConsents((await r.json()).consents))
   useEffect(() => { load(); search() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const act = async (id: string, action: string) => {
     const body: any = { action }
     if (action === 'reject') { body.note = window.prompt('Reason for rejecting')?.trim(); if (!body.note) return }
     else if (!window.confirm('Anonymise this person and close the login? This cannot be undone.')) return
-    const res = await fetch(`/api/admin/deletion-requests/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const res = await fetch(`${BASE_PATH}/api/admin/deletion-requests/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const json = await res.json()
     res.ok ? toast.success(json.message) : toast.error(json.message)
     load()
@@ -43,7 +44,7 @@ export default function DataRequestsPage() {
           <input className="form-input" placeholder="Type (e.g. DECLARATION)" value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })} />
           <input className="form-input" type="date" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} />
           <input className="form-input" type="date" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} />
-          <span className="flex gap-2"><button className="btn-secondary text-xs" onClick={search}>Search</button><a className="btn-ghost text-xs" href={`/api/admin/consents?${qs()}&export=csv`}>CSV</a></span>
+          <span className="flex gap-2"><button className="btn-secondary text-xs" onClick={search}>Search</button><a className="btn-ghost text-xs" href={`${BASE_PATH}/api/admin/consents?${qs()}&export=csv`}>CSV</a></span>
         </div>
         <div className="overflow-x-auto"><table className="w-full">
           <thead><tr className="text-left text-gray-500 border-b">{['When', 'Person', 'Person ID', 'Type', 'Granted', 'Version', 'IP'].map((h) => <th key={h} className="py-1 pr-3 font-medium">{h}</th>)}</tr></thead>

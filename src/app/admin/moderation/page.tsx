@@ -1,38 +1,51 @@
-'use client'
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import toast from 'react-hot-toast'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { redirect } from 'next/navigation'
+import { prisma } from '@/lib/prisma'
+import { ShieldCheck } from 'lucide-react'
+import PostModerationQueue from '@/components/admin/PostModerationQueue'
+import ReportedContentQueue from '@/components/admin/ReportedContentQueue'
+import { canModeratePost } from '@/lib/posts'
+import { getPostAccess } from '@/lib/interest-groups'
 
-/** F34 / F36 — items reported for abuse; hidden ones (past the threshold) first. */
-export default function ModerationPage() {
-  const [items, setItems] = useState<any[] | null>(null)
-  const load = () => fetch('/api/reports').then(async (r) => setItems(r.ok ? (await r.json()).items : []))
-  useEffect(() => { load() }, [])
-  const review = async (type: string, id: string, action: string) => {
-    const note = action === 'remove' ? window.prompt('Note to the author (optional)') ?? undefined : undefined
-    const res = await fetch('/api/reports/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, id, action, note }) })
-    const json = await res.json()
-    res.ok ? toast.success(json.message) : toast.error(json.message)
-    load()
+/**
+ * Moderation: posts waiting for approval (F36; FLAGGED = interest-group posts
+ * hidden after reports), limited to the ones this viewer may decide, and the
+ * F34 / F36 reported-content queue.
+ */
+export default async function ModerationPage() {
+  const session = await getServerSession(authOptions)
+  const roles = ((session?.user as any)?.roles ?? []) as string[]
+  if (!roles.includes('ADMIN') && !roles.includes('OPERATOR')) redirect('/dashboard')
+
+  const waiting = await prisma.post.findMany({
+    where: { status: { in: ['PENDING_APPROVAL', 'FLAGGED'] }, deletedAt: null },
+    include: {
+      postType: { select: { label: true, icon: true } },
+      author: { select: { member: { select: { firstName: true, lastName: true } } } },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: 100,
+  })
+  const posts = []
+  for (const p of waiting) {
+    const mine = p.groupId ? (getPostAccess(session, p.id).then((a) => a.isModerator)) : canModeratePost(session, p)
+    if (await mine) posts.push(p)
+    if (posts.length >= 50) break
   }
-  const link = (i: any) => (i.type === 'post' ? `/community/${i.id}` : i.type === 'photo' ? `/api/photos/${i.id}/file` : null)
+
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
-      <h1 className="text-xl font-bold text-gray-900">Reported content</h1>
-      {items?.length === 0 && <p className="text-sm text-gray-500">Nothing reported.</p>}
-      {(items ?? []).map((i) => (
-        <div key={`${i.type}:${i.id}`} className="card text-sm flex items-center justify-between gap-3">
-          <div>
-            <p><strong>{i.type}</strong> · {i.count} report{i.count > 1 ? 's' : ''} {i.hidden && <span className="badge-orange text-xs">hidden</span>}</p>
-            <p className="text-gray-500">{Array.from(new Set(i.reasons)).join(' · ')}</p>
-            {link(i) && <Link href={link(i)!} target="_blank" className="text-saffron-600 text-xs">Open</Link>}
-          </div>
-          <span className="flex gap-2">
-            <button className="btn-secondary text-xs" onClick={() => review(i.type, i.id, 'restore')}>Restore</button>
-            <button className="btn-primary text-xs" onClick={() => review(i.type, i.id, 'remove')}>Remove</button>
-          </span>
-        </div>
-      ))}
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5" /> Moderation
+        </h1>
+        <p className="text-gray-500 text-sm">
+          Posts stay hidden until approved here. {posts.length} waiting.
+        </p>
+      </div>
+      <PostModerationQueue posts={posts as any} />
+      <ReportedContentQueue />
     </div>
   )
 }

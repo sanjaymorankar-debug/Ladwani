@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -34,7 +35,7 @@ export default function NewOrganisationPage() {
     if (file) fd.append('certificate', file)
     setBusy(true)
     try {
-      const res = await fetch('/api/organisations', { method: 'POST', body: fd })
+      const res = await fetch(`${BASE_PATH}/api/organisations`, { method: 'POST', body: fd })
       const json = await res.json()
       if (!res.ok) return void toast.error(json.message)
       toast.success(json.message)

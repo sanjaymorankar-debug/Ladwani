@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -21,7 +22,7 @@ export default function OrganisationPage({ params }: { params: { id: string } })
   const [data, setData] = useState<any>(null)
   const [invitee, setInvitee] = useState<{ id: string; name: string } | null>(null)
   const load = useCallback(() => {
-    fetch(`/api/organisations/${params.id}`).then(async (r) => setData(r.ok ? await r.json() : { error: true }))
+    fetch(`${BASE_PATH}/api/organisations/${params.id}`).then(async (r) => setData(r.ok ? await r.json() : { error: true }))
   }, [params.id])
   useEffect(() => { load() }, [load])
 
@@ -31,7 +32,7 @@ export default function OrganisationPage({ params }: { params: { id: string } })
     if (!res.ok) { toast.error(json.message); return false }
     toast.success(json.message); load(); return true
   }
-  const memberAction = (memberId: string, action: string, extra: object = {}) => post(`/api/organisations/${params.id}/members/${memberId}`, { action, ...extra })
+  const memberAction = (memberId: string, action: string, extra: object = {}) => post(`${BASE_PATH}/api/organisations/${params.id}/members/${memberId}`, { action, ...extra })
   const ask = (q: string) => window.prompt(q)?.trim()
 
   if (!data) return null
@@ -72,7 +73,7 @@ export default function OrganisationPage({ params }: { params: { id: string } })
       )}
       {o.decisionNote && <div className="card text-sm text-amber-800 bg-amber-50 whitespace-pre-line">{o.decisionNote}</div>}
       {o.status === 'CORRECTION_REQUIRED' && data.full && (
-        <button className="btn-primary text-sm" onClick={() => post(`/api/organisations/${o.id}/submit`, {})}>Resubmit for verification</button>
+        <button className="btn-primary text-sm" onClick={() => post(`${BASE_PATH}/api/organisations/${o.id}/submit`, {})}>Resubmit for verification</button>
       )}
 
       <div className="card text-sm space-y-1">
@@ -80,7 +81,7 @@ export default function OrganisationPage({ params }: { params: { id: string } })
         {o.purpose && <p>{o.purpose}</p>}
         {o.registrationNumber && <p className="text-gray-500">Registration no. {o.registrationNumber}</p>}
         {o.addressLine && <p className="text-gray-500">{o.addressLine}</p>}
-        {o.hasCertificate && <a href={`/api/organisations/${o.id}/certificate`} target="_blank" rel="noreferrer" className="text-saffron-600">Certificate</a>}
+        {o.hasCertificate && <a href={`${BASE_PATH}/api/organisations/${o.id}/certificate`} target="_blank" rel="noreferrer" className="text-saffron-600">Certificate</a>}
       </div>
 
       {/* F27 members and posts */}
@@ -122,11 +123,11 @@ export default function OrganisationPage({ params }: { params: { id: string } })
         {data.canManage && o.status === 'ACTIVE' && o.kind === 'LOCAL' && (
           <div className="flex items-end gap-2 pt-2">
             <div className="flex-1"><MemberPicker label="Add a member" value={invitee} onPick={setInvitee} /></div>
-            <button className="btn-primary text-sm" disabled={!invitee} onClick={async () => { if (await post(`/api/organisations/${o.id}/members`, { memberId: invitee!.id })) setInvitee(null) }}>Invite</button>
+            <button className="btn-primary text-sm" disabled={!invitee} onClick={async () => { if (await post(`${BASE_PATH}/api/organisations/${o.id}/members`, { memberId: invitee!.id })) setInvitee(null) }}>Invite</button>
           </div>
         )}
         {!data.full && o.status === 'ACTIVE' && o.kind === 'LOCAL' && (
-          <button className="btn-secondary text-sm" onClick={() => post(`/api/organisations/${o.id}/members`, {})}>Request to join</button>
+          <button className="btn-secondary text-sm" onClick={() => post(`${BASE_PATH}/api/organisations/${o.id}/members`, {})}>Request to join</button>
         )}
         {me?.status === 'ACTIVE' && (
           <button className="text-xs text-gray-500" onClick={() => { if (window.confirm('Leave this organisation?')) memberAction(me.memberId, 'resign') }}>Leave</button>

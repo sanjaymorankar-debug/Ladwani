@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 
   let areaIds: string[] | null = null
   if (mulGaon || district) {
-    const areas = await prisma.area.findMany({ where: { name: { contains: mulGaon || district }, type: mulGaon ? { in: ['VILLAGE', 'CITY'] } : 'DISTRICT' }, select: { id: true } })
+    const areas = await prisma.area.findMany({ where: { name: { contains: mulGaon || district, mode: 'insensitive' }, type: mulGaon ? { in: ['VILLAGE', 'CITY'] } : 'DISTRICT' }, select: { id: true } })
     areaIds = areas.map((a) => a.id)
     if (district) {
       // Villages / cities under those districts (two levels of talukas at most).
@@ -33,8 +33,8 @@ export async function GET(req: Request) {
   const people = await prisma.member.findMany({
     where: {
       id: me ? { not: me } : undefined, deletedAt: null, status: 'ACTIVE', user: { status: 'ACTIVE' },
-      ...(q ? { OR: [{ firstName: { contains: q } }, { lastName: { contains: q } }] } : {}),
-      ...(gotra ? { families: { some: { leftAt: null, family: { gotra: { contains: gotra } } } } } : {}),
+      ...(q ? { OR: [{ firstName: { contains: q, mode: 'insensitive' } }, { lastName: { contains: q, mode: 'insensitive' } }] } : {}),
+      ...(gotra ? { families: { some: { leftAt: null, family: { gotra: { contains: gotra, mode: 'insensitive' } } } } } : {}),
       ...(areaIds ? { memberAreas: { some: { isPrimary: true, areaId: { in: areaIds } } } } : {}),
     },
     select: {

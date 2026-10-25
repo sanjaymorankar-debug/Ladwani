@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import RelationshipSelect from './RelationshipSelect'
@@ -11,7 +12,7 @@ export default function JoinFamilyPanel({ familyId, kartaMemberId, kartaName, ge
   const [note, setNote] = useState('')
   const [sent, setSent] = useState(false)
   const send = async () => {
-    const res = await fetch(`/api/families/${familyId}/join-requests`, {
+    const res = await fetch(`${BASE_PATH}/api/families/${familyId}/join-requests`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ relationshipTypeCode: role || undefined, relatedToMemberId: role ? kartaMemberId : undefined, note }),
     })

@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Briefcase, Plus, Trash2 } from 'lucide-react'
@@ -19,7 +20,7 @@ export default function EmploymentManager({ memberId }: { memberId: string }) {
   const [form, setForm] = useState({ employmentType: '', employerName: '', designation: '', isCurrent: true })
 
   const load = () =>
-    fetch(`/api/members/${memberId}`)
+    fetch(`${BASE_PATH}/api/members/${memberId}`)
       .then((r) => r.json())
       .then((d) => setRecords(d.employment ?? []))
 
@@ -28,7 +29,7 @@ export default function EmploymentManager({ memberId }: { memberId: string }) {
   const add = async () => {
     setAdding(true)
     try {
-      const res = await fetch(`/api/members/${memberId}/employment`, {
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/employment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -45,7 +46,7 @@ export default function EmploymentManager({ memberId }: { memberId: string }) {
   }
 
   const remove = async (id: string) => {
-    await fetch(`/api/members/${memberId}/employment/${id}`, { method: 'DELETE' })
+    await fetch(`${BASE_PATH}/api/members/${memberId}/employment/${id}`, { method: 'DELETE' })
     setRecords((r) => r.filter((x) => x.id !== id))
   }
 

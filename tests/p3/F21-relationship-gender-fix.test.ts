@@ -8,25 +8,29 @@ import type { Person } from '../p2/fixtures'
 /**
  * P3 data fix (owner's decision): relationship rows whose type does not fit
  * the person's gender — left by the old single-inverse rule — are corrected
- * by database/data-fixes/fix_relationship_gender_*.sql, with a backup table
+ * by scripts/postgres/data-fixes/fix_relationship_gender_*.sql (PostgreSQL), with a backup table
  * and an exact rollback.
  */
 const fx = p3Fixtures('p3g')
 let woman: Person, man: Person, child: Person
 
+// The scripts wrap their changes in BEGIN … COMMIT for psql / the Neon SQL
+// editor. Prisma's pool cannot hold one transaction across calls, so the
+// statements between them run one by one here.
 function statements(file: string) {
-  const sql = fs.readFileSync(path.join(__dirname, '../../database/data-fixes', file), 'utf8')
-  return sql.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n').split(/;\s*(?:\n|$)/).map((s) => s.trim()).filter(Boolean)
+  const sql = fs.readFileSync(path.join(__dirname, '../../scripts/postgres/data-fixes', file), 'utf8')
+  return sql.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n').split(/;\s*(?:\n|$)/).map((s) => s.trim())
+    .filter((s) => s && !/^(BEGIN|COMMIT)$/i.test(s))
 }
 async function run(file: string) {
   for (const s of statements(file)) {
-    if (/^select/i.test(s)) await prisma.$queryRawUnsafe(s)
+    if (/^(select|with)\b/i.test(s) && !/\binsert\b/i.test(s)) await prisma.$queryRawUnsafe(s)
     else await prisma.$executeRawUnsafe(s)
   }
 }
 const typeId = async (code: string) => (await prisma.relationshipType.findUniqueOrThrow({ where: { code } })).id
 const row = (fromMemberId: string, code: string) => prisma.memberRelationship.findFirst({ where: { fromMemberId, toMemberId: child.memberId, relationshipType: { code } } })
-const backupExists = async () => ((await prisma.$queryRawUnsafe(`SHOW TABLES LIKE 'zz_fix_relationship_gender_backup'`)) as unknown[]).length > 0
+const backupExists = async () => ((await prisma.$queryRawUnsafe(`SELECT to_regclass('public.zz_fix_relationship_gender_backup')::text AS t`)) as { t: string | null }[])[0].t !== null
 
 beforeAll(async () => {
   woman = await fx.profile('woman', { gender: 'FEMALE' })
@@ -59,7 +63,7 @@ describe('F21 Correct existing relationship rows with the wrong gender (P3 data 
     expect(await row(man.memberId, 'son')).toMatchObject({ isActive: true })
     expect(await row(man.memberId, 'daughter')).toMatchObject({ isActive: false }) // kept, not deleted
     expect(await row(woman.memberId, 'fathers_elder_brother')).toMatchObject({ isActive: true })
-    const backup = (await prisma.$queryRawUnsafe(`SELECT relationshipId, action FROM zz_fix_relationship_gender_backup WHERE fromMemberId IN (?, ?)`, woman.memberId, man.memberId)) as { action: string }[]
+    const backup = (await prisma.$queryRawUnsafe(`SELECT "relationshipId", "action" FROM "zz_fix_relationship_gender_backup" WHERE "fromMemberId" IN ($1, $2)`, woman.memberId, man.memberId)) as { action: string }[]
     expect(backup.map((b) => b.action).sort()).toEqual(['DEACTIVATE', 'RETYPE'])
   })
 

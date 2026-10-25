@@ -1,15 +1,16 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import { BarChart3, Download } from 'lucide-react'
 
 /** F39 — counts by state / district, age and education, Operator SLA (Admin); CSV (Excel) export. */
 export default function ReportsPage() {
   const [d, setD] = useState<any>(null)
-  useEffect(() => { fetch('/api/reports/dashboard').then(async (r) => setD(r.ok ? await r.json() : { error: (await r.json()).message })) }, [])
+  useEffect(() => { fetch(`${BASE_PATH}/api/reports/dashboard`).then(async (r) => setD(r.ok ? await r.json() : { error: (await r.json()).message })) }, [])
   if (!d) return null
   if (d.error) return <p className="text-center text-gray-500 py-10">{d.error}</p>
   const Export = ({ name }: { name: string }) => d.canExport
-    ? <a href={`/api/reports/dashboard?export=${name}`} className="text-xs text-saffron-700 flex items-center gap-1"><Download className="w-3.5 h-3.5" /> Excel (CSV)</a> : null
+    ? <a href={`${BASE_PATH}/api/reports/dashboard?export=${name}`} className="text-xs text-saffron-700 flex items-center gap-1"><Download className="w-3.5 h-3.5" /> Excel (CSV)</a> : null
   const Table = ({ cols, rows }: { cols: [string, string][]; rows: any[] }) => (
     <div className="overflow-x-auto"><table className="w-full text-sm">
       <thead><tr className="text-left text-gray-500 border-b">{cols.map(([, l]) => <th key={l} className="py-1.5 pr-3 font-medium">{l}</th>)}</tr></thead>

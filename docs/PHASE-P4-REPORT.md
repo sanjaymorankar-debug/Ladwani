@@ -1,5 +1,7 @@
 # Phase P4 — Organisations and LadWani bodies: delivery report
 
+> **Database update (25 Oct 2026):** LadWani runs on **PostgreSQL** (Neon). This report was written when the work was on MySQL; its phpMyAdmin scripts and MySQL migrations were replaced by one PostgreSQL migration and `scripts/postgres/`. See [`POSTGRESQL-PORT.md`](POSTGRESQL-PORT.md); its steps replace the MySQL ones below.
+
 Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as P0–P3).
 
 ## 1. Gap analysis (Phase = P4, flows F26–F31)

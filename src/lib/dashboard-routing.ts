@@ -34,3 +34,32 @@ export function resolveOnboardingPath(joinIntent: string | null | undefined): st
   if (joinIntent === 'JOIN_EXISTING') return '/family/setup?mode=search'
   return null
 }
+
+/**
+ * The page to open after sign-in, from the login page's ?callbackUrl=.
+ *
+ * Returned without the basePath, which is the form router.push() takes (Next
+ * adds the prefix itself, so a prefixed path would become /ladwani/ladwani/...).
+ * The value arrives in both forms: the middleware builds it with the basePath
+ * (/ladwani/dashboard), the register page without it (/family/setup?...).
+ * Anything that is not a path on this site, such as another origin or a
+ * protocol-relative //host, gives null, so the parameter cannot send someone
+ * who has just signed in to another site.
+ */
+export function resolveCallbackPath(
+  raw: string | null | undefined,
+  basePath: string,
+  origin?: string,
+): string | null {
+  if (!raw) return null
+  let path = raw.trim()
+  if (origin && (path === origin || path.startsWith(`${origin}/`) || path.startsWith(`${origin}?`))) {
+    path = path.slice(origin.length) || '/'
+  }
+  if (!path.startsWith('/') || path.startsWith('//') || path.startsWith('/\\')) return null
+  if (basePath && (path === basePath || path.startsWith(`${basePath}/`) || path.startsWith(`${basePath}?`))) {
+    path = path.slice(basePath.length)
+    if (!path.startsWith('/')) path = `/${path}`
+  }
+  return path
+}

@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -10,7 +11,7 @@ const STATUS_LABEL: Record<string, string> = { READY: 'Ready', NEEDS_TALUKA: 'Ne
 export default function GroupConversionPage() {
   const [data, setData] = useState<{ groups: any[]; notActive: number } | null>(null)
   const [busy, setBusy] = useState(false)
-  const load = () => fetch('/api/admin/group-conversion').then(async (r) => (r.ok ? setData(await r.json()) : toast.error((await r.json()).message)))
+  const load = () => fetch(`${BASE_PATH}/api/admin/group-conversion`).then(async (r) => (r.ok ? setData(await r.json()) : toast.error((await r.json()).message)))
   useEffect(() => { load() }, [])
   const run = async (action: 'apply' | 'undo') => {
     const ask = action === 'apply'
@@ -18,7 +19,7 @@ export default function GroupConversionPage() {
       : 'Remove the copies that are not active yet (with their invitations and verification tasks)? Active ones are kept.'
     if (!window.confirm(ask)) return
     setBusy(true)
-    const res = await fetch('/api/admin/group-conversion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
+    const res = await fetch(`${BASE_PATH}/api/admin/group-conversion`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
     const json = await res.json()
     res.ok ? toast.success(json.message) : toast.error(json.message)
     setBusy(false)

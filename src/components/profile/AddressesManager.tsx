@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { MapPin, Save, Loader2 } from 'lucide-react'
@@ -29,7 +30,7 @@ export default function AddressesManager({
   const [savingNative, setSavingNative] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/members/${memberId}/addresses`)
+    fetch(`${BASE_PATH}/api/members/${memberId}/addresses`)
       .then((r) => r.json())
       .then((d) => {
         const addrs = d.addresses ?? []
@@ -43,7 +44,7 @@ export default function AddressesManager({
   const save = async (addressType: 'CURRENT' | 'NATIVE', data: AddressForm, setSaving: (b: boolean) => void) => {
     setSaving(true)
     try {
-      const res = await fetch(`/api/members/${memberId}/addresses`, {
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/addresses`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ addressType, ...data }),

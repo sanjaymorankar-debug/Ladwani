@@ -95,6 +95,15 @@ describe('TC-ASSET — registration and approval', () => {
   })
 })
 
+describe('TC-ASSET — search', () => {
+  it('TC-ASSET-005 the city filter is case-insensitive', async () => {
+    const member = await account('MEMBER-01')
+    actAs({ userId: member.userId, roles: member.roles, memberId: member.memberId })
+    const { assets } = await (await getAssets(jsonReq('http://x/api/assets?city=pUNE', 'GET') as any)).json()
+    expect(assets.map((a: any) => a.id)).toContain(assetId)
+  })
+})
+
 describe('TC-BOOK — booking, availability and payment', () => {
   it('TC-BOOK-001 booking quotes the right price and holds the slot pending payment', async () => {
     const member = await account('MEMBER-01')
@@ -149,6 +158,31 @@ describe('TC-BOOK — booking, availability and payment', () => {
       where: { assetId, startAt: start, status: { in: ['PENDING_PAYMENT', 'CONFIRMED'] } },
     })
     expect(held).toBe(1)
+  })
+
+  it('TC-BOOK-002c the database itself refuses an overlap, even bypassing the route (bookings_no_overlap)', async () => {
+    const member = await account('MEMBER-01')
+    const start = tomorrow(60)
+    const end = tomorrow(62)
+    const base = { assetId, memberId: member.memberId, bookedByUserId: member.userId, amountPaise: 1, status: 'PENDING_PAYMENT' as const }
+    const first = await prisma.booking.create({ data: { ...base, reference: `TC-002C-A-${Date.now()}`, startAt: start, endAt: end } })
+    try {
+      // No row lock, no overlap check: straight at the table.
+      await expect(
+        prisma.booking.create({ data: { ...base, reference: `TC-002C-B-${Date.now()}`, startAt: tomorrow(61), endAt: tomorrow(63) } })
+      ).rejects.toThrow(/bookings_no_overlap/)
+
+      // Ranges are half-open, so a booking that starts when another ends is fine.
+      const backToBack = await prisma.booking.create({ data: { ...base, reference: `TC-002C-C-${Date.now()}`, startAt: end, endAt: tomorrow(63) } })
+      await prisma.booking.delete({ where: { id: backToBack.id } })
+
+      // Cancelled bookings do not hold the slot.
+      await prisma.booking.update({ where: { id: first.id }, data: { status: 'CANCELLED' } })
+      const again = await prisma.booking.create({ data: { ...base, reference: `TC-002C-D-${Date.now()}`, startAt: start, endAt: end } })
+      await prisma.booking.delete({ where: { id: again.id } })
+    } finally {
+      await prisma.booking.deleteMany({ where: { assetId, reference: { startsWith: 'TC-002C-' } } })
+    }
   })
 
   it('TC-BOOK-003 a cancelled booking frees the slot again', async () => {

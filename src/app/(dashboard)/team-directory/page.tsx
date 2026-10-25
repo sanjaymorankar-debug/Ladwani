@@ -1,3 +1,4 @@
+import { BASE_PATH } from '@/lib/api-path'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -36,7 +37,7 @@ export default async function TeamDirectoryPage({ searchParams }: { searchParams
           <p className="text-gray-500 text-sm">{scopeLabel} · {result.total} found</p>
         </div>
         {scope.canExport && (
-          <a href={`/api/directory/export${searchParams.q ? `?q=${encodeURIComponent(searchParams.q)}` : ''}`}
+          <a href={`${BASE_PATH}/api/directory/export${searchParams.q ? `?q=${encodeURIComponent(searchParams.q)}` : ''}`}
             className="btn-secondary text-sm flex items-center gap-1.5">
             <Download className="w-4 h-4" /> Export CSV
           </a>

@@ -274,14 +274,14 @@ describe('F28–F31 The LadWani District, State and Country organisations', () =
     for (const code of ['DISTRICT_TEAM', 'STATE_TEAM', 'NATIONAL_TEAM']) expect(await roleOf(sec, code)).toBeNull()
     expect(await membership(districtOrg, m3.memberId)).toMatchObject({ status: 'ACTIVE' }) // the new holder goes up
     expect(await roleOf(m1, 'NATIONAL_TEAM')).not.toBeNull() // others untouched
-    expect(await prisma.notification.count({ where: { type: 'OFFICE_VACANT', data: { path: '$.organisationId', equals: districtOrg } } })).toBeGreaterThan(0)
+    expect(await prisma.notification.count({ where: { type: 'OFFICE_VACANT', data: { path: ['organisationId'], equals: districtOrg } } })).toBeGreaterThan(0)
   })
 
   it('F31 an expired member\'s posts and seats fall vacant and their access goes', async () => {
     await onMemberExpired(m1.memberId, admin.userId)
     for (const code of ['DISTRICT_TEAM', 'STATE_TEAM', 'NATIONAL_TEAM']) expect(await roleOf(m1, code)).toBeNull()
     expect(await membership(districtOrg, m1.memberId)).toMatchObject({ status: 'ENDED' })
-    expect(await prisma.notification.count({ where: { type: 'OFFICE_VACANT', data: { path: '$.organisationId', equals: orgId } } })).toBeGreaterThan(0)
+    expect(await prisma.notification.count({ where: { type: 'OFFICE_VACANT', data: { path: ['organisationId'], equals: orgId } } })).toBeGreaterThan(0)
   })
 
   it('a non-member sees an active organisation\'s summary only (with its town and start date)', async () => {

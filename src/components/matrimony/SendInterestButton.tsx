@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { Heart, Check, Loader2 } from 'lucide-react'
@@ -9,7 +10,7 @@ export default function SendInterestButton({ toMemberId }: { toMemberId: string 
   const send = async () => {
     setStatus('sending')
     try {
-      const res = await fetch('/api/matrimony/interests', {
+      const res = await fetch(`${BASE_PATH}/api/matrimony/interests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ toMemberId }),

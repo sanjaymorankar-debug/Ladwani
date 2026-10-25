@@ -13,6 +13,8 @@ import { getMemberAccess } from '@/lib/member-auth'
 import { hasStaffView } from '@/lib/visibility'
 import InviteToClaimPanel from '@/components/members/InviteToClaimPanel'
 import MarkDeceasedPanel from '@/components/members/MarkDeceasedPanel'
+import DetailsSummary from '@/components/additional-details/DetailsSummary'
+import { EDUCATION_CORE_SELECT, BUSINESS_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 export default async function MemberProfilePage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -29,9 +31,9 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
         include: { family: { select: { id: true, name: true, registrationNumber: true, nativeVillage: true } } },
         take: 1,
       },
-      education: { orderBy: [{ isHighest: 'desc' }, { yearCompleted: 'desc' }] },
+      education: { orderBy: [{ isHighest: 'desc' }, { yearCompleted: 'desc' }], select: EDUCATION_CORE_SELECT },
       employment: { where: { isCurrent: true }, include: { incomeRange: { select: { label: true } } } },
-      businesses: { where: { isActive: true } },
+      businesses: { where: { isActive: true }, select: BUSINESS_CORE_SELECT },
       skills: { include: { skill: true } },
       relationshipsFrom: {
         where: { isActive: true },
@@ -298,6 +300,9 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
           </div>
         )}
       </div>
+
+      {/* Additional Details: each section shown only if its owner's visibility setting includes this viewer. */}
+      <DetailsSummary session={session} memberId={member.id} />
     </div>
   )
 }

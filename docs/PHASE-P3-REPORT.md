@@ -1,5 +1,7 @@
 # Phase P3 — Family tree and cross-family links: delivery report
 
+> **Database update (25 Oct 2026):** LadWani runs on **PostgreSQL** (Neon). This report was written when the work was on MySQL; its phpMyAdmin scripts and MySQL migrations were replaced by one PostgreSQL migration and `scripts/postgres/`. See [`POSTGRESQL-PORT.md`](POSTGRESQL-PORT.md); its steps replace the MySQL ones below.
+
 Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as P0–P2). The stack is unchanged.
 
 ## 1. Gap analysis (Phase = P3, flows F19–F25)
@@ -140,12 +142,12 @@ A browser run against the production build covered:
 
 ## 11. Follow-up: correcting relationship rows with the wrong gender (your decision)
 - **The problem (§1 e 2):** before P3 the reverse link always used the master's single inverse, so for example a daughter added relative to her mother stored "mother is **father** of daughter". New links have been right since P3. Old rows still carry the wrong label (the tree draws them correctly, since father and mother both mean "parent").
-- **The fix is three SQL scripts, not a migration**, in `database/data-fixes/`. A migration would run by itself wherever migrations are deployed, production included. These run only when someone imports them, and per your instruction that is **test only** for now.
+- **The fix is three SQL scripts, not a migration**, now in `scripts/postgres/data-fixes/` (PostgreSQL; first written for MySQL in `database/data-fixes/`). A migration would run by itself wherever migrations are deployed, production included. These run only when someone imports them, and per your instruction that is **test only** for now.
   1. `fix_relationship_gender_preview.sql` changes nothing. It lists (1) the rows the fix will correct, with names and the planned action; (2) mismatches it will **not** touch, because the type has no gender counterpart in the master (e.g. "father's elder brother"), for a person to decide; (3) family roles (`family_members.relationshipRole`) that do not fit the person's gender, also for the Karta or an Operator (F18) to fix by hand.
   2. `fix_relationship_gender_apply.sql` first copies every row it will change (old type, active flag) into a backup table `zz_fix_relationship_gender_backup`. It then gives a wrong row the right type of the same pair (father ↔ mother, son ↔ daughter, and the other 17 gender pairs the app uses). If the correct row already exists, the wrong twin is **switched off** (`isActive = false`), not deleted. Nothing is deleted, and running it twice changes nothing more.
   3. `fix_relationship_gender_rollback.sql` puts every changed row back exactly (type and active flag) from the backup table, then drops the table. Once you are happy with the fix, you can simply drop the backup table instead.
 - **On the test data here:** the preview finds 1 row (Sita Sharma recorded as Rajesh Sharma's *father*), corrected to *mother*. There are no mismatches without a counterpart and no wrong family roles. On a copy of the test database, apply → second apply (no change) → rollback restored it and dropped the backup table.
-- **To run on the test site (phpMyAdmin):** back up (`scripts/backup.sh`); import the preview and check the list; import apply; check a few trees; keep or roll back. Production only on your instruction.
+- **To run on the test site** (`psql` or the Neon SQL editor, on the `test` branch): back up (`scripts/backup.sh`); run the preview and check the list; run apply; check a few trees; keep or roll back. Production only on your instruction.
 - **Tests added:** `tests/p3/F21-relationship-gender-fix.test.ts` (3 tests) runs the real scripts:
   - Preview changes nothing.
   - Apply retypes a mother stored as "father" (same row, new type), switches off a wrong "daughter" twin of an existing "son" row, leaves "father's elder brother" alone, and a second run changes nothing.

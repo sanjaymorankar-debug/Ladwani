@@ -2,23 +2,45 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Two URLs, the names Neon's own tooling writes:
+// - DATABASE_URL           the app at runtime. On Neon, the *pooled* endpoint
+//                          (host contains "-pooler"; PgBouncer, transaction mode).
+// - DATABASE_URL_UNPOOLED  the CLI: migrate, db push, studio. On Neon, the
+//                          *direct* endpoint, because migrate takes a
+//                          session-level advisory lock the pooler cannot hold.
+// The app at runtime never reads DATABASE_URL_UNPOOLED, but every CLI command
+// that loads this datasource fails while it is unset. Prisma has no fallback
+// of its own, so with only one database (local, CI) both hold the same URL:
+// scripts/with-env.js copies DATABASE_URL into it when it is unset, and
+// .env.example sets it to "${DATABASE_URL}", which Prisma's .env loader expands.
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
+
+// PostgreSQL notes (the database was MySQL until Oct 2026):
+// - users.email is CITEXT, so the unique index and every lookup are
+//   case-insensitive, as they were under MySQL's utf8mb4_unicode_ci. The
+//   baseline migration runs CREATE EXTENSION citext.
+// - bookings carries an exclusion constraint (bookings_no_overlap, btree_gist)
+//   that Prisma cannot express; it lives only in the migration SQL. See the
+//   comment on model Booking.
+// - Free-text search uses `mode: 'insensitive'` (ILIKE), since Postgres
+//   compares text case-sensitively by default.
 
 // ─────────────────────────────────────────────────────────────────
 // AUTHENTICATION & ROLES
 // ─────────────────────────────────────────────────────────────────
 
 model User {
-  id                      String     @id @default(cuid())
-  email                   String?    @unique
-  mobile                  String?    @unique
-  passwordHash            String
-  emailVerified           Boolean    @default(false)
-  mobileVerified          Boolean    @default(false)
-  status                  UserStatus @default(PENDING)
+  id              String    @id @default(cuid())
+  email           String?   @unique @db.Citext
+  mobile          String?   @unique
+  passwordHash    String
+  emailVerified   Boolean   @default(false)
+  mobileVerified  Boolean   @default(false)
+  status          UserStatus @default(PENDING)
   // What the user chose at signup: KARTA (register a new family and head it)
   // or JOIN_EXISTING (find and join a family already on the platform).
   // This records INTENT only — it never grants a role by itself. The KARTA
@@ -178,9 +200,13 @@ model ConsentRecord {
   otpReference    String?
   grantedAt       DateTime  @default(now())
   revokedAt       DateTime?
+  /// Whose data the consent covers when it isn't the signed-in user's own —
+  /// a Karta or parent consenting for a child or an account-less elder.
+  memberId        String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([memberId, consentType])
   @@map("consent_records")
 }
 
@@ -318,11 +344,12 @@ model FamilyMember {
   relationshipRole   String?
   relativeToMemberId String?
   status             String    @default("ACTIVE")
-  // Rule 2, enforced by the database: a generated column (migration
-  // 20261009150000_p2_family_karta) that is 1 only on the active Karta row,
+  // Rule 2, enforced by the database: a STORED generated column (migration
+  // 20261025100000_workbook_phases) that is 1 only on the active Karta row,
   // under unique(familyId, kartaGuard) — at most one active Karta per family.
-  // Never written by the application.
-  kartaGuard         Int?
+  // Never written by the application. The dbgenerated text is PostgreSQL's
+  // own rendering of the expression, so `migrate diff` sees no drift.
+  kartaGuard         Int?      @default(dbgenerated("\nCASE\n    WHEN (\"isKarta\" AND (\"leftAt\" IS NULL)) THEN 1\n    ELSE NULL::integer\nEND"))
 
   family Family @relation(fields: [familyId], references: [id])
   member Member @relation(fields: [memberId], references: [id])
@@ -337,81 +364,95 @@ model FamilyMember {
 // ─────────────────────────────────────────────────────────────────
 
 model Member {
-  id                 String             @id @default(cuid())
-  memberNumber       String             @unique
-  userId             String?            @unique
-  firstName          String
-  middleName         String?
-  lastName           String?
-  gender             Gender             @default(NOT_STATED)
-  dateOfBirth        DateTime?
-  dateOfBirthApprox  Boolean            @default(false)
-  bloodGroup         String?
-  heightCm           Int?
-  weightKg           Int?
-  bodyType           String?
-  physicalDisability String?
-  mobilePrimary      String?
-  mobileAlternate    String?
-  email              String?
-  profilePhotoId     String?            @unique
-  biography          String?            @db.Text
-  currentCity        String?
-  currentState       String?
-  currentCountry     String?
-  nativeVillage      String?
-  nativeDistrict     String?
-  nativeState        String?
-  nationality        String             @default("Indian")
-  languages          Json? // JSON array of strings (MySQL has no native arrays)
-  maritalStatus      MaritalStatus      @default(UNMARRIED)
-  employmentStatus   String?
-  occupationCategory String?
-  status             MemberStatus       @default(ACTIVE)
-  deceasedAt         DateTime?
-  deceasedPlace      String?
-  deceasedNotes      String?            @db.Text
-  deathCertKey       String? // F12: encrypted death certificate (secure-files), owner's decision
-  deathCertMime      String?
-  verificationStatus VerificationStatus @default(UNVERIFIED)
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  createdBy          String?
-  updatedBy          String?
-  deletedAt          DateTime?
+  id                    String         @id @default(cuid())
+  memberNumber          String         @unique
+  userId                String?        @unique
+  firstName             String
+  middleName            String?
+  lastName              String?
+  gender                Gender         @default(NOT_STATED)
+  dateOfBirth           DateTime?
+  dateOfBirthApprox     Boolean        @default(false)
+  bloodGroup            String?
+  heightCm              Int?
+  weightKg              Int?
+  bodyType              String?
+  physicalDisability    String?
+  mobilePrimary         String?
+  mobileAlternate       String?
+  /// CITEXT, like users.email: the Karta's duplicate check matches an address
+  /// whatever case it was typed in. Not unique: a parent and child may share one.
+  email                 String?        @db.Citext
+  profilePhotoId        String?        @unique
+  biography             String?        @db.Text
+  currentCity           String?
+  currentState          String?
+  currentCountry        String?
+  nativeVillage         String?
+  nativeDistrict        String?
+  nativeState           String?
+  nationality           String         @default("Indian")
+  languages             Json?          // JSON (jsonb) array of strings
+  maritalStatus         MaritalStatus  @default(UNMARRIED)
+  employmentStatus      String?
+  occupationCategory    String?
+  status                MemberStatus   @default(ACTIVE)
+  deceasedAt            DateTime?
+  deceasedPlace         String?
+  deceasedNotes         String?        @db.Text
+  deathCertKey          String? // F12: encrypted death certificate (secure-files), owner's decision
+  deathCertMime         String?
+  verificationStatus    VerificationStatus @default(UNVERIFIED)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  createdBy             String?
+  updatedBy             String?
+  deletedAt             DateTime?
 
-  user               User?                   @relation(fields: [userId], references: [id])
-  families           FamilyMember[]
-  familiesAsKarta    Family[]                @relation("FamilyKarta")
-  relationshipsFrom  MemberRelationship[]    @relation("RelationshipFrom")
-  relationshipsTo    MemberRelationship[]    @relation("RelationshipTo")
-  maritalHistory     MaritalStatusHistory[]
-  marriageRecordsA   MarriageRecord[]        @relation("MarriagePartnerA")
-  marriageRecordsB   MarriageRecord[]        @relation("MarriagePartnerB")
-  addresses          Address[]
-  education          EducationRecord[]
-  employment         EmploymentRecord[]
-  businesses         Business[]
-  skills             MemberSkill[]
-  matrimonialProfile MatrimonialProfile?
-  photos             Photo[]
-  sentInterests      MatrimonialInterest[]   @relation("InterestFrom")
-  receivedInterests  MatrimonialInterest[]   @relation("InterestTo")
-  savedProfiles      MatrimonialSave[]       @relation("SavedBy")
-  savedByProfiles    MatrimonialSave[]       @relation("Saved")
-  memberAreas        MemberArea[]
-  fieldVisibility    MemberFieldVisibility[]
-  joinRequests       FamilyJoinRequest[]
-  assets             Asset[]
-  bookings           Booking[]
-  payments           Payment[]
-  feeInvoices        FeeInvoice[]
-  profilePhoto       Photo?                  @relation("ProfilePhoto", fields: [profilePhotoId], references: [id])
-  groupsConvened     CommunityGroup[]        @relation("GroupConvener")
-  communityGroups    CommunityGroupMember[]
-  invitations        MemberInvitation[]
-  profileDetails     MemberProfileDetail?
-  idProofs           IdProof[]
+  user                  User?          @relation(fields: [userId], references: [id])
+  families              FamilyMember[]
+  familiesAsKarta       Family[]       @relation("FamilyKarta")
+  relationshipsFrom     MemberRelationship[] @relation("RelationshipFrom")
+  relationshipsTo       MemberRelationship[] @relation("RelationshipTo")
+  maritalHistory        MaritalStatusHistory[]
+  marriageRecordsA      MarriageRecord[] @relation("MarriagePartnerA")
+  marriageRecordsB      MarriageRecord[] @relation("MarriagePartnerB")
+  addresses             Address[]
+  education             EducationRecord[]
+  employment            EmploymentRecord[]
+  businesses            Business[]
+  skills                MemberSkill[]
+  matrimonialProfile    MatrimonialProfile?
+  photos                Photo[]
+  sentInterests         MatrimonialInterest[] @relation("InterestFrom")
+  receivedInterests     MatrimonialInterest[] @relation("InterestTo")
+  savedProfiles         MatrimonialSave[]  @relation("SavedBy")
+  savedByProfiles       MatrimonialSave[]  @relation("Saved")
+  memberAreas           MemberArea[]
+  fieldVisibility       MemberFieldVisibility[]
+  joinRequests          FamilyJoinRequest[]
+  assets                Asset[]
+  bookings              Booking[]
+  payments              Payment[]
+  feeInvoices           FeeInvoice[]
+  profilePhoto          Photo?         @relation("ProfilePhoto", fields: [profilePhotoId], references: [id])
+  groupsConvened        CommunityGroup[]       @relation("GroupConvener")
+  communityGroups       CommunityGroupMember[]
+  invitations           MemberInvitation[]
+  profileDetails        MemberProfileDetail?
+  additionalDetail        MemberAdditionalDetail?
+  sectionSettings         MemberSectionSetting[]
+  insurances              MemberInsurance[]
+  vehicles                MemberVehicle[]
+  loanNeeds               MemberLoanNeed[]
+  farmHoldings            MemberFarmHolding[]
+  sports                  MemberSport[]
+  hobbies                 MemberHobby[]
+  supportRequests         SupportRequest[]
+  files                   MemberFile[]
+  contactRequestsSent     ContactRequest[]        @relation("ContactRequestFrom")
+  contactRequestsReceived ContactRequest[]        @relation("ContactRequestTo")
+  idProofs                IdProof[]
 
   @@map("members")
 }
@@ -532,6 +573,13 @@ model EducationRecord {
   yearCompleted  Int?
   isHighest      Boolean  @default(false)
   isOngoing      Boolean  @default(false)
+  // Additional Details §8 — marks for this degree/class. Year passed is the
+  // existing yearCompleted column; these extend the row, never duplicate it.
+  marksType       String? // PERCENTAGE, CGPA, GRADE
+  marksValue      String?
+  marksScale      Int? // 100, 10, 4
+  boardUniversity String?
+  marksheetFileId String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -575,6 +623,10 @@ model Business {
   establishedYear Int?
   incomeRangeId   String?
   isActive        Boolean  @default(true)
+  // Additional Details §12 — business directory listing.
+  contact         String?
+  showInDirectory Boolean? @default(false)
+  supportNeeds    Json? // array: CUSTOMERS, FUNDING, MENTORING, GOVT_SCHEME, DIGITAL_PRESENCE
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -715,26 +767,433 @@ model MemberProfileDetail {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// ADDITIONAL DETAILS (extended personal details, 23 optional sections)
+//
+// Section definitions, option lists, conditional rules and privacy caps live
+// in src/lib/additional-details/. Amounts are always bands, never figures.
+// No policy, account, card, PAN, CIBIL, 7/12 or survey numbers, and no
+// illness/diagnosis/treatment data is ever stored here.
+// ─────────────────────────────────────────────────────────────────
+
+/// One row per member per section: the opening Yes / No / Prefer-not-to-say
+/// answer, who may see the section, and who entered it (a Karta entering for
+/// a child or elder leaves a note).
+model MemberSectionSetting {
+  id              String   @id @default(cuid())
+  memberId        String
+  sectionKey      String
+  answer          String? // YES, NO, PREFER_NOT
+  visibility      String? // ONLY_ME, KARTA, FAMILY, COMMUNITY_BODIES, COMMUNITY
+  enteredByUserId String?
+  entryNote       String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, sectionKey])
+  @@map("member_section_settings")
+}
+
+/// The single-row sections (2, 3, 5-shared, 7, 8-support, 11, 13–23), one row
+/// per member. Multi-select answers are JSON arrays of option values.
+model MemberAdditionalDetail {
+  id                       String   @id @default(cuid())
+  memberId                 String   @unique
+  // 1 Insurance (help only — policies are rows in member_insurances)
+  insuranceNeedsHelp       Boolean?
+  insuranceHelpNote        String?  @db.Text
+  // 2 Family doctor
+  doctorName               String?
+  doctorSpeciality         String?
+  doctorClinic             String?
+  doctorCity               String?
+  doctorContact            String?
+  doctorNeedsHelp          Boolean?
+  // 3 Investment manager / financial adviser
+  adviserName              String?
+  adviserType              String?
+  adviserContact           String?
+  adviserNeedsGuidance     Boolean?
+  // 5 Banking (loan rows are in member_loan_needs)
+  hasExistingLoans         Boolean?
+  existingLoanTypes        Json?
+  otherBankingNeeds        Json?
+  // 7 House (address is the existing CURRENT address — never duplicated)
+  houseOwnership           String?
+  houseType                String?
+  houseWantsToBuy          Boolean?
+  // 8 Education support (marks are on education_records)
+  eduNeedsSupport          Boolean?
+  eduSupportTypes          Json?
+  eduSupportAmountBand     String?
+  eduSupportNote           String?  @db.Text
+  // 11 Career and work
+  careerLookingFor         Json?
+  careerSkills             Json?
+  careerPreferredCity      String?
+  careerExperienceBand     String?
+  careerCanOffer           Json?
+  careerOfferField         String?
+  careerSupportNeeds       Json?
+  // 13 Skills I can share
+  teachSubjects            String?
+  teachMode                String?
+  teachFeeMode             String?
+  guidanceFields           Json?
+  volunteerReady           Boolean?
+  volunteerHoursBand       String?
+  willingToDonateBlood     Boolean?
+  lastDonatedMonth         String? // YYYY-MM; shown only in the blood donor finder flow
+  // 14 Health and fitness (wellness only)
+  wellnessActivities       Json?
+  wellnessWants            Json?
+  // 15 Senior citizen needs
+  seniorLivesWith          String?
+  seniorNeeds              Json?
+  seniorEmergencyMemberId  String?
+  // 16 Children and students
+  studentClassCourse       String?
+  studentCareerInterest    String?
+  studentNeeds             Json?
+  studentExamName          String?
+  // 17 Women's support
+  womenInterests           Json?
+  womenNeeds               Json?
+  // 18 Government documents and scheme help (tick-list only)
+  govDocNeeds              Json?
+  // 19 Housing and relocation
+  housingLookingTo         Json?
+  housingCity              String?
+  housingBudgetBand        String?
+  relocatingCity           String?
+  relocatingWantsContacts  Boolean?
+  // 20 Travel and events
+  travelInterests          Json?
+  travelCanHost            Boolean?
+  // 21 Language, culture and social (languages spoken = members.languages)
+  motherTongue             String?
+  cultureInterests         Json?
+  openToCityFriends        Boolean?
+  openToMulGaon            Boolean?
+  openToProfession         Boolean?
+  // 22 Marriage-related support
+  marriageSupportNeeds     Json?
+  // 23 Emergency readiness
+  emergencyContactMemberId String?
+  canHelpEmergency         Boolean?
+  emergencyHelpTypes       Json?
+  // Interest-group preferences
+  autoAddToGroups          Boolean? @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("member_additional_details")
+}
+
+/// §1 Insurance (many). No policy numbers.
+model MemberInsurance {
+  id             String   @id @default(cuid())
+  memberId       String
+  insuranceType  String?
+  insurerName    String?
+  sumInsuredBand String?
+  renewalMonth   Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@map("member_insurances")
+}
+
+/// §4 Vehicles and servicing (many). Registration shown masked to others.
+model MemberVehicle {
+  id                    String   @id @default(cuid())
+  memberId              String
+  vehicleType           String?
+  make                  String?
+  model                 String?
+  year                  Int?
+  fuelType              String?
+  lastServiceMonth      String?
+  nextServiceDueMonth   String?
+  preferredGarage       String?
+  needsServicingSupport Boolean?
+  servicingSupportNote  String?  @db.Text
+  registrationNumber    String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@map("member_vehicles")
+}
+
+/// §5 Loan requirements (many). No account/card numbers, CIBIL or PAN.
+model MemberLoanNeed {
+  id            String   @id @default(cuid())
+  memberId      String
+  loanType      String?
+  amountBand    String?
+  purpose       String?
+  neededByMonth String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@map("member_loan_needs")
+}
+
+/// §6 Farm holding (many). District from the areas master; no 7/12 or survey numbers.
+model MemberFarmHolding {
+  id             String   @id @default(cuid())
+  memberId       String
+  districtAreaId String?
+  district       String?
+  taluka         String?
+  village        String?
+  areaValue      Float?
+  areaUnit       String?
+  ownership      String?
+  irrigated      Boolean?
+  mainCrops      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@map("member_farm_holdings")
+}
+
+/// §9 Sports (many); medals and certificates are child rows.
+model MemberSport {
+  id                   String   @id @default(cuid())
+  memberId             String
+  interestId           String?
+  level                String?
+  needsCoachingSupport Boolean?
+  supportTypes         Json?
+  supportNote          String?  @db.Text
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  member       Member                   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  interest     Interest?                @relation(fields: [interestId], references: [id])
+  achievements MemberSportAchievement[]
+
+  @@index([memberId])
+  @@map("member_sports")
+}
+
+model MemberSportAchievement {
+  id                String   @id @default(cuid())
+  sportId           String
+  eventName         String?
+  year              Int?
+  medal             String?
+  certificateFileId String?
+  createdAt         DateTime @default(now())
+
+  sport MemberSport @relation(fields: [sportId], references: [id], onDelete: Cascade)
+
+  @@map("member_sport_achievements")
+}
+
+/// §10 Hobbies and interests (many) — drives the interest groups.
+model MemberHobby {
+  id           String   @id @default(cuid())
+  memberId     String
+  interestId   String
+  level        String? // BEGINNER, REGULAR, EXPERT
+  detail       String? // "which instrument / which dance"
+  canTeach     Boolean?
+  needsSupport Boolean?
+  supportTypes Json?
+  supportNote  String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  member   Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  interest Interest @relation(fields: [interestId], references: [id])
+
+  @@unique([memberId, interestId])
+  @@map("member_hobbies")
+}
+
+/// Hobby / sport master list (§10, §9). Members' "Other" entries arrive as
+/// PENDING and only get a group once an Admin approves (or merges) them.
+model Interest {
+  id                  String    @id @default(cuid())
+  name                String
+  slug                String    @unique
+  category            String?
+  isSport             Boolean?  @default(false)
+  isChildSafe         Boolean?  @default(false)
+  status              String?   @default("APPROVED") // PENDING, APPROVED, REJECTED, MERGED
+  mergedIntoId        String?
+  suggestedByMemberId String?
+  reviewedBy          String?
+  reviewedAt          DateTime?
+  sortOrder           Int?      @default(0)
+  isActive            Boolean?  @default(true)
+  createdAt           DateTime  @default(now())
+
+  hobbies MemberHobby[]
+  sports  MemberSport[]
+  groups  CommunityGroup[]
+
+  @@index([status])
+  @@map("interests")
+}
+
+/// Admin-editable dropdown values (rule 11). When a list has no rows here the
+/// built-in defaults in src/lib/additional-details/options.ts apply.
+model OptionMaster {
+  id        String   @id @default(cuid())
+  listKey   String
+  value     String
+  label     String
+  sortOrder Int?     @default(0)
+  isActive  Boolean? @default(true)
+  updatedAt DateTime @updatedAt
+
+  @@unique([listKey, value])
+  @@map("option_masters")
+}
+
+/// A "needs help" answer the member chose to share with the community support
+/// team (rule 3). District team of that district sees names; State/National
+/// see counts only.
+model SupportRequest {
+  id              String    @id @default(cuid())
+  memberId        String
+  sourceKey       String // e.g. insurance, education, vehicle:<rowId>, hobby:<interestId>
+  category        String // EDUCATION, SPORTS, LOAN, INSURANCE, DOCTOR, SERVICING, …
+  district        String?
+  note            String?   @db.Text
+  status          String?   @default("OPEN") // OPEN, WITHDRAWN, CLOSED
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  withdrawnAt     DateTime?
+  closedAt        DateTime?
+  closedBy        String?
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, sourceKey, status])
+  @@index([category, status])
+  @@map("support_requests")
+}
+
+/// Private uploads for this area (marksheets, sport certificates). Stored via
+/// src/lib/storage.ts, outside the public web root; served only through
+/// /api/member-files/[id] after a visibility check.
+model MemberFile {
+  id               String   @id @default(cuid())
+  memberId         String
+  purpose          String // MARKSHEET, CERTIFICATE
+  storageKey       String
+  originalFilename String?
+  mimeType         String?
+  sizeBytes        Int?
+  uploadedBy       String?
+  createdAt        DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@map("member_files")
+}
+
+/// "Request contact": blood donor finder and matching suggestions. A phone
+/// number is shared only once the recipient accepts.
+model ContactRequest {
+  id           String    @id @default(cuid())
+  purpose      String // BLOOD_DONOR, CONNECT
+  fromMemberId String
+  toMemberId   String
+  message      String?   @db.Text
+  status       String?   @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  respondedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  fromMember Member @relation("ContactRequestFrom", fields: [fromMemberId], references: [id], onDelete: Cascade)
+  toMember   Member @relation("ContactRequestTo", fields: [toMemberId], references: [id], onDelete: Cascade)
+
+  @@index([toMemberId, status])
+  @@map("contact_requests")
+}
+
+/// Group polls and event RSVPs (group posts reuse the posts table).
+model PostPollOption {
+  id        String @id @default(cuid())
+  postId    String
+  label     String
+  sortOrder Int?   @default(0)
+
+  post  Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  votes PostPollVote[]
+
+  @@map("post_poll_options")
+}
+
+model PostPollVote {
+  id        String   @id @default(cuid())
+  postId    String
+  optionId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post   Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  option PostPollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_poll_votes")
+}
+
+model PostRsvp {
+  postId    String
+  userId    String
+  response  String? // GOING, MAYBE, NOT_GOING
+  updatedAt DateTime @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@map("post_rsvps")
+}
+
+// ─────────────────────────────────────────────────────────────────
 // MATRIMONY
 // ─────────────────────────────────────────────────────────────────
 
 model MatrimonialProfile {
-  id                String   @id @default(cuid())
-  memberId          String   @unique
-  isVisible         Boolean  @default(false)
-  about             String?  @db.Text
-  heightCm          Int?
-  // MySQL has no native array column type (unlike Postgres) — stored as a
-  // JSON array of strings instead. Nullable; application code treats a
-  // missing value as an empty list.
-  languages         Json?
+  id         String  @id @default(cuid())
+  memberId   String  @unique
+  isVisible  Boolean @default(false)
+  about      String? @db.Text
+  heightCm   Int?
+  // A JSON (jsonb) array of strings. It was a native String[] before the
+  // MySQL interlude and stayed JSON on the way back, so existing read sites
+  // and migrated MySQL rows need no conversion. Nullable; application code
+  // treats a missing value as an empty list.
+  languages  Json?
   /// F37 extra details.
   expectations      String?  @db.Text
   horoscope         String?  @db.Text
   contactPreference String? // SELF, KARTA, BOTH — who is contacted once an interest is accepted
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  createdBy         String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  createdBy  String?
 
   member      Member                 @relation(fields: [memberId], references: [id])
   preferences MatrimonialPreference?
@@ -863,20 +1322,36 @@ model CommunityGroup {
   reviewNote               String?     @db.Text
   /// Roster upkeep: when the membership list was last confirmed as current,
   /// and how often it should be. Drives the "review due" prompt.
-  lastRosterReviewAt       DateTime?
-  lastRosterReviewBy       String?
-  rosterReviewIntervalDays Int         @default(180)
-  isActive                 Boolean     @default(true)
-  createdAt                DateTime    @default(now())
-  updatedAt                DateTime    @updatedAt
-  createdBy                String?
-  deletedAt                DateTime?
+  lastRosterReviewAt   DateTime?
+  lastRosterReviewBy   String?
+  rosterReviewIntervalDays Int   @default(180)
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  createdBy      String?
+  deletedAt      DateTime?
+  // ── Interest groups (groupType = INTEREST) ──────────────────────
+  // Created automatically from members' Additional Details answers. autoKey
+  // is "<groupKey>|<district or empty>", so the community-level group and
+  // each district sub-group are unique.
+  groupKey                 String? // interest:<interestId>, derived:CAREER, exam:NEET, profession:TEACHER …
+  autoKey                  String?     @unique
+  interestId               String?
+  parentGroupId            String?
+  district                 String?
+  isChildSafe              Boolean?    @default(false)
+  rules                    String?     @db.Text
 
   area     Area?                  @relation(fields: [areaId], references: [id])
   convener Member?                @relation("GroupConvener", fields: [convenerMemberId], references: [id])
   members  CommunityGroupMember[]
+  interest  Interest?              @relation(fields: [interestId], references: [id])
+  parent    CommunityGroup?        @relation("GroupSubGroups", fields: [parentGroupId], references: [id])
+  subGroups CommunityGroup[]       @relation("GroupSubGroups")
+  posts     Post[]
 
   @@index([status, isActive])
+  @@index([groupType, parentGroupId])
   @@map("community_groups")
 }
 
@@ -898,8 +1373,14 @@ model CommunityGroupMember {
   addedBy     String?
   /// Members are retired from a roster rather than deleted, so the group's
   /// history stays intact across periodic updates.
-  leftAt      DateTime?
-  leftReason  String?
+  leftAt     DateTime?
+  leftReason      String? // interest groups: LEFT_BY_MEMBER and REMOVED_BY_MODERATOR are never auto-re-added; NO_LONGER_MATCHES may be
+  // ── Interest-group membership settings ──────────────────────────
+  autoJoined      Boolean?  @default(false)
+  notifyMode      String?   @default("DAILY_DIGEST") // DAILY_DIGEST, EVERY_POST
+  isMuted         Boolean?  @default(false)
+  rulesAcceptedAt DateTime?
+  lastDigestAt    DateTime?
 
   group  CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   member Member         @relation(fields: [memberId], references: [id])
@@ -947,14 +1428,26 @@ model Post {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   deletedAt      DateTime?
+  // ── Interest-group posts. NULL groupId = an ordinary community post. ──
+  groupId         String?
+  groupPostKind   String? // POST, QUESTION, KNOWLEDGE, EVENT, POLL
+  linkUrl         String?    @db.Text
+  isSolved        Boolean?   @default(false)
+  solvedAt        DateTime?
+  solvedCommentId String?
 
-  author    User       @relation(fields: [authorId], references: [id])
-  postType  PostType   @relation(fields: [postTypeId], references: [id])
-  area      Area?      @relation(fields: [targetAreaId], references: [id])
-  comments  Comment[]
+  author   User     @relation(fields: [authorId], references: [id])
+  postType PostType @relation(fields: [postTypeId], references: [id])
+  area     Area?    @relation(fields: [targetAreaId], references: [id])
+  group       CommunityGroup?  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  comments Comment[]
   reactions Reaction[]
-  photos    Photo[]
+  photos   Photo[]
+  pollOptions PostPollOption[]
+  pollVotes   PostPollVote[]
+  rsvps       PostRsvp[]
 
+  @@index([groupId, status])
   @@index([audienceType, audienceId])
   @@map("posts")
 }
@@ -1094,11 +1587,13 @@ model AssetBlackout {
   @@map("asset_blackouts")
 }
 
-/// Double-booking prevention: MySQL has no equivalent of a Postgres GiST
-/// exclusion constraint, so overlap is enforced in application code —
-/// `SELECT ... FOR UPDATE` on the parent Asset row inside the booking
-/// transaction (see src/app/api/assets/[id]/bookings/route.ts) serializes
-/// concurrent attempts for the same asset before the overlap check runs.
+/// Double-booking prevention is enforced by the database: the exclusion
+/// constraint `bookings_no_overlap` (GiST, needs the btree_gist extension)
+/// makes two PENDING_PAYMENT/CONFIRMED bookings of the same asset with
+/// overlapping [startAt, endAt) ranges impossible. Prisma cannot declare it,
+/// so it is created in the baseline migration SQL. The booking route also
+/// locks the Asset row (`SELECT ... FOR UPDATE`) and checks for overlap first,
+/// so the usual case gets a clean 409 instead of a constraint error.
 model Booking {
   id             String        @id @default(cuid())
   reference      String        @unique
@@ -1613,7 +2108,7 @@ model OrganisationMember {
   joinedAt           DateTime?
   endedAt            DateTime?
   endReason          String?
-  officeGuard        String?
+  officeGuard        String?   @default(dbgenerated("\nCASE\n    WHEN ((status = 'ACTIVE'::text) AND (designation <> 'MEMBER'::text)) THEN designation\n    ELSE NULL::text\nEND")) // generated; see the comment above the model
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 

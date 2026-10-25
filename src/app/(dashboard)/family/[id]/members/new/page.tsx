@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -58,8 +59,8 @@ export default function AddMemberPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/relationship-types').then((r) => r.json()),
-      fetch(`/api/families/${familyId}/members`).then((r) => r.json()),
+      fetch(`${BASE_PATH}/api/relationship-types`).then((r) => r.json()),
+      fetch(`${BASE_PATH}/api/families/${familyId}/members`).then((r) => r.json()),
     ]).then(([rels, members]) => {
       setRelTypes(rels?.types ?? [])
       setFamilyMembers(members?.members ?? [])
@@ -80,7 +81,7 @@ export default function AddMemberPage() {
   const submitMember = async (data: FormData, forceCreate: boolean) => {
     setIsLoading(true)
     try {
-      const res = await fetch(`/api/families/${familyId}/members`, {
+      const res = await fetch(`${BASE_PATH}/api/families/${familyId}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, forceCreate }),

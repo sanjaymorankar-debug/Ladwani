@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Users, Search, Filter, MapPin } from 'lucide-react'
 import { calculateAge, genderLabel, maritalLabel } from '@/lib/utils'
 import { redactMembersForViewer } from '@/lib/visibility'
+import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 export default async function MembersDirectoryPage() {
   const session = await getServerSession(authOptions)
@@ -14,7 +15,7 @@ export default async function MembersDirectoryPage() {
   const members = await redactMembersForViewer(session, await prisma.member.findMany({
     where: { status: 'ACTIVE', deletedAt: null },
     include: {
-      education: { where: { isHighest: true }, take: 1 },
+      education: { where: { isHighest: true }, take: 1, select: EDUCATION_CORE_SELECT },
       families: { include: { family: { select: { name: true } } }, take: 1 },
     },
     orderBy: { firstName: 'asc' },

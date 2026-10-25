@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -35,14 +36,14 @@ export default function NewPostPage() {
   const selectedType = postTypes.find((pt) => pt.id === selectedTypeId)
 
   useEffect(() => {
-    fetch('/api/post-types').then((r) => r.json()).then((d) => setPostTypes(d?.types ?? []))
-    fetch('/api/posts/audiences').then((r) => r.json()).then((d) => setAudiences(d?.options ?? []))
+    fetch(`${BASE_PATH}/api/post-types`).then((r) => r.json()).then((d) => setPostTypes(d?.types ?? []))
+    fetch(`${BASE_PATH}/api/posts/audiences`).then((r) => r.json()).then((d) => setAudiences(d?.options ?? []))
   }, [])
 
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
     try {
-      const res = await fetch('/api/posts', {
+      const res = await fetch(`${BASE_PATH}/api/posts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, audienceType: audience.split(':')[0], audienceId: audience.split(':')[1] || null }),

@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Mail, Loader2, Send, X, CheckCircle2 } from 'lucide-react'
@@ -33,7 +34,7 @@ export default function InviteToClaimPanel({
   const [loading, setLoading] = useState(true)
 
   const load = () =>
-    fetch(`/api/members/${memberId}/invite`)
+    fetch(`${BASE_PATH}/api/members/${memberId}/invite`)
       .then((r) => (r.ok ? r.json() : { invitations: [] }))
       .then((d) => setInvitations(d.invitations ?? []))
       .catch(() => {})
@@ -48,7 +49,7 @@ export default function InviteToClaimPanel({
     if (!email.trim()) return toast.error('Enter an email address')
     setBusy(true)
     try {
-      const res = await fetch(`/api/members/${memberId}/invite`, {
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() }),
@@ -69,7 +70,7 @@ export default function InviteToClaimPanel({
   const revoke = async () => {
     setBusy(true)
     try {
-      const res = await fetch(`/api/members/${memberId}/invite`, { method: 'DELETE' })
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/invite`, { method: 'DELETE' })
       if (!res.ok) throw new Error((await res.json()).message)
       toast.success('Invitation cancelled')
       await load()

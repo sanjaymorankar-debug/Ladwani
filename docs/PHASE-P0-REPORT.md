@@ -1,5 +1,7 @@
 # Phase P0 — Foundation: gap analysis and delivery report
 
+> **Database update (25 Oct 2026):** LadWani runs on **PostgreSQL** (Neon). This report was written when the work was on MySQL; its phpMyAdmin scripts and MySQL migrations were replaced by one PostgreSQL migration and `scripts/postgres/`. See [`POSTGRESQL-PORT.md`](POSTGRESQL-PORT.md); its steps replace the MySQL ones below.
+
 Prepared 9 Oct 2026 against `LadWani_Community_Website_Flows_and_Plan.xlsx`
 (workbook) and the build prompt. Branch `claude/intelligent-ritchie-8b37zt`.
 

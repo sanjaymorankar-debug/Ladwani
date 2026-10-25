@@ -1,3 +1,4 @@
+import { BASE_PATH } from '@/lib/api-path'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -61,7 +62,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       district: org.areaId ? chainText(await areaChain(org.areaId)) : null,
       officers: officers.map((o) => ({ designation: o.designation, name: names.get(o.memberId) ?? '', accepted: o.status === 'ACTIVE' })),
       members: body.filter((o) => o.designation === 'MEMBER').map((o) => ({ name: names.get(o.memberId) ?? '', accepted: o.status === 'ACTIVE' })),
-      certificate: canOpenFiles && org.certificateKey ? `/api/organisations/${org.id}/certificate` : null,
+      certificate: canOpenFiles && org.certificateKey ? `${BASE_PATH}/api/organisations/${org.id}/certificate` : null,
     }
   }
 
@@ -84,7 +85,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     change: change ? { status: change.status, changes: change.changes } : null,
     idProofs: proofs.map((p) => ({
       id: p.id, idType: p.idType, masked: maskIdNumber(p.idLast4), status: p.status,
-      files: canOpenFiles ? { proof: `/api/id-proofs/${p.id}/file?kind=proof`, selfSigned: `/api/id-proofs/${p.id}/file?kind=selfSigned` } : null,
+      files: canOpenFiles ? { proof: `${BASE_PATH}/api/id-proofs/${p.id}/file?kind=proof`, selfSigned: `${BASE_PATH}/api/id-proofs/${p.id}/file?kind=selfSigned` } : null,
     })),
   })
 }
