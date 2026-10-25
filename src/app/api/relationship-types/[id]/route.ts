@@ -10,6 +10,8 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
   if (!roles.includes('ADMIN')) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
+  const existing = await prisma.relationshipType.findUnique({ where: { id: params.id }, select: { id: true } })
+  if (!existing) return NextResponse.json({ message: 'Not found' }, { status: 404 })
   const type = await prisma.relationshipType.update({
     where: { id: params.id },
     data: {

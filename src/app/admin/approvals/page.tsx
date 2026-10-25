@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { Clock, CheckCircle2, XCircle, RotateCcw, ArrowUpRight, Filter } from 'lucide-react'
 import { formatDate, timeAgo } from '@/lib/utils'
+import { approvalQueueWhere } from '@/lib/approvals'
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   SUBMITTED: { label: 'Pending', color: 'badge-orange', icon: Clock },
@@ -32,9 +33,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<{ sta
   if (!roles.includes('ADMIN') && !roles.includes('OPERATOR')) redirect('/dashboard')
 
   const statusFilter = searchParams.status
-  const where: any = {}
-  if (statusFilter) where.status = statusFilter
-  else where.status = { in: ['SUBMITTED', 'UNDER_REVIEW', 'ESCALATED'] }
+  const where = approvalQueueWhere(statusFilter)
 
   const [approvals, counts] = await Promise.all([
     prisma.approval.findMany({
