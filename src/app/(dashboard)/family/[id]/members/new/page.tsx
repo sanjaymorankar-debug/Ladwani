@@ -52,7 +52,7 @@ export default function AddMemberPage() {
   const [familyMembers, setFamilyMembers] = useState<any[]>([])
   const [possibleDuplicates, setPossibleDuplicates] = useState<any[] | null>(null)
 
-  const { register, handleSubmit, watch, formState: { errors }, trigger } = useForm<FormData>({
+  const { register, handleSubmit, watch, formState: { errors }, trigger } = useForm<z.input<typeof schema>, unknown, FormData>({
     resolver: zodResolver(schema),
     defaultValues: { gender: 'NOT_STATED', maritalStatus: 'UNMARRIED', currentCountry: 'India' },
   })
@@ -102,7 +102,9 @@ export default function AddMemberPage() {
   }
 
   const onSubmit = (data: FormData) => submitMember(data, false)
-  const addAsNewAnyway = () => submitMember(watch(), true)
+  // Resends the values just submitted (the duplicate warning came back from
+  // the server), so they have passed the schema already.
+  const addAsNewAnyway = () => submitMember(watch() as FormData, true)
 
   const genderWatch = watch('gender')
 

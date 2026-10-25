@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer'
+import nodemailer, { type Mail } from 'nodemailer'
 
 /**
  * Email is sent whenever SMTP is configured — including in development, so
@@ -10,9 +10,9 @@ export function isEmailConfigured(): boolean {
   return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD)
 }
 
-let cachedTransporter: nodemailer.Transporter | null = null
+let cachedTransporter: Mail | null = null
 
-export function getTransporter(): nodemailer.Transporter | null {
+export function getTransporter(): Mail | null {
   if (!isEmailConfigured()) return null
   if (cachedTransporter) return cachedTransporter
 

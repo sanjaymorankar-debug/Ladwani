@@ -26,7 +26,7 @@ export default function CreateMatrimonyProfilePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [existingId, setExistingId] = useState<string | null>(null)
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<z.input<typeof schema>, unknown, FormData>({
     resolver: zodResolver(schema),
   })
 

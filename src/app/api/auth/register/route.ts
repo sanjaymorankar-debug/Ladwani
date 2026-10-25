@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     const parsed = registerSchema.safeParse({ ...body, confirmPassword: body.password, consentAccepted: true })
     
     if (!parsed.success) {
-      return NextResponse.json({ message: parsed.error.errors[0].message }, { status: 400 })
+      return NextResponse.json({ message: parsed.error.issues[0].message }, { status: 400 })
     }
     const data = parsed.data
 
