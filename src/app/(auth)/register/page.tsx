@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -38,7 +39,7 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterInput) => {
     setIsLoading(true)
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(`${BASE_PATH}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -90,7 +91,7 @@ export default function RegisterPage() {
   const verifyOtp = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch('/api/auth/verify-otp', {
+      const res = await fetch(`${BASE_PATH}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: getValues('email'), otp }),

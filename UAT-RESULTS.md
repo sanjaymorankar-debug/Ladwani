@@ -164,5 +164,5 @@ broken; they were never here.
 
 ```bash
 npm run db:seed:uat   # (re)create the test accounts and families
-npm test              # run all 94 tests
+npm test              # the whole suite (94 tests then; TEST_SPEC.md §5 has today's count)
 ```

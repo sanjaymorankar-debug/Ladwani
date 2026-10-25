@@ -3,7 +3,7 @@ import { describe, it, expect, afterAll, vi } from 'vitest'
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }))
 
 import { prisma } from '@/lib/prisma'
-import { POST as postFamilies } from '@/app/api/families/route'
+import { POST as postFamilies, GET as listFamilies } from '@/app/api/families/route'
 import { POST as postMembers, GET as getMembers } from '@/app/api/families/[id]/members/route'
 import { GET as getTree } from '@/app/api/families/[id]/tree/route'
 import { POST as postJoinRequest, GET as getJoinRequests } from '@/app/api/families/[id]/join-requests/route'
@@ -119,6 +119,27 @@ describe('TC-FAM — family and Karta', () => {
     expect(after).toBe(before) // nothing was created (spec §31)
   })
 
+  it('TC-FAM-007b the duplicate check matches an email typed in a different case', async () => {
+    const karta = await account('KARTA-01')
+    // Someone already in the community with only an email on record.
+    const existing = await prisma.member.create({
+      data: { memberNumber: `UAT-TMP-${Date.now()}`, firstName: 'Meera', lastName: 'Casecheck', email: 'Meera.Casecheck@uat.test' },
+    })
+    created.push(existing.id)
+    actAs({ userId: karta.userId, roles: ['KARTA'], memberId: karta.memberId })
+
+    const before = await prisma.member.count()
+    const res = await postMembers(
+      jsonReq('http://x', 'POST', { firstName: 'M', lastName: 'C', gender: 'FEMALE', email: 'MEERA.CASECHECK@UAT.TEST' }) as any,
+      { params: { id: karta.familyId! } }
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.possibleDuplicates.map((d: any) => d.id)).toContain(existing.id)
+    expect(await prisma.member.count()).toBe(before)
+  })
+
   it('TC-FAM-008 an existing member can request to join, and the Karta accepts', async () => {
     const joiner = await account('MEMBER-02')
     const karta = await account('KARTA-02')
@@ -165,7 +186,7 @@ describe('TC-FAM — family and Karta', () => {
 
     actAs({ userId: karta.userId, roles: ['KARTA'], memberId: karta.memberId })
     const res = await patchJoinRequest(
-      jsonReq('http://x', 'PATCH', { decision: 'REJECT' }) as any,
+      jsonReq('http://x', 'PATCH', { decision: 'REJECT', note: 'Not a member of this family' }) as any,
       { params: { id: karta.familyId!, reqId: requestId } }
     )
     expect(res.status).toBe(200)
@@ -175,6 +196,20 @@ describe('TC-FAM — family and Karta', () => {
     })
     expect(link).toBeNull()
     await prisma.familyJoinRequest.deleteMany({ where: { memberId: joiner.memberId } })
+  })
+})
+
+describe('TC-FAM — search', () => {
+  it('TC-FAM-010 family search matches a name typed in a different case', async () => {
+    const karta = await account('KARTA-01')
+    const family = await prisma.family.findUniqueOrThrow({ where: { id: karta.familyId! } })
+    const swapCase = (t: string) =>
+      t.split('').map((c) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase())).join('')
+    expect(swapCase(family.name)).not.toBe(family.name) // the test really changes the case
+    actAs({ userId: karta.userId, roles: karta.roles, memberId: karta.memberId })
+    const res = await listFamilies(new Request(`http://x/api/families?q=${encodeURIComponent(swapCase(family.name))}`) as any)
+    expect(res.status).toBe(200)
+    expect(JSON.stringify(await res.json())).toContain(family.id)
   })
 })
 

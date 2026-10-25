@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -28,7 +29,7 @@ export default function RelationshipTypesTable({ initialTypes }: { initialTypes:
     }
     setBusy(true)
     try {
-      const res = await fetch('/api/relationship-types', {
+      const res = await fetch(`${BASE_PATH}/api/relationship-types`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -53,7 +54,7 @@ export default function RelationshipTypesTable({ initialTypes }: { initialTypes:
 
   const toggleActive = async (id: string, isActive: boolean) => {
     setTypes((t) => t.map((rt) => (rt.id === id ? { ...rt, isActive } : rt)))
-    await fetch(`/api/relationship-types/${id}`, {
+    await fetch(`${BASE_PATH}/api/relationship-types/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isActive }),

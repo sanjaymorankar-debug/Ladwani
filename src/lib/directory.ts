@@ -61,9 +61,9 @@ export async function queryDirectory(
   if (q) {
     and.push({
       OR: [
-        { firstName: { contains: q } },
-        { lastName: { contains: q } },
-        { memberNumber: { contains: q } },
+        { firstName: { contains: q, mode: 'insensitive' } },
+        { lastName: { contains: q, mode: 'insensitive' } },
+        { memberNumber: { contains: q, mode: 'insensitive' } },
       ],
     })
   }

@@ -13,11 +13,11 @@ export default async function AuditLogsPage({ searchParams = {} }: { searchParam
   // F40: search the log — action, entity, actor, dates; "ID proof" shows every upload / view.
   const sp = searchParams
   const where: any = {}
-  if (sp.action) where.action = { contains: sp.action }
+  if (sp.action) where.action = { contains: sp.action, mode: 'insensitive' }
   if (sp.idProof === '1') where.entityType = 'id_proof'
   else if (sp.entityType) where.entityType = sp.entityType
   if (sp.entityId) where.entityId = sp.entityId
-  if (sp.actor) where.actor = { OR: [{ email: { contains: sp.actor } }, { member: { OR: [{ firstName: { contains: sp.actor } }, { lastName: { contains: sp.actor } }] } }] }
+  if (sp.actor) where.actor = { OR: [{ email: { contains: sp.actor, mode: 'insensitive' } }, { member: { OR: [{ firstName: { contains: sp.actor, mode: 'insensitive' } }, { lastName: { contains: sp.actor, mode: 'insensitive' } }] } }] }
   if (sp.from || sp.to) where.createdAt = { ...(sp.from ? { gte: new Date(sp.from) } : {}), ...(sp.to ? { lte: new Date(`${sp.to}T23:59:59`) } : {}) }
   const logs = await prisma.auditLog.findMany({
     where,

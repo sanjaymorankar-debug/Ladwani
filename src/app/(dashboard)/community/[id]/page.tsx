@@ -13,7 +13,7 @@ export default async function PostDetailPage({ params }: { params: { id: string 
   if (!session) return null
 
   const post = await prisma.post.findUnique({
-    where: { id: params.id, deletedAt: null },
+    where: { id: params.id, deletedAt: null, groupId: null }, // interest-group posts stay inside their group
     include: {
       author: AUTHOR_SELECT,
       postType: { select: { label: true, icon: true } },

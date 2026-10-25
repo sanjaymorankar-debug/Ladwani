@@ -1,10 +1,12 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, Shield, CheckCircle2, XCircle, AlertTriangle, MapPin } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDate } from '@/lib/utils'
+import TeamRolesPanel from '@/components/admin/TeamRolesPanel'
 
 const ROLES = ['MEMBER', 'KARTA', 'OPERATOR', 'ADMIN', 'NATIONAL_TEAM', 'DATA_EXPORT']
 // F32: roles mapped to a location. Operators and District teams take a
@@ -26,13 +28,13 @@ export default function UserDetailPage() {
   const [scopedArea, setScopedArea] = useState('')
 
   useEffect(() => {
-    fetch(`/api/admin/users/${params.id}`)
+    fetch(`${BASE_PATH}/api/admin/users/${params.id}`)
       .then((r) => r.json())
       .then(setUser)
   }, [params.id])
 
   useEffect(() => {
-    Promise.all(['DISTRICT', 'STATE'].map((t) => fetch(`/api/admin/areas?type=${t}`).then((r) => r.json())))
+    Promise.all(['DISTRICT', 'STATE'].map((t) => fetch(`${BASE_PATH}/api/admin/areas?type=${t}`).then((r) => r.json())))
       .then((lists) => setAreas(lists.flatMap((l) => l.areas ?? [])))
       .catch(() => setAreas([]))
   }, [])
@@ -40,7 +42,7 @@ export default function UserDetailPage() {
   const updateStatus = async (status: string) => {
     setIsSaving(true)
     try {
-      const res = await fetch(`/api/admin/users/${params.id}`, {
+      const res = await fetch(`${BASE_PATH}/api/admin/users/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -59,14 +61,14 @@ export default function UserDetailPage() {
     const hasRole = user?.userRoles?.some((ur: any) => ur.role.code === roleCode && (ur.areaId ?? null) === areaId)
     setIsSaving(true)
     try {
-      const res = await fetch(`/api/admin/users/${params.id}`, {
+      const res = await fetch(`${BASE_PATH}/api/admin/users/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ toggleRole: roleCode, areaId }),
       })
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? 'Update failed')
       toast.success(hasRole ? `Role ${roleCode} removed` : `Role ${roleCode} added`)
-      const updated = await fetch(`/api/admin/users/${params.id}`).then((r) => r.json())
+      const updated = await fetch(`${BASE_PATH}/api/admin/users/${params.id}`).then((r) => r.json())
       setUser(updated)
     } catch (e: any) {
       toast.error(e.message)
@@ -201,6 +203,8 @@ export default function UserDetailPage() {
           </p>
         )}
       </div>
+
+      <TeamRolesPanel userId={String(params.id)} user={user} onChange={setUser} />
 
       <div className="card space-y-3">
         <h3 className="font-semibold text-gray-900 flex items-center gap-2">

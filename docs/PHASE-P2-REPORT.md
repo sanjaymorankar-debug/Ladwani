@@ -1,5 +1,7 @@
 # Phase P2 — Family and Karta: delivery report
 
+> **Database update (25 Oct 2026):** LadWani runs on **PostgreSQL** (Neon). This report was written when the work was on MySQL; its phpMyAdmin scripts and MySQL migrations were replaced by one PostgreSQL migration and `scripts/postgres/`. See [`POSTGRESQL-PORT.md`](POSTGRESQL-PORT.md); its steps replace the MySQL ones below.
+
 Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as
 P0 and P1). The stack is unchanged (Next.js 14 + Prisma + MySQL).
 
@@ -119,7 +121,7 @@ No new environment keys.
 ## 8. Decisions needed
 1. ~~**Admin review of a Karta change.**~~ — decided: keep it (§9).
 2. ~~**Review queue for marking Expired.**~~ — decided: the review stays, and a death certificate is added (§10).
-3. **Reject without a reason (F15).** The workbook says reject with a reason. The inbox now asks for one, but the API still accepts a rejection without it, because the existing test TC-FAM-009 rejects without a note and expects success. Enforce it in the API? That test would then need a note added.
+3. ~~**Reject without a reason (F15)**~~ — decided: every rejection gives a reason (§11).
 4. **"Removed from friend lists" (F12)** waits for P5, because no friend/connection table exists yet.
 
 ## 9. Follow-up: the Admin review of Karta hand-overs stays (your decision)
@@ -134,12 +136,41 @@ No new environment keys.
 - **Review:** unchanged. A Karta's request goes to the existing §28 review (`member.mark_deceased`); staff still record it directly. The workbook F12 has no review step; this is a deliberate difference.
 - **Certificate:** the "Mark as deceased" form now has a file field (JPG, PNG, WebP or PDF, up to 5 MB). The file is checked by its content, stored **encrypted** in `UPLOAD_DIR` (like the ID proofs), and travels with the review. When the request is approved it is kept on the member (`members.deathCertKey` / `deathCertMime`).
 - **Who can open it:** Admins and Operators only, from the review screen ("View death certificate") via `/api/members/[id]/death-certificate`. Every view is written to the audit log. The Karta who uploaded it, and other members, get "not found".
-- **"After go-live":** the setting `deceased.certificate_required` decides whether the certificate is required. It is **off** now, so existing deaths can be recorded without one during data loading (a certificate can still be attached). At go-live it is switched on with `database/phpmyadmin/set_death_certificate_required_on.sql` (P6 runbook step 2). From then on a request without a certificate is refused ("Attach the death certificate"), and the form marks the field as required.
+- **"After go-live":** the setting `deceased.certificate_required` decides whether the certificate is required. It is **off** now, so existing deaths can be recorded without one during data loading (a certificate can still be attached). At go-live it is switched on with `scripts/postgres/set-death-certificate-required-on.sql` (P6 runbook step 2). From then on a request without a certificate is refused ("Attach the death certificate"), and the form marks the field as required.
 - **Migration** `20261024110000_death_certificate` (+ `down.sql`; phpMyAdmin: `add_death_certificate.sql`). It adds two nullable columns to `members` and the setting (off). It does not change existing data. **Rollback:** `down.sql` deletes the setting and drops the two columns; certificate files already stored stay in the uploads folder (prefix `death-certificates/`) until deleted by hand. Checked on a scratch database: deploy → `down.sql` → phpMyAdmin script → `prisma migrate status` up to date, `migrate diff` no difference.
 - **Tests added** in `tests/p2/F09-F13-family-karta.test.ts`: `F12 while the setting is off, a request without a certificate still goes through` and `F12 once switched on, the certificate is required; it is stored encrypted, travels with the review, and lands on the member when approved` (no file → 400; a non-image → 400; with a PNG → 202, not stored in the clear; the Karta cannot open it, an Admin can and the view is audited; after approval it is on the member). No existing test changed. **416 passed**, twice in a row on a fresh database; typecheck clean; build OK.
 - **Browser check (production build):**
   - Setting off: the form shows "Death certificate (optional)"; the Karta submits with a PNG → "Submitted for review"; the Karta opening the file gets 404; an Operator sees "View death certificate" on the review screen, and it opens (200, image/png).
   - Setting on: the form shows "(required)"; submitting without a file shows "Attach the death certificate", and the API returns 400.
   - A production build without `ID_PROOF_KEY` refuses to store the file (503, "File storage is not configured"), as for ID proofs. The key is already in the P6 runbook step 3.
-- **Still open in §8:** whether the API must refuse a rejection without a reason (F15, item 3). Your reply did not say; it needs your permission to change the existing test TC-FAM-009.
-- **Finding (from before this PR, not changed):** `GET /api/approvals/[id]` returns any request to any signed-in user who knows its id. The certificate itself is safe (the viewer above checks the role), but the request's details are not. Limit it to staff and the person who submitted it? That would change an existing route, so I have not touched it.
+- **Finding (from before this PR) — fixed on your decision (§12):** `GET /api/approvals/[id]` returned any request to any signed-in user who knew its id.
+
+## 11. Follow-up: every rejection gives a reason (your decision)
+- **Rule:** when someone reviewing a request turns it down, the API now refuses to do so without a reason (blank or spaces count as none). The reason is stored and sent to the person, as before.
+
+| Where | Action | Before |
+|---|---|---|
+| Family join request (F15) | Karta rejects | reason optional in the API (the inbox already asked) |
+| Review queue §28 (`/api/approvals/[id]`): Karta change, Expired, spouse link, … | reject, **send back** | optional |
+| Profile claim (F17) | Karta rejects | optional, and the inbox did not ask |
+| Organisation join request (F27) | President / Secretary rejects | optional in the API (the page already asked) |
+| Post moderation (F36) | reject | optional; an empty prompt was sent |
+| Already required | Operator verification reject / send back (F04–F07), tree-link reject (F22), data-deletion reject (F40) | unchanged |
+
+- **Not included on purpose:** a person declining something offered *to them*: an invitation to a family, a Karta or office nomination, a friend request, a marriage interest. That is their own choice, and asking them to explain would be intrusive (and for the bureau, unkind). Hiding a live post keeps its optional note.
+- **Screens:** the claim "Reject" button now asks for the reason; post moderation stops if the reason prompt is empty; the review screen labels the note "required to reject or send back" and checks it before sending.
+- **No migration, no data change.**
+- **Existing test changed (your permission):** `TC-FAM-009` in `tests/uat/family.test.ts` now sends a note (`'Not a member of this family'`) with its rejection. Nothing else in it changed.
+- **Tests added / extended (all mine, in this PR):**
+  - `F15 every rejection gives a reason …; someone declining an invitation they received need not` (join request without / with blank reason → 400 and still pending; invitee declines without one → 200; review queue reject and send back without a note → 400).
+  - `F17 rejecting a claim gives a reason`.
+  - In F27, a President's reject without a reason → 400.
+  - In F36, a moderator's reject without a reason → 400.
+
+  **429 passed**, twice in a row on a fresh database; typecheck clean; build OK.
+
+## 12. Follow-up: one review request is readable by staff only (your decision)
+- **Before:** `GET /api/approvals/[id]` returned a whole request (its old and new values, e.g. a death certificate's file key or a changed name) to any signed-in user who knew the id.
+- **Now:** only Admins and Operators get it; anyone else gets 403. Your words were "staff", so the person who sent the request cannot open it this way either. Members still see their own requests in the list (`GET /api/approvals?mine`), which was already limited to what they submitted. The only screen that opens a single request is the Admin review screen, so no member screen changes.
+- **No migration, no data change.** No existing test read a single request.
+- **Checks added** to my own test `F12 once switched on, the certificate is required …` in `tests/p2/F09-F13-family-karta.test.ts`: the Karta who sent the request gets 403 and an Admin gets 200. **432 passed**, twice in a row on a fresh database; typecheck clean; build OK.

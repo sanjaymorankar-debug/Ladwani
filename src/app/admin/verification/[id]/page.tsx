@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -16,7 +17,7 @@ export default function VerificationTaskPage() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/verification/tasks/${params.id}`).then(async (r) => {
+    fetch(`${BASE_PATH}/api/verification/tasks/${params.id}`).then(async (r) => {
       const j = await r.json()
       if (!r.ok) setError(j.message); else setData(j)
     })
@@ -25,7 +26,7 @@ export default function VerificationTaskPage() {
   const submit = async (decision: string) => {
     if (!window.confirm('A decision cannot be changed after you submit it. Continue?')) return
     setBusy(true)
-    const res = await fetch(`/api/verification/tasks/${params.id}`, {
+    const res = await fetch(`${BASE_PATH}/api/verification/tasks/${params.id}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, checklist, remarks }),
     })
     const j = await res.json()

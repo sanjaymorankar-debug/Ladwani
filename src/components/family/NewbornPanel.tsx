@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -15,7 +16,7 @@ export default function NewbornPanel({ familyId, fathers, mothers }: {
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }))
 
   const save = async () => {
-    const res = await fetch(`/api/families/${familyId}/newborn`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+    const res = await fetch(`${BASE_PATH}/api/families/${familyId}/newborn`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
     const json = await res.json()
     if (!res.ok) return toast.error(json.message)
     toast.success(`${json.name} added`); setOpen(false); router.refresh()

@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Camera, Star, Trash2, Loader2, Upload } from 'lucide-react'
@@ -23,7 +24,7 @@ const VISIBILITY_OPTIONS = [
 function PhotoThumb({ photoId }: { photoId: string }) {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
-    fetch(`/api/photos/${photoId}/url?variant=thumbnail`)
+    fetch(`${BASE_PATH}/api/photos/${photoId}/url?variant=thumbnail`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setUrl(d.url))
       .catch(() => {})
@@ -42,10 +43,10 @@ export default function PhotoManager({ memberId }: { memberId: string }) {
   const fileRef = useRef<HTMLInputElement>(null)
   // F34: one of my friend lists can be the audience too.
   const [lists, setLists] = useState<{ id: string; name: string }[]>([])
-  useEffect(() => { fetch('/api/friends').then((r) => (r.ok ? r.json() : null)).then((d) => d && setLists(d.lists ?? [])).catch(() => {}) }, [])
+  useEffect(() => { fetch(`${BASE_PATH}/api/friends`).then((r) => (r.ok ? r.json() : null)).then((d) => d && setLists(d.lists ?? [])).catch(() => {}) }, [])
 
   const load = () =>
-    fetch(`/api/members/${memberId}/photos`)
+    fetch(`${BASE_PATH}/api/members/${memberId}/photos`)
       .then((r) => r.json())
       .then((d) => setPhotos(d.photos ?? []))
 
@@ -59,7 +60,7 @@ export default function PhotoManager({ memberId }: { memberId: string }) {
       const form = new FormData()
       form.append('file', file)
       form.append('setAsProfile', String(photos.length === 0))
-      const res = await fetch(`/api/members/${memberId}/photos`, { method: 'POST', body: form })
+      const res = await fetch(`${BASE_PATH}/api/members/${memberId}/photos`, { method: 'POST', body: form })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message)
       toast.success('Photo uploaded')
@@ -73,7 +74,7 @@ export default function PhotoManager({ memberId }: { memberId: string }) {
   }
 
   const setProfile = async (photoId: string) => {
-    await fetch(`/api/members/${memberId}/photos/${photoId}`, {
+    await fetch(`${BASE_PATH}/api/members/${memberId}/photos/${photoId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ setAsProfile: true }),
@@ -83,7 +84,7 @@ export default function PhotoManager({ memberId }: { memberId: string }) {
 
   const setVisibility = async (photoId: string, value: string) => {
     const [visibility, audienceListId] = value.split(':')
-    await fetch(`/api/members/${memberId}/photos/${photoId}`, {
+    await fetch(`${BASE_PATH}/api/members/${memberId}/photos/${photoId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ visibility, audienceListId: audienceListId || undefined }),
@@ -92,7 +93,7 @@ export default function PhotoManager({ memberId }: { memberId: string }) {
   }
 
   const remove = async (photoId: string) => {
-    await fetch(`/api/members/${memberId}/photos/${photoId}`, { method: 'DELETE' })
+    await fetch(`${BASE_PATH}/api/members/${memberId}/photos/${photoId}`, { method: 'DELETE' })
     setPhotos((p) => p.filter((x) => x.id !== photoId))
   }
 

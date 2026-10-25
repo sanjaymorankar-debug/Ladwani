@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Plus, ChevronRight, ChevronDown } from 'lucide-react'
@@ -29,7 +30,7 @@ export default function LocationMasterAdmin() {
   const [adding, setAdding] = useState<{ parentId: string | null; type: string } | null>(null)
   const [name, setName] = useState('')
 
-  const load = () => fetch('/api/admin/areas').then((r) => r.json()).then((d) => setAreas(d.areas ?? []))
+  const load = () => fetch(`${BASE_PATH}/api/admin/areas`).then((r) => r.json()).then((d) => setAreas(d.areas ?? []))
   useEffect(() => { load() }, [])
 
   const children = useMemo(() => {
@@ -49,7 +50,7 @@ export default function LocationMasterAdmin() {
 
   const add = async () => {
     if (!adding) return
-    const ok = await call('/api/admin/areas', {
+    const ok = await call(`${BASE_PATH}/api/admin/areas`, {
       method: 'POST',
       body: JSON.stringify({ name, type: adding.type, parentId: adding.parentId }),
     }, `${adding.type.toLowerCase()} added`)
@@ -61,7 +62,7 @@ export default function LocationMasterAdmin() {
 
   const rename = (a: Area) => {
     const next = window.prompt(`Rename ${a.type.toLowerCase()}`, a.name)
-    if (next && next.trim() !== a.name) call(`/api/admin/areas/${a.id}`, { method: 'PATCH', body: JSON.stringify({ name: next }) }, 'Renamed')
+    if (next && next.trim() !== a.name) call(`${BASE_PATH}/api/admin/areas/${a.id}`, { method: 'PATCH', body: JSON.stringify({ name: next }) }, 'Renamed')
   }
 
   const addForm = (parentId: string | null, parentType: string) => {
@@ -102,7 +103,7 @@ export default function LocationMasterAdmin() {
             </button>
             <div className="flex gap-3 text-xs flex-shrink-0">
               <button type="button" onClick={() => rename(a)} className="text-gray-600 hover:text-gray-900">Rename</button>
-              <button type="button" onClick={() => call(`/api/admin/areas/${a.id}`, { method: 'PATCH', body: JSON.stringify({ isActive: !a.isActive }) }, a.isActive ? 'Deactivated' : 'Reactivated')}
+              <button type="button" onClick={() => call(`${BASE_PATH}/api/admin/areas/${a.id}`, { method: 'PATCH', body: JSON.stringify({ isActive: !a.isActive }) }, a.isActive ? 'Deactivated' : 'Reactivated')}
                 className={a.isActive ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}>
                 {a.isActive ? 'Deactivate' : 'Reactivate'}
               </button>

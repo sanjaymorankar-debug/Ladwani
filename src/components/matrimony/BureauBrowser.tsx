@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, MapPin, GraduationCap, Briefcase } from 'lucide-react'
@@ -15,7 +16,7 @@ export default function BureauBrowser() {
   const set = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }))
   const search = useCallback(async (filters = f) => {
     const qs = new URLSearchParams(Object.entries(filters).filter(([, v]) => v) as [string, string][])
-    const res = await fetch(`/api/matrimony/profiles?${qs}`)
+    const res = await fetch(`${BASE_PATH}/api/matrimony/profiles?${qs}`)
     const json = await res.json()
     if (!res.ok) { setError(json.message); setProfiles([]); return }
     setError(null); setProfiles(json.profiles)

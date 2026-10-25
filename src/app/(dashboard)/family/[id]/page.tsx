@@ -15,6 +15,7 @@ import MemberManageActions from '@/components/family/MemberManageActions'
 import NewbornPanel from '@/components/family/NewbornPanel'
 import FamilyAlbum from '@/components/family/FamilyAlbum'
 import JoinFamilyPanel from '@/components/family/JoinFamilyPanel'
+import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 export default async function FamilyDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -64,7 +65,7 @@ export default async function FamilyDetailPage({ params }: { params: { id: strin
         include: {
           member: {
             include: {
-              education: { where: { isHighest: true }, take: 1 },
+              education: { where: { isHighest: true }, take: 1, select: EDUCATION_CORE_SELECT },
             },
           },
         },

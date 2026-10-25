@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 
@@ -54,14 +55,14 @@ export default function TreeBuilderActions({ familyId, person, onChanged }: {
   const [toMemberId, setToMemberId] = useState('')
 
   const searchFamilies = async () => {
-    const r = await fetch(`/api/families?q=${encodeURIComponent(famQ)}`)
+    const r = await fetch(`${BASE_PATH}/api/families?q=${encodeURIComponent(famQ)}`)
     const j = await r.json()
     setFamilies((j.families ?? []).filter((f: any) => f.id !== familyId))
   }
   const pickFamily = async (f: any) => {
     setTarget(f); setFamilies([])
     if (open === 'link') {
-      const r = await fetch(`/api/tree-links/candidates?familyId=${f.id}&q=${encodeURIComponent(person.firstName)}`)
+      const r = await fetch(`${BASE_PATH}/api/tree-links/candidates?familyId=${f.id}&q=${encodeURIComponent(person.firstName)}`)
       setPeople((await r.json()).people ?? [])
     }
   }
@@ -69,18 +70,18 @@ export default function TreeBuilderActions({ familyId, person, onChanged }: {
   const run = async (fn: () => Promise<void>) => { setBusy(true); try { await fn() } finally { setBusy(false) } }
 
   const saveParents = () => run(async () => {
-    const { res, json } = await post(`/api/families/${familyId}/tree/parents`, { childMemberId: person.id, father, mother })
+    const { res, json } = await post(`${BASE_PATH}/api/families/${familyId}/tree/parents`, { childMemberId: person.id, father, mother })
     if (!res.ok) return void toast.error(json.message)
     toast.success(json.message); setOpen(null); onChanged()
   })
   const saveSibling = () => run(async () => {
-    const { res, json } = await post(`/api/families/${familyId}/tree/siblings`, { ofMemberId: person.id, ...sib, linkFamilyId: target?.id })
+    const { res, json } = await post(`${BASE_PATH}/api/families/${familyId}/tree/siblings`, { ofMemberId: person.id, ...sib, linkFamilyId: target?.id })
     if (!res.ok) return void toast.error(json.message)
     toast.success(json.linkPlaceholder ? 'Sibling added. Link them to the person in the other family from your requests.' : json.message)
     setOpen(null); onChanged()
   })
   const sendLink = () => run(async () => {
-    const { res, json } = await post('/api/tree-links', {
+    const { res, json } = await post(`${BASE_PATH}/api/tree-links`, {
       fromFamilyId: familyId, fromMemberId: person.id, toFamilyId: target?.id, toMemberId,
       ...(conflicts ? { proposedResolution: choice } : {}),
     })

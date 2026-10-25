@@ -28,11 +28,22 @@ if (fs.existsSync(envPath)) {
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1)
     }
+    // ${NAME} refers to a variable defined earlier (or already in the
+    // environment), as in Prisma's and Next's own .env loading, so a file
+    // copied from .env.example means the same thing here.
+    value = value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, name) => env[name] ?? '')
     env[key] = value
   }
 } else {
   console.error(`env file not found: ${envPath}`)
   process.exit(1)
+}
+
+// prisma/schema.prisma reads the direct (unpooled) URL for the CLI from
+// DATABASE_URL_UNPOOLED. With a single database, as in local tests and CI,
+// that is the same URL, so one variable is enough.
+if (!env.DATABASE_URL_UNPOOLED && env.DATABASE_URL) {
+  env.DATABASE_URL_UNPOOLED = env.DATABASE_URL
 }
 
 const result = spawnSync(command, args, { stdio: 'inherit', env, shell: process.platform === 'win32' })

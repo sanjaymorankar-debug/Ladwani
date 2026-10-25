@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -34,7 +35,7 @@ export default function EditFamilyPage() {
   })
 
   useEffect(() => {
-    fetch(`/api/families/${familyId}`)
+    fetch(`${BASE_PATH}/api/families/${familyId}`)
       .then((r) => r.json())
       .then((data) => {
         reset({
@@ -57,7 +58,7 @@ export default function EditFamilyPage() {
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
     try {
-      const res = await fetch(`/api/families/${familyId}`, {
+      const res = await fetch(`${BASE_PATH}/api/families/${familyId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

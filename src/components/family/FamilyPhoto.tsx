@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -19,7 +20,7 @@ export default function FamilyPhoto({
   useEffect(() => {
     setUrl(null)
     if (!photoId) return
-    fetch(`/api/photos/${photoId}/url`)
+    fetch(`${BASE_PATH}/api/photos/${photoId}/url`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setUrl(d.url))
       .catch(() => {})
@@ -32,7 +33,7 @@ export default function FamilyPhoto({
     try {
       const form = new FormData()
       form.append('file', file)
-      const res = await fetch(`/api/families/${familyId}/photos`, { method: 'POST', body: form })
+      const res = await fetch(`${BASE_PATH}/api/families/${familyId}/photos`, { method: 'POST', body: form })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message)
       toast.success('Family photo updated')

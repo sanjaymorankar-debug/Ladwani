@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Landmark, Plus } from 'lucide-react'
@@ -10,7 +11,7 @@ const STATUS: Record<string, string> = { PENDING_APPROVAL: 'Being verified', COR
 export default function OrganisationsPage() {
   const [data, setData] = useState<{ mine: any[]; organisations: any[] } | null>(null)
   const [q, setQ] = useState('')
-  const load = (query = '') => fetch(`/api/organisations?q=${encodeURIComponent(query)}`).then((r) => r.json()).then(setData)
+  const load = (query = '') => fetch(`${BASE_PATH}/api/organisations?q=${encodeURIComponent(query)}`).then((r) => r.json()).then(setData)
   useEffect(() => { load() }, [])
 
   return (

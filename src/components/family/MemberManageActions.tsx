@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -20,7 +21,7 @@ export default function MemberManageActions({ familyId, memberId, gender, canRem
   const [remark, setRemark] = useState('')
 
   const send = async (method: string, body: object, ok: string) => {
-    const res = await fetch(`/api/families/${familyId}/members/${memberId}`, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const res = await fetch(`${BASE_PATH}/api/families/${familyId}/members/${memberId}`, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const json = await res.json().catch(() => ({}))
     if (!res.ok) return toast.error(json.message ?? 'Failed')
     toast.success(ok); setMode('none'); router.refresh()

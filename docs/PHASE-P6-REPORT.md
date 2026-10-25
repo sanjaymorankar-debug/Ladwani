@@ -1,5 +1,7 @@
 # Phase P6 — Reports, data rights and hardening: delivery report
 
+> **Database update (25 Oct 2026):** LadWani runs on **PostgreSQL** (Neon). This report was written when the work was on MySQL; its phpMyAdmin scripts and MySQL migrations were replaced by one PostgreSQL migration and `scripts/postgres/`. See [`POSTGRESQL-PORT.md`](POSTGRESQL-PORT.md); its steps replace the MySQL ones below.
+
 Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as P0–P5).
 
 **Production has not been touched.** Per your instruction, the production deployment below is a prepared runbook only.
@@ -33,11 +35,11 @@ Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as P0�
 - Recommendation: set `connection_limit=5` in `DATABASE_URL` on Hostinger and run a single `next start` process.
 
 ## 3. Backup and restore (exit criterion)
-- **New scripts:**
-  - `scripts/backup.sh`: mysqldump `--single-transaction --no-tablespaces` (works without the PROCESS privilege on shared hosting), plus the uploads folder; keeps 14 days; files are written private (`umask 077`).
+- **New scripts** (rewritten for PostgreSQL on 25 Oct; the MySQL version used mysqldump):
+  - `scripts/backup.sh`: `pg_dump` custom format from `BACKUP_DATABASE_URL` (the direct URL), plus the uploads folder; keeps 14 days; files are written private (`umask 077`).
   - `scripts/restore.sh`: restores **only into a new, empty database**, and refuses the live one.
   - `scripts/verify-restore.sh`: compares row counts table by table.
-- **Tested here** on the full test database (68 tables, including the generated-column tables):
+- **Tested here again on PostgreSQL** (25 Oct): 85 tables, including the two generated columns. The steps and results were the same as below. First run, on MySQL, with 68 tables:
   1. Backup.
   2. Restore into a fresh database plus the uploads archive.
   3. "restore verified: every table matches".
@@ -84,28 +86,18 @@ A browser run against the production build covered:
 5. The HSTS header being present.
 
 ## 7. Deployment runbook (test first; production only on your instruction)
-1. **Back up** with `scripts/backup.sh`, using `scripts/.backup.env` with the hosting database credentials (the file is git-ignored).
-2. **Migrate** with `npx prisma migrate deploy`. Or, in phpMyAdmin, import in order:
-   - `add_p0_team_roles.sql`
-   - `add_p1_registration_approval.sql`
-   - `add_p2_family_karta.sql` (run its PRE-CHECK first)
-   - `add_p3_tree_links.sql`
-   - `add_p4_organisations.sql`
-   - `add_p5_social_bureau.sql`
-   - `add_p6_data_rights.sql`
-   - `set_bureau_workbook_rules_on.sql`
-   - `set_address_changes_instant.sql`
-   - `add_p4_taluka_chain.sql`
-   - `add_death_certificate.sql`
-   - `add_group_conversion.sql` (then, when ready: Admin → Settings → Convert Groups to Organisations; test first; P4 report §10)
-   - **production only, at go-live:** `set_death_certificate_required_on.sql` (from then on an Expired request needs a death certificate; P2 report §10)
+*(Updated for PostgreSQL / Neon; see `POSTGRESQL-PORT.md` and `DEPLOYMENT.md`.)*
+1. **Back up** with `scripts/backup.sh` (`pg_dump`), with `BACKUP_DATABASE_URL` set to the tier's **direct** Neon URL in `scripts/.backup.env` (git-ignored). Neon's own point-in-time history also covers its retention window.
+2. **Migrate** with `npx prisma migrate deploy` (it uses `DATABASE_URL_UNPOOLED`, the direct URL). That applies `20261025100000_workbook_phases`, which is all of P0–P6. An **empty** database can instead be built with `scripts/postgres/01-schema.sql` then `02-reference-data.sql`.
+   - Then, when ready: Admin → Settings → Convert Groups to Organisations (test first; P4 report §10).
+   - **Production only, at go-live:** `scripts/postgres/set-death-certificate-required-on.sql`. From then on an Expired request needs a death certificate (P2 report §10).
 
    Then run `npm run db:seed` (reference data only; it does not overwrite real data). **Never run `db:seed:uat` on production.**
 3. **Environment:** `ID_PROOF_KEY` (32 random bytes, base64, kept safe), `CRON_SECRET` (16+ characters), working SMTP (Admin 2FA, confirmations). Optional: `AUTH_ADMIN_2FA`, `NEXT_PUBLIC_REGISTRATION_REQUIRE_MOBILE`, `CSP_REPORT_ONLY` (build-time; `true` only reports CSP violations, the rollback switch in §11). `UPLOAD_DIR` must be outside `public_html`. Run **one** `next start` process: the rate limits are kept in memory.
 4. **Cron jobs (hPanel):**
    - hourly: `/api/cron/approval-sla`
    - daily: `/api/cron/daily`
-   - nightly: `scripts/backup.sh`
+   - nightly: `scripts/backup.sh`, from a machine with `pg_dump` (Hostinger shared hosting may not have it)
 5. **Map Operators:** at least 3 per district (OP-04).
 6. **Rebuild and restart** the Node app.
 7. **Run the UAT checklist** (`docs/UAT-CHECKLIST.md`) and a **restore drill**: restore last night's backup into a scratch database and run `verify-restore.sh`.
@@ -117,7 +109,7 @@ A browser run against the production build covered:
 - **Deliverable "Production release"** — ⏳ waiting for your instruction (production not touched).
 
 ## 9. Decisions needed
-1. **Production go-live:** when, and who runs the steps above?
+1. ~~**Production go-live**~~ — your answer: everything stays on **test only** until you say otherwise. Production is not touched.
 2. ~~**Content-Security-Policy and rate limiting**~~ — decided: build them (§11).
 3. ~~**Operator access to global counts**~~ — decided: Admin only (§10).
 

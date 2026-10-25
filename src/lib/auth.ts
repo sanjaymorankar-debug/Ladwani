@@ -4,6 +4,7 @@ import { compare, hash } from 'bcryptjs'
 import { prisma } from './prisma'
 import { requireAccountVerification, adminSecondFactorRequired } from './auth-config'
 import { verifyOtp } from './otp'
+import { BASE_PATH } from './api-path'
 
 export type LoginErrorCode =
   | 'INVALID_CREDENTIALS'
@@ -133,9 +134,12 @@ export async function validateLogin(identifier: string, password: string): Promi
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt', maxAge: 30 * 24 * 60 * 60 },
+  // next-auth redirects to these verbatim (it knows nothing of Next's
+  // basePath), so they carry the prefix the app is served under: /ladwani on
+  // bkesari.com, '' when served from the root of its own hostname.
   pages: {
-    signIn: '/login',
-    error: '/login',
+    signIn: `${BASE_PATH}/login`,
+    error: `${BASE_PATH}/login`,
   },
   callbacks: {
     async jwt({ token, user }) {

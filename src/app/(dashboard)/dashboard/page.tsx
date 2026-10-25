@@ -9,6 +9,8 @@ import Link from 'next/link'
 import VacancyConfirmList from '@/components/family/VacancyConfirmList'
 import { formatDate, calculateAge } from '@/lib/utils'
 import { resolveDashboardLabel, resolveOnboardingPath } from '@/lib/dashboard-routing'
+import MatchSuggestions from '@/components/connect/MatchSuggestions'
+import ContactRequests from '@/components/connect/ContactRequests'
 
 async function getDashboardData(userId: string) {
   const [user, recentPosts, stats] = await Promise.all([
@@ -24,7 +26,7 @@ async function getDashboardData(userId: string) {
       },
     }),
     prisma.post.findMany({
-      where: { status: 'PUBLISHED', deletedAt: null },
+      where: { status: 'PUBLISHED', deletedAt: null, groupId: null },
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: {
@@ -158,6 +160,14 @@ export default async function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* Matching suggestions (Additional Details, Step 3 rule 12) */}
+      {member && (
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2"><MatchSuggestions memberId={member.id} /></div>
+          <ContactRequests />
+        </div>
+      )}
 
       {/* Community feed */}
       <div className="grid lg:grid-cols-3 gap-6">

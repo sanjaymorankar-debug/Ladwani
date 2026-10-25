@@ -1,5 +1,7 @@
 # Phase P3 — Family tree and cross-family links: delivery report
 
+> **Database update (25 Oct 2026):** LadWani runs on **PostgreSQL** (Neon). This report was written when the work was on MySQL; its phpMyAdmin scripts and MySQL migrations were replaced by one PostgreSQL migration and `scripts/postgres/`. See [`POSTGRESQL-PORT.md`](POSTGRESQL-PORT.md); its steps replace the MySQL ones below.
+
 Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as P0–P2). The stack is unchanged.
 
 ## 1. Gap analysis (Phase = P3, flows F19–F25)
@@ -116,8 +118,8 @@ A browser run against the production build covered:
 
 ## 8. Decisions needed
 1. ~~**OP-02:**~~ — decided: 3 generations up (§10).
-2. **Marriage review:** the existing §28 review still applies before a marriage takes effect, so the family requests follow the review. The workbook F23 has no review step. Remove it? It is the approval rule `member.marital_status.change`; there is no screen for it (see P2 report §9), so it would be switched off with a small migration.
-3. **Wrong-gender inverse links in existing data:** may I correct them? That would mean a script with a rollback list, run first on test.
+2. ~~**Marriage review**~~ — decided: kept (§12).
+3. ~~**Wrong-gender inverse links in existing data**~~ — decided: correct them (§11).
 4. ~~**Members building the tree**~~ — decided: members may build the tree and its links (§9).
 
 ## 9. Follow-up: members may build the tree and its links (your decision)
@@ -137,3 +139,24 @@ A browser run against the production build covered:
 - **This is what was built:** the setting `tree.ancestor_levels` defaults to 3 and the existing tests check the limit. **No code, migration or data change.**
 - **Correction to §1:** the setting is not editable on the Settings page (that page only shows the community name and tagline). Changing it later would take one SQL `UPDATE` on `settings`.
 - **Still open in §8:** the marriage review step and correcting existing wrong-gender relationship rows.
+
+## 11. Follow-up: correcting relationship rows with the wrong gender (your decision)
+- **The problem (§1 e 2):** before P3 the reverse link always used the master's single inverse, so for example a daughter added relative to her mother stored "mother is **father** of daughter". New links have been right since P3. Old rows still carry the wrong label (the tree draws them correctly, since father and mother both mean "parent").
+- **The fix is three SQL scripts, not a migration**, now in `scripts/postgres/data-fixes/` (PostgreSQL; first written for MySQL in `database/data-fixes/`). A migration would run by itself wherever migrations are deployed, production included. These run only when someone imports them, and per your instruction that is **test only** for now.
+  1. `fix_relationship_gender_preview.sql` changes nothing. It lists (1) the rows the fix will correct, with names and the planned action; (2) mismatches it will **not** touch, because the type has no gender counterpart in the master (e.g. "father's elder brother"), for a person to decide; (3) family roles (`family_members.relationshipRole`) that do not fit the person's gender, also for the Karta or an Operator (F18) to fix by hand.
+  2. `fix_relationship_gender_apply.sql` first copies every row it will change (old type, active flag) into a backup table `zz_fix_relationship_gender_backup`. It then gives a wrong row the right type of the same pair (father ↔ mother, son ↔ daughter, and the other 17 gender pairs the app uses). If the correct row already exists, the wrong twin is **switched off** (`isActive = false`), not deleted. Nothing is deleted, and running it twice changes nothing more.
+  3. `fix_relationship_gender_rollback.sql` puts every changed row back exactly (type and active flag) from the backup table, then drops the table. Once you are happy with the fix, you can simply drop the backup table instead.
+- **On the test data here:** the preview finds 1 row (Sita Sharma recorded as Rajesh Sharma's *father*), corrected to *mother*. There are no mismatches without a counterpart and no wrong family roles. On a copy of the test database, apply → second apply (no change) → rollback restored it and dropped the backup table.
+- **To run on the test site** (`psql` or the Neon SQL editor, on the `test` branch): back up (`scripts/backup.sh`); run the preview and check the list; run apply; check a few trees; keep or roll back. Production only on your instruction.
+- **Tests added:** `tests/p3/F21-relationship-gender-fix.test.ts` (3 tests) runs the real scripts:
+  - Preview changes nothing.
+  - Apply retypes a mother stored as "father" (same row, new type), switches off a wrong "daughter" twin of an existing "son" row, leaves "father's elder brother" alone, and a second run changes nothing.
+  - Rollback restores every row and drops the backup table.
+- **No code or schema change.**
+
+## 12. Follow-up: marriages keep the Operator review (your decision)
+- **Your answer:** keep it. A marriage recorded by a member or their Karta first passes the date and legal-age checks (18 F / 21 M). It then waits in the §28 review queue (rule `member.marital_status.change`) until an Operator or Admin approves it. Only then are both people marked Married and linked, and each spouse's family Karta is asked to add the other partner (the F23 family requests).
+- **Why it matters:** without it, one member could mark another registered member as married without that person agreeing, and so take them off the marriage bureau.
+- **Differs from the workbook:** F23 has no review step; this is a deliberate difference, like the Karta hand-over review (P2 §9).
+- **No code, migration or data change.** This was already the behaviour, covered by the existing marriage tests (`tests/uat/marital-karta.test.ts`, `tests/p3/F22-F25-links-marriage-view.test.ts`).
+- **P3 has no open decisions left.**

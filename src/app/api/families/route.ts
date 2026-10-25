@@ -22,20 +22,20 @@ export async function GET(req: NextRequest) {
   const and: any[] = []
   if (q) {
     and.push({ OR: [
-      { name: { contains: q } },
-      { surname: { contains: q } },
-      { nativeVillage: { contains: q } },
-      { karta: { OR: [{ firstName: { contains: q } }, { lastName: { contains: q } }] } },
+      { name: { contains: q, mode: 'insensitive' } },
+      { surname: { contains: q, mode: 'insensitive' } },
+      { nativeVillage: { contains: q, mode: 'insensitive' } },
+      { karta: { OR: [{ firstName: { contains: q, mode: 'insensitive' } }, { lastName: { contains: q, mode: 'insensitive' } }] } },
     ] })
   }
   const gotra = url.searchParams.get('gotra')
-  if (gotra) and.push({ gotra: { contains: gotra } })
+  if (gotra) and.push({ gotra: { contains: gotra, mode: 'insensitive' } })
   const district = url.searchParams.get('district')
-  if (district) and.push({ nativeDistrict: { contains: district } })
+  if (district) and.push({ nativeDistrict: { contains: district, mode: 'insensitive' } })
   const kartaName = url.searchParams.get('karta')
-  if (kartaName) and.push({ karta: { OR: [{ firstName: { contains: kartaName } }, { lastName: { contains: kartaName } }] } })
+  if (kartaName) and.push({ karta: { OR: [{ firstName: { contains: kartaName, mode: 'insensitive' } }, { lastName: { contains: kartaName, mode: 'insensitive' } }] } })
   const mulGaon = url.searchParams.get('mulGaon')
-  if (mulGaon) and.push({ nativeVillage: { contains: mulGaon } })
+  if (mulGaon) and.push({ nativeVillage: { contains: mulGaon, mode: 'insensitive' } })
   if (and.length) where.AND = and
 
   const [families, total] = await Promise.all([

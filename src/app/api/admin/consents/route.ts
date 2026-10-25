@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   const where: any = {}
   if (p.get('type')) where.consentType = p.get('type')
   if (p.get('from') || p.get('to')) where.grantedAt = { ...(p.get('from') ? { gte: new Date(p.get('from')!) } : {}), ...(p.get('to') ? { lte: new Date(`${p.get('to')}T23:59:59`) } : {}) }
-  if (q) where.user = { OR: [{ email: { contains: q } }, { mobile: { contains: q } }, { member: { OR: [{ firstName: { contains: q } }, { lastName: { contains: q } }, { memberNumber: { contains: q } }] } }] }
+  if (q) where.user = { OR: [{ email: { contains: q, mode: 'insensitive' } }, { mobile: { contains: q, mode: 'insensitive' } }, { member: { OR: [{ firstName: { contains: q, mode: 'insensitive' } }, { lastName: { contains: q, mode: 'insensitive' } }, { memberNumber: { contains: q, mode: 'insensitive' } }] } }] }
   const rows = await prisma.consentRecord.findMany({
     where, orderBy: { grantedAt: 'desc' }, take: 500,
     select: {

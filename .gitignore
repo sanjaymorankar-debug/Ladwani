@@ -45,3 +45,10 @@ uploads/
 # Files written by the test suite (UPLOAD_DIR=./uploads-test in .env.test)
 uploads-test/
 scripts/.backup.env
+
+# Testing agent: gate state and run reports (local only)
+.claude/state/
+.claude/test-runs/
+
+# MySQL -> PostgreSQL data migration reports (primary keys of real rows)
+migration-report-*.json

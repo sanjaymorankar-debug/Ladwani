@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useState } from 'react'
 import Link from 'next/link'
 import { Heart, MessageSquare, Share2, MoreHorizontal, Pin, Flag } from 'lucide-react'
@@ -24,7 +25,7 @@ export default function PostCard({ post, viewerUserId }: PostCardProps) {
     setLiked(newLiked)
     setReactionCount((c: number) => newLiked ? c + 1 : c - 1)
     try {
-      await fetch(`/api/posts/${post.id}/reactions`, {
+      await fetch(`${BASE_PATH}/api/posts/${post.id}/reactions`, {
         method: newLiked ? 'POST' : 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reactionType: 'LIKE' }),
@@ -116,7 +117,7 @@ export default function PostCard({ post, viewerUserId }: PostCardProps) {
             // F36 report-abuse: hidden after several reports until a moderator reviews it.
             const reason = window.prompt('What is wrong with this post?')?.trim()
             if (!reason) return
-            const res = await fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'post', id: post.id, reason }) })
+            const res = await fetch(`${BASE_PATH}/api/reports`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'post', id: post.id, reason }) })
             const json = await res.json()
             if (res.ok) toast.success(json.message)
             else toast.error(json.message)

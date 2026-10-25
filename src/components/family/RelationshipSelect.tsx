@@ -1,4 +1,5 @@
 'use client'
+import { BASE_PATH } from '@/lib/api-path'
 import { useEffect, useState } from 'react'
 
 interface RelType { code: string; label: string; localName: string | null; genderApplicable: string | null }
@@ -12,7 +13,7 @@ export default function RelationshipSelect({ value, onChange, gender, id }: {
   const [types, setTypes] = useState<RelType[]>(cache ?? [])
   useEffect(() => {
     if (cache) return
-    fetch('/api/relationship-types').then((r) => r.json()).then((d) => { cache = d.types ?? []; setTypes(cache!) })
+    fetch(`${BASE_PATH}/api/relationship-types`).then((r) => r.json()).then((d) => { cache = d.types ?? []; setTypes(cache!) })
   }, [])
   const shown = types.filter((t) => !gender || !['MALE', 'FEMALE'].includes(gender) || !t.genderApplicable || ['ANY', gender].includes(t.genderApplicable))
   return (
