@@ -1,37 +1,49 @@
 /**
- * Both processes of the rebuild for a single Hostinger Node.js site.
+ * Both halves of the rebuild in ONE process, for a single Hostinger Node.js site.
  *
- * The API (NestJS) runs as a CHILD process on 127.0.0.1:API_PORT (default 4001)
- * and the web app (Next.js standalone, built by `npm run build:hostinger`) in
- * this process on the site's PORT. The web app reaches the API through its own
- * /api/v1 rewrite, so build it with NEXT_PUBLIC_API_URL=http://127.0.0.1:<API_PORT>
- * (and BASE_PATH, e.g. /ladwani). Nothing reaches the API from outside.
- *
- * A child, not a second require(): Hostinger's launcher hooks http.Server.listen
- * in the process it starts and lets only the first call through ("listen() was
- * called more than once, ignore"), so an in-process API never got its port. The
- * child is started with the launcher's preload stripped, so its listen is real.
+ * Hostinger's launcher lets only the first http.Server.listen() through, and the
+ * account's process limit refuses a child process (spawn EAGAIN), so the API
+ * cannot have a port of its own. Instead the Next.js standalone server (built by
+ * `npm run build:hostinger`) listens on the site's PORT, and every request for
+ * `${BASE_PATH}/api/v1/...` is handed to the NestJS app's Express handler before
+ * Next.js sees it. The API never listens anywhere.
  */
+const http = require('http')
 const path = require('path')
-const { fork } = require('child_process')
 
-process.env.API_PORT = process.env.API_PORT || '4001'
+const base = (process.env.BASE_PATH || '').replace(/\/$/, '')
+const api = `${base}/api/v1`
+const isApi = (url) => url === api || url.startsWith(`${api}/`) || url.startsWith(`${api}?`)
 
-function startApi() {
-  const env = { ...process.env }
-  delete env.NODE_OPTIONS
-  delete env.PORT
-  const child = fork(path.join(__dirname, '..', 'apps', 'api', 'dist', 'main.js'), [], { env, execArgv: [] })
-  child.on('exit', (code, signal) => {
-    console.error(`API process exited (${signal || code}); restarting in 2 s`)
-    setTimeout(startApi, 2000)
+let apiHandler = null
+const apiReady = require(path.join(__dirname, '..', 'apps', 'api', 'dist', 'main.js'))
+  .createApi()
+  .then(async (app) => {
+    await app.init()
+    apiHandler = app.getHttpAdapter().getInstance()
+    console.log('API ready (in-process)')
   })
-  return child
-}
+  .catch((err) => {
+    console.error('API failed to start:', err)
+  })
 
-const api = startApi()
-for (const sig of ['SIGTERM', 'SIGINT']) {
-  process.on(sig, () => { api.removeAllListeners('exit'); api.kill(sig); process.exit(0) })
+const createServer = http.createServer
+http.createServer = function (...args) {
+  const listener = typeof args[args.length - 1] === 'function' ? args.pop() : null
+  const server = createServer.apply(this, args)
+  if (!listener) return server
+  server.on('request', (req, res) => {
+    if (!isApi(req.url || '')) return listener(req, res)
+    // Nest's prefix is api/v1, so the API sees the path without BASE_PATH.
+    if (base) req.url = req.url.slice(base.length)
+    if (apiHandler) return apiHandler(req, res)
+    apiReady.then(() => {
+      if (apiHandler) return apiHandler(req, res)
+      res.writeHead(503, { 'Content-Type': 'application/json' })
+      res.end('{"message":"API unavailable"}')
+    })
+  })
+  return server
 }
 
 require(path.join(__dirname, '..', 'apps', 'web', '.next', 'standalone', 'apps', 'web', 'server.js'))
