@@ -362,7 +362,7 @@ Measured 2026-10-24 on branch `claude/fervent-bell-wcmmdu` (base commit
 | Level | Count | Time |
 |---|---|---|
 | S1.1–S1.6 static (syntax, workflows, typecheck, `prisma validate`, provider + `directUrl`, BASE_PATH) | all pass | ~11 s |
-| S1.7 lint | does not run (Known gaps) | — |
+| S1.7 lint | since ESLint 9 (2026-10-25): 0 errors, 990 warnings (918 `no-explicit-any`) | ~8 s |
 | S2 unit | 5 files, 59 passed | 4.6 s |
 | S3.1–S3.3 migrate, both seeds, `migrate diff` | pass: no pending migrations, no difference | ~22 s |
 | S3.4 `npm test` | **21 files, 332 passed, 0 failed, 0 skipped** | 55 s |
