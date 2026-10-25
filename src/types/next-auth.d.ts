@@ -15,6 +15,8 @@ declare module 'next-auth' {
     roles: string[]
     memberId: string | null
     status: string
+    /** The central (bkesari.com) user id, for a session bridged from central login. */
+    ssoSub?: string | null
   }
 }
 
@@ -24,5 +26,7 @@ declare module 'next-auth/jwt' {
     roles: string[]
     memberId: string | null
     status: string
+    /** The central (bkesari.com) user id, for a session bridged from central login. */
+    ssoSub?: string | null
   }
 }
