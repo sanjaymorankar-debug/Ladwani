@@ -26,7 +26,11 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
   app.enableCors({ origin: process.env.WEB_ORIGIN ?? 'http://localhost:3000', credentials: true })
   app.setGlobalPrefix('api/v1')
-  const port = process.env.PORT ?? 4000
-  await app.listen(port)
+  // API_PORT: when the web app and the API share one process (one Hostinger site,
+  // scripts/hostinger-start.js), the API listens on its own internal port and the
+  // web app takes the site's PORT.
+  const port = process.env.API_PORT ?? process.env.PORT ?? 4000
+  if (process.env.API_PORT) await app.listen(port, '127.0.0.1')
+  else await app.listen(port)
 }
 bootstrap()
