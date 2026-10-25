@@ -183,12 +183,20 @@ describe('Admin: full access', () => {
   })
 
   it('can view and edit any member', async () => {
-    mockSessionAs({ id: fx.adminUser.id, roles: ['ADMIN'], memberId: null, status: 'ACTIVE' })
-    const res = await patchMember(
-      req('http://x/api/members/x', { method: 'PATCH', body: JSON.stringify({ firstName: 'AdminEdited' }) }),
-      { params: { id: fx.memberUser.memberId } }
-    )
-    expect(res.status).toBe(200)
+    // Put the seeded name back afterwards. Left as 'AdminEdited', the next run's
+    // "can edit their own profile" becomes a real name change, which F08 queues
+    // as a pending change request, and the run after that gets 409.
+    const { firstName } = await prisma.member.findUniqueOrThrow({ where: { id: fx.memberUser.memberId }, select: { firstName: true } })
+    try {
+      mockSessionAs({ id: fx.adminUser.id, roles: ['ADMIN'], memberId: null, status: 'ACTIVE' })
+      const res = await patchMember(
+        req('http://x/api/members/x', { method: 'PATCH', body: JSON.stringify({ firstName: 'AdminEdited' }) }),
+        { params: { id: fx.memberUser.memberId } }
+      )
+      expect(res.status).toBe(200)
+    } finally {
+      await prisma.member.update({ where: { id: fx.memberUser.memberId }, data: { firstName } })
+    }
   })
 
   it('can add a member to any family', async () => {
