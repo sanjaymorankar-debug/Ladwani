@@ -43,6 +43,8 @@ Tick each line and note anything unexpected. The automated test for each flow is
 - [ ] F24 Someone in two families sees "My Families" with a role in each.
 - [ ] F25 Tree: zoom, collapse, person card, jump icon, Print / Save as PDF. Someone from an unrelated family gets "not found".
 
+- [ ] F21 (data fix, test site) Import `database/data-fixes/fix_relationship_gender_preview.sql`, check the list, import `..._apply.sql`: the listed people now show the right relationship (e.g. mother, not father). `..._rollback.sql` puts them back.
+
 ## P4 — Organisations
 - [ ] F26 Create a local organisation: name, start date, taluka (State › District › Taluka), town, President / Secretary / Chairman and other members (certificate optional). Everyone named accepts; two Operators of the district approve → ACTIVE.
 - [ ] F27 Invite / accept, request / approve, hand the President post over (the new holder accepts), set a term.
