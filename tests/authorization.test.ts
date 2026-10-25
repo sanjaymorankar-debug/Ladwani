@@ -183,9 +183,10 @@ describe('Admin: full access', () => {
   })
 
   it('can view and edit any member', async () => {
-    // Put the seeded name back afterwards. Left as 'AdminEdited', the next run's
-    // "can edit their own profile" becomes a real name change, which F08 queues
-    // as a pending change request, and the run after that gets 409.
+    // Put the name back afterwards: "can edit their own profile" re-sends
+    // firstName 'Test', which must stay a no-op. Left as 'AdminEdited', the
+    // next run turns that into a pending F08 change request, and the run
+    // after that gets 409 "already awaiting approval".
     const { firstName } = await prisma.member.findUniqueOrThrow({ where: { id: fx.memberUser.memberId }, select: { firstName: true } })
     try {
       mockSessionAs({ id: fx.adminUser.id, roles: ['ADMIN'], memberId: null, status: 'ACTIVE' })
@@ -194,6 +195,7 @@ describe('Admin: full access', () => {
         { params: { id: fx.memberUser.memberId } }
       )
       expect(res.status).toBe(200)
+      expect((await prisma.member.findUniqueOrThrow({ where: { id: fx.memberUser.memberId } })).firstName).toBe('AdminEdited')
     } finally {
       await prisma.member.update({ where: { id: fx.memberUser.memberId }, data: { firstName } })
     }
