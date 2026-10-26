@@ -34,22 +34,6 @@ jobs:
   check:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        # Docker Hub's official postgres image via AWS's public mirror: anonymous
-        # Docker Hub pulls are rate-limited and have failed CI runs.
-        image: public.ecr.aws/docker/library/postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: miladwani_test
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres -d miladwani_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-
     env:
       # A throwaway CI database. Nothing here reaches any real tier: the dev,
       # test and production credentials live only in each server's own .env.
@@ -59,6 +43,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # PostgreSQL runs on the runner itself rather than as a service container:
+      # both Docker Hub (anonymous rate limit) and AWS's public mirror ("Data
+      # limit exceeded") have refused the image pull on shared runner IPs.
+      # Installed from Ubuntu's own mirror only if the runner image lacks it.
+      - name: Start PostgreSQL
+        run: |
+          if ! ls /usr/lib/postgresql/*/bin/postgres >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq postgresql
+          fi
+          sudo systemctl start postgresql.service
+          for i in $(seq 1 30); do pg_isready -h 127.0.0.1 -q && break; sleep 1; done
+          pg_isready -h 127.0.0.1
+          sudo -u postgres psql -qc "ALTER USER postgres PASSWORD 'postgres'"
+          sudo -u postgres createdb miladwani_test
+          psql "postgresql://postgres:postgres@127.0.0.1:5432/miladwani_test" -Atc "SELECT version()"
 
       - uses: actions/setup-node@v4
         with:
