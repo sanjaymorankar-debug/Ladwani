@@ -1,6 +1,6 @@
 # Porting the workbook flows to the rebuild: gap analysis
 
-Prepared 25 Oct 2026. **Read-only:** no code, database or site was changed.
+Prepared 25 Oct 2026. **Read-only:** no code, database or site was changed. **26 Oct:** all 25 decisions in §3 approved by the owner. LadWani is now live at `bkesari.com/ladwani` (bkesari-platform PR #20), so the security findings in §2 apply to production as well as test.
 
 - **Target.** The rebuild as the bkesari.com hub serves it at `/ladwani/`:
   - repository `bkesari-platform`, folder `ladwani/`;
@@ -55,9 +55,11 @@ PR #10's logic ports mostly one to one, roughly 3,000 lines of rules. It has to 
 4. **Areas and links are missing.** There is no TALUKA or VILLAGE in the location master, and members and families are never linked to an area. So nothing can be routed to "the Operators of the district" yet.
 5. **The building blocks are absent:** no settings table, no scheduler, no email or SMS delivery. Uploads are stored unencrypted on the hub's local disk, with a default signing secret, and are not covered by any backup.
 6. **No full Aadhaar or ID number is stored anywhere.** The rebuild has no ID-proof model, so OP-01 is built in from the start.
-7. **LadWani production is not deployed yet** (hub `DEPLOY.md`). Every finding above affects the test tier only.
+7. **LadWani went live at `bkesari.com/ladwani` on 25 Oct** (bkesari-platform PR #20). The findings above now affect production too, which is why step 0 of §4 comes first.
 
 ## 3. Decisions needed before porting
+
+> **Approved, 26 Oct 2026.** The owner approved all 25 recommendations below as written ("approve all recommendations"). They are now the decisions the port follows.
 
 The four sections list 46 stop-and-ask items. Many are the same question raised in several phases. Merged, they come to 25. Each has a recommendation, so you can approve them in one pass or change the ones you disagree with.
 
