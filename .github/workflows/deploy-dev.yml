@@ -30,32 +30,36 @@ env:
 
 jobs:
   # The same suite ci.yml runs, so the build that gets published is one that
-  # passed its tests against a real MySQL.
+  # passed its tests against a real PostgreSQL.
   check:
     runs-on: ubuntu-latest
-
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: miladwani_test
-        ports: ["3306:3306"]
-        options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -proot"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
 
     env:
       # A throwaway CI database. Nothing here reaches any real tier: the dev,
       # test and production credentials live only in each server's own .env.
-      DATABASE_URL: mysql://root:root@127.0.0.1:3306/miladwani_test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/miladwani_test?schema=public
       NEXTAUTH_SECRET: ci-only-secret-not-used-in-production
       NEXTAUTH_URL: http://localhost:3000
 
     steps:
       - uses: actions/checkout@v4
+
+      # PostgreSQL runs on the runner itself rather than as a service container:
+      # both Docker Hub (anonymous rate limit) and AWS's public mirror ("Data
+      # limit exceeded") have refused the image pull on shared runner IPs.
+      # Installed from Ubuntu's own mirror only if the runner image lacks it.
+      - name: Start PostgreSQL
+        run: |
+          if ! ls /usr/lib/postgresql/*/bin/postgres >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq postgresql
+          fi
+          sudo systemctl start postgresql.service
+          for i in $(seq 1 30); do pg_isready -h 127.0.0.1 -q && break; sleep 1; done
+          pg_isready -h 127.0.0.1
+          sudo -u postgres psql -qc "ALTER USER postgres PASSWORD 'postgres'"
+          sudo -u postgres createdb miladwani_test
+          psql "postgresql://postgres:postgres@127.0.0.1:5432/miladwani_test" -Atc "SELECT version()"
 
       - uses: actions/setup-node@v4
         with:
@@ -68,7 +72,7 @@ jobs:
       - name: Write .env.test
         run: |
           cat > .env.test <<'ENV'
-          DATABASE_URL=mysql://root:root@127.0.0.1:3306/miladwani_test
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/miladwani_test?schema=public
           NEXTAUTH_SECRET=ci-only-secret-not-used-in-production
           NEXTAUTH_URL=http://localhost:3000
           NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -101,13 +105,21 @@ jobs:
       - name: Check every API URL carries BASE_PATH
         run: bash scripts/check-base-path.sh
 
-      # The app was ported from PostgreSQL for shared hosting; a provider
-      # flipped back would fail only once a real query ran.
-      - name: Check the schema still targets MySQL
+      # PostgreSQL is the final database (the schema spent Sep-Oct 2026 on
+      # MySQL); a provider flipped again would fail only once a real query ran.
+      - name: Check the schema still targets PostgreSQL
         run: |
           set -euo pipefail
-          grep -qE '^\s*provider\s*=\s*"mysql"' prisma/schema.prisma \
-            || { echo "::error::prisma/schema.prisma no longer targets mysql"; exit 1; }
+          grep -qE '^\s*provider\s*=\s*"postgresql"' prisma/schema.prisma \
+            || { echo "::error::prisma/schema.prisma no longer targets postgresql"; exit 1; }
+          grep -qE '^provider\s*=\s*"postgresql"' prisma/migrations/migration_lock.toml \
+            || { echo "::error::prisma/migrations/migration_lock.toml no longer targets postgresql"; exit 1; }
+
+      # The migrations must build exactly the schema in schema.prisma, or
+      # `migrate deploy` on a real database would leave it different from what
+      # the client expects. Runs against the database "Apply migrations" built.
+      - name: Check the migrations match the schema
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
 
       - name: Unit and integration tests
         run: npm test
@@ -153,7 +165,7 @@ jobs:
           # Never connected to. Prisma's client wants a syntactically valid URL
           # at import time and `next build` imports modules that construct it.
           # The real dev credentials live only in the server's .env.
-          DATABASE_URL: mysql://build:build@127.0.0.1:3306/build
+          DATABASE_URL: postgresql://build:build@127.0.0.1:5432/build
           NEXTAUTH_SECRET: build-only-not-used-at-runtime
           # The hub forwards /ladwani/ here WITHOUT stripping the prefix, so
           # the app owns it. Needed at build time because Next inlines it into
@@ -253,14 +265,10 @@ jobs:
           REMOTE
 
       # Migrations are NOT applied automatically. Schema changes on this estate
-      # are reviewed and applied through phpMyAdmin (or by running
-      # `npx prisma migrate deploy` over SSH), so a deploy can never alter a
-      # database on its own. This step only tells you whether this push
-      # brought any.
-      # Migrations are NOT applied automatically. Schema changes on this estate
-      # are reviewed and applied through phpMyAdmin (or by running
-      # `npx prisma migrate deploy` over SSH), so a deploy can never alter a
-      # database on its own. This step only reports what the push brought.
+      # are reviewed and applied by hand (`npx prisma migrate deploy` from a
+      # machine that reaches the PostgreSQL database), so a deploy can never
+      # alter a database on its own. This step only reports what the push
+      # brought.
       - name: Report migrations included in this deploy
         env:
           # The branch head before this push. Empty on a manual run.

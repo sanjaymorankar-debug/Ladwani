@@ -89,6 +89,15 @@ npm run build   # runs "prisma generate" then "next build" (see package.json)
 npm run start
 ```
 
+### Database
+
+PostgreSQL (13+, with the `citext` and `btree_gist` extensions the first
+migration creates) is the final database. Hostinger's shared/cloud web
+hosting does not offer PostgreSQL, so production needs a managed PostgreSQL
+service or a VPS. Full steps: [DEPLOYMENT.md](DEPLOYMENT.md). Schema without
+the CLI: [scripts/postgres/](scripts/postgres/). Moving data from the old
+MySQL database: [MIGRATION.md](MIGRATION.md).
+
 ### Environment Variables for Production
 
 ```

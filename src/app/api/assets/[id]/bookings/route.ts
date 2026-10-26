@@ -78,11 +78,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // MySQL has no exclusion-constraint equivalent, so double-booking is
-      // prevented here instead: lock the asset's own row for the rest of
-      // this transaction, so a second, concurrent booking attempt for the
-      // same asset blocks on this SELECT until we commit or roll back —
-      // only then does it see the row we're about to insert.
+      // The guarantee against double-booking is the database's exclusion
+      // constraint `bookings_no_overlap` (see the baseline migration): two
+      // active bookings of one asset cannot overlap, however requests
+      // interleave. This lock and check are the friendly path in front of
+      // it: lock the asset's own row for the rest of this transaction, so a
+      // concurrent attempt for the same asset waits here until we commit or
+      // roll back, then sees our row and gets a clean 409 below.
       await tx.$executeRaw`SELECT id FROM assets WHERE id = ${asset.id} FOR UPDATE`
 
       const overlapping = await tx.booking.count({
@@ -137,7 +139,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       { status: 201 }
     )
   } catch (e: any) {
-    if (e === OVERLAP) {
+    // OVERLAP: our own check found a clash. The constraint error (SQLSTATE
+    // 23P01) is the backstop, should anything ever bypass the lock above.
+    if (e === OVERLAP || /bookings_no_overlap|23P01/.test(String(e?.message))) {
       return NextResponse.json(
         { message: 'That slot has just been taken. Please choose a different time.' },
         { status: 409 }

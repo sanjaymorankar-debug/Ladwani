@@ -10,7 +10,7 @@ export async function GET(req: Request) {
 
   const q = new URL(req.url).searchParams.get('q')?.trim()
   const skills = await prisma.skill.findMany({
-    where: { isActive: true, ...(q ? { name: { contains: q } } : {}) },
+    where: { isActive: true, ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}) },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     take: 50,
     select: { id: true, name: true, category: true },
