@@ -10,7 +10,7 @@ interface TopbarProps {
 export default function Topbar({ user }: TopbarProps) {
   const name = user?.name ?? 'User'
   return (
-    <header className="h-16 bg-white border-b border-gray-100 flex items-center px-4 gap-4 sticky top-0 z-30">
+    <header className="print:hidden h-16 bg-white border-b border-gray-100 flex items-center px-4 gap-4 sticky top-0 z-30">
       <button className="md:hidden p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-50">
         <Menu className="w-5 h-5" />
       </button>

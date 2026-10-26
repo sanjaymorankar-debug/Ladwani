@@ -1,0 +1,162 @@
+# Phase P3 — Family tree and cross-family links: delivery report
+
+> **Database update (25 Oct 2026):** LadWani runs on **PostgreSQL** (Neon). This report was written when the work was on MySQL; its phpMyAdmin scripts and MySQL migrations were replaced by one PostgreSQL migration and `scripts/postgres/`. See [`POSTGRESQL-PORT.md`](POSTGRESQL-PORT.md); its steps replace the MySQL ones below.
+
+Prepared 9 Oct 2026. Branch `claude/intelligent-ritchie-8b37zt` (same PR as P0–P2). The stack is unchanged.
+
+## 1. Gap analysis (Phase = P3, flows F19–F25)
+
+| Flow | Status before | Existing files / tables | What was missing or wrong | Change made | Risk to existing data |
+|---|---|---|---|---|---|
+| F19 Ancestor tree (3 up) | MISSING | `member_relationships`, `relationship_types` | No tree builder. Ancestors could only be added one by one as members, with no pair, year-only birth or "expired" option. | `POST api/families/[id]/tree/parents`: father + mother as a husband–wife pair. Each has a name, a full date or just a birth year, and alive or expired (shown "Late"). They become non-login members with role father/mother relative to the child. Depth is limited by the setting `tree.ancestor_levels` (default **3**, OP-02). | None. |
+| F20 Spouse-side tree | MISSING | — | — | Same builder for a spouse's parents. The Karta can add them, or a member for their own spouse. Both sides join at the marriage in the tree. "Link to the spouse's birth family" is F22. | None. |
+| F21 Add siblings | MISSING | — | — | `POST api/families/[id]/tree/siblings` for anyone at any level. The sibling gets the person's recorded parents automatically. Duplicate first name among siblings is refused. "Has own family on site" leaves a link placeholder for F22. | None. |
+| F22 Link to another family tree | MISSING | — | — | `api/tree-links` (+ `/[id]`, `/candidates`): <br>1. The Karta picks the other family and the matching person (limited view: name, gender, birth year). <br>2. Differences in name, surname, gender or date of birth are shown side by side; the requester chooses the correct value for each. <br>3. The other Karta accepts, choosing too. If both chose the same, the two records **merge into one person shown in both trees**; if not, an Operator of either family's district (or an Admin) decides. Reject needs a reason. <br>4. Alerts go to the target Karta, the requester and the Operators. | Merge is one transaction and audited (old and new values). The retired record is soft-deleted, not erased. Two records that both have a login are never merged. |
+| F23 Marriage triggers family link | PARTIAL | `api/members/[id]/spouse`, `approvals` (§28 gate), `marriage_records` | No marriage date or legal-age check. A spouse not on the site could only be a name. The spouse's family was never asked to add the person. Divorce/widowhood changed only the person's status field; the marriage record stayed "MARRIED". | Marriage date (not in the future). Legal age **18 F / 21 M** on that date, for both partners. Optional "add the spouse as a person". After the marriage is applied (directly or after the existing review), a **request goes to each spouse's family Karta** to add the other partner as daughter-in-law / son-in-law (or wife / husband). These are marked "Marriage" in the inbox, and the birth-family Kartas are told. Nobody leaves their birth family. Divorced/widowed marks the marriage record (with date) and the spouse, and keeps history. | Additive column `family_join_requests.origin` (default MEMBER). **Kept:** the existing §28 review of marriages. |
+| F24 One person, many families | PARTIAL | `family_members` (P2 roles) | `/family` showed only the first membership, including ones already left. There was no "My Families" list. | `/family` lists all active families with the role in each and switches between them (`?f=`). The dashboard has a "My Families" card with role and tree link. Personal data is one record, so edits show in every tree. | None. |
+| F25 View tree | PARTIAL | `family/[id]/tree` page, `api/families/[id]/tree`, `FamilyTree.tsx` | **Security:** the tree *page* had no access check — any signed-in user could open any family's tree by URL (the API checked; the page did not). The layout treated every stored relationship row as parent → child, so the two-way rows produced loops. There was no generation order, no "Late", no profile card, no jump to linked families, and no collapse. | Access: family member or Admin sees the full tree. A member of a **linked** family sees only the connecting branch (the shared person, their parents, siblings, spouse and children), with no date of birth or city. Everyone else sees nothing (404 page / 403 API). <br>Layout: generation rows relative to the Karta, children under parents, spouses side by side. <br>Also: "Late" on expired people, a click-through profile card, jump links to the person's other families, collapse/expand per branch, and Print / Save as PDF (the app's sidebar and top bar are hidden on print). | None. |
+
+### a) Found in code, not in the workbook (left as they are)
+- The `/family/[id]/members/new` form.
+- External spouse names without a record (TC-MAR-004).
+- Matrimony withdrawal on marriage.
+
+### b) Schema differences (resolved additively)
+- `family_join_requests.origin`.
+- `tree_link_requests` table.
+- Setting `tree.ancestor_levels`.
+
+### c) Role differences
+- **F19 / F20 / F21 / F22:** any member of the family may build the tree, not only the Karta (your decision, §9). Accepting a link from another family stays with that family's Karta.
+- **F22:** an unresolved conflict goes to an Operator of *either* family's district.
+
+### d) Open points
+- **OP-02 (tree depth):** built as 3 levels above the Karta, changeable in Settings (`tree.ancestor_levels`). Please confirm.
+- **OP-11 (duplicate persons):** handled by F17 + F22, with Operator resolution.
+
+### e) Security and data findings (report only unless noted)
+1. **Tree page leaked any family's tree** to any signed-in user — **fixed** under F25, because it is the flow's own rule ("Non-members see nothing").
+2. **Wrong-gender inverse links.**
+   - The relationship master has one inverse per type, so adding a daughter relative to her mother stored the mother → daughter link as "father". The same happened with the other gendered pairs.
+   - New links now use the right one (`src/lib/relations.ts`).
+   - **Existing rows were not changed.** The tree still draws them correctly, since both father and mother mean "parent"; only the label is wrong.
+   - A fix rewrites data, so it needs your approval. Rows affected:
+     ```sql
+     SELECT mr.id, rt.code, m.gender FROM member_relationships mr
+       JOIN relationship_types rt ON rt.id = mr.relationshipTypeId
+       JOIN members m ON m.id = mr.fromMemberId
+      WHERE (rt.genderApplicable = 'MALE' AND m.gender = 'FEMALE') OR (rt.genderApplicable = 'FEMALE' AND m.gender = 'MALE');
+     ```
+
+## 2. Change list
+
+| File | Flow | Why |
+|---|---|---|
+| migration `20261009160000_p3_tree_links` (+ `down.sql`), `schema.prisma` | F22, F23, OP-02 | Link table, join-request origin, depth setting |
+| `src/lib/relations.ts` (new) | F10, F21, F23 | Gendered inverse, two-way linking, parents, blood-relation check |
+| `src/lib/tree.ts` (new), `src/lib/tree-layout.ts` (new) | F24, F25 | Access modes, generations, edges, connecting branch; layout and collapse |
+| `src/lib/tree-edit.ts` (new), `api/families/[id]/tree/parents`, `.../siblings` (new) | F19–F21 | Builder |
+| `src/lib/merge.ts` (new), `src/lib/claims.ts` | F17, F22 | One shared person-merge (also moves relationships, marriages, groups, bookings…); F17 now uses it |
+| `src/lib/tree-links.ts` (new), `api/tree-links/*` (new) | F22 | Link, conflicts, Operator review |
+| `src/lib/marriage.ts` (new), `api/members/[id]/spouse`, `src/lib/approvals.ts`, `api/approvals/[id]` | F23 | Date, legal age, new spouse record, requests to both families |
+| `api/members/[id]` | F23 | Divorced / widowed marks the marriage |
+| `api/families/[id]/members`, `.../members/[memberId]`, `.../join-requests/[reqId]` | F10, F15, F21 | Gender-correct inverse links |
+| `api/families/[id]/newborn`, `NewbornPanel` | F13 | No preselected parents (the browser run had picked the Karta's own mother); blood relatives refused as a parent pair |
+| `api/families/[id]/tree` route + page, `TreeClient`, `FamilyTree`, `TreeBuilderActions` (new), `TreeLinksInbox` (new), `SpouseLink`, `JoinRequestsInbox`, family page, dashboard, `admin/verification`, `Sidebar`/`TopBar` (print) | F19–F25 | Screens |
+| `database/phpmyadmin/add_p3_tree_links.sql` | deploy | Same SQL plus the migration record |
+
+**P2 follow-ups in this commit:**
+- The join-request inbox now asks for a rejection reason.
+- `docs/PHASE-P2-REPORT.md` was corrected: the API does not require the reason, because of TC-FAM-009.
+- One assertion in my own P2 test (F15 in `tests/p2/F14-F18…`, added earlier in this PR) expected the old "father" inverse. It now expects "mother". No test that existed before this PR was edited.
+
+## 3. Migration
+`20261009160000_p3_tree_links`:
+- Adds one column with default `'MEMBER'`, so every existing request stays as it was.
+- Adds one table and one setting. No backfill.
+- Rollback: `down.sql`.
+- Tested: up → down → up. The phpMyAdmin script was tested on a P2-state database: no pending migrations and zero schema diff afterwards.
+
+## 4. Tests — before vs after
+
+| | Test files | Tests | Typecheck | Build |
+|---|---|---|---|---|
+| After P2 | 27 | 347 | clean | OK |
+| After P3 | 29 | **363 passed** (twice in a row on one database) | clean | OK |
+
+The new tests are named by Flow ID:
+- `tests/p3/F19-F21-tree-builder.test.ts` (8)
+- `tests/p3/F22-F25-links-marriage-view.test.ts` (8)
+
+**Test isolation note (not a P3 change).** Run the whole suite a *third* time on the same database without resetting it, and `authorization.test.ts › can edit their own profile` fails with 409.
+- Cause: another test in that file renames the member to "AdminEdited". Since P1 (F08), the member renaming themselves back becomes a pending change request, which locks the profile.
+- CI always starts from a fresh database, so it is not affected.
+- Fixing it means changing that existing test, so I left it.
+
+A browser run against the production build covered:
+1. The UAT family tree draws in generation rows, with "Late" and the Karta badge.
+2. Clicking a person opens their card, and "Add sibling" from the card draws the new sister under the shared parent.
+3. Printing hides the app's sidebar and top bar.
+4. A member of another family gets a 404 page and no tree.
+
+## 5. Deployment (shared hosting, dev → test only)
+1. Back up, then `npx prisma migrate deploy`, or import `add_p3_tree_links.sql` in phpMyAdmin after the P2 script.
+2. Rebuild and restart the Node app.
+3. No new environment keys or cron jobs.
+
+## 6. Exit criteria (Phase Plan, P3)
+- **One person = one record across families** — ✅. A person joins other families as an extra membership with its own role (F23, F24). A duplicate entered by two Kartas is merged by F22 into one record that appears in both trees, keeping every link. Tested.
+- **Marriage trigger alerts both Kartas** — ✅. The spouse's family Karta gets the request and the birth-family Karta is told; tested for both partners.
+- **Deliverable "Visual tree with jump links"** — ✅. Generation layout, profile card, jump links to the person's other families, branch-only view for linked families.
+
+## 7. Assumptions
+- **Tree depth** is counted above the Karta, on both the paternal and maternal sides. The spouse side is limited the same way.
+- **Merge choice:** the record with a login is kept; otherwise the target family's record is kept. The chosen values override, and the other record only fills blanks.
+- **The requester must choose** a value for each difference before sending (otherwise "both Kartas agree" cannot be checked).
+- **Marriage role:** daughter-in-law / son-in-law relative to the spouse's parent when that parent is in the family; otherwise wife / husband relative to the spouse.
+- **PDF** is the browser's "Save as PDF" from the print dialog. No server-side PDF library was added (no new package).
+
+## 8. Decisions needed
+1. ~~**OP-02:**~~ — decided: 3 generations up (§10).
+2. ~~**Marriage review**~~ — decided: kept (§12).
+3. ~~**Wrong-gender inverse links in existing data**~~ — decided: correct them (§11).
+4. ~~**Members building the tree**~~ — decided: members may build the tree and its links (§9).
+
+## 9. Follow-up: members may build the tree and its links (your decision)
+- **Before:** members could add siblings anywhere and the parents of their own spouse. Adding ancestors (F19) and linking to another family's tree (F22) were for the Karta only.
+- **Now:** any active member of the family (and staff, as before) may:
+  - add the parents of anyone in the family's tree (F19 / F20). The depth limit (`tree.ancestor_levels`, OP-02) and the usual checks still apply: parents already recorded, parents older than the child, and so on;
+  - add siblings, as before (F21);
+  - ask to link a person in their tree to another family's tree (F22), search the other family's people for it (name, gender and birth year only, as before), and cancel their own request.
+- **Unchanged:** a link request from another family is still accepted or rejected only by **that family's Karta**, because it changes their tree; differences still go to an Operator; the requester is told the result. The family's own Karta still sees all its sent links in the link inbox. Adding a new member to the family (F10) stays with the Karta.
+- **Code:** `api/families/[id]/tree/parents` (Karta-only check removed), `api/tree-links` (POST for any family member; cancel also by the member who asked), `api/tree-links/candidates`, and the tree page's "Link to another family" button, now shown to every member.
+- **No migration, no data change.**
+- **Tests:** my own P3 test that expected a member to be refused for someone else's spouse side now checks the member's own spouse side only. New tests: a plain member adds ancestors for someone else in the family (the checks still apply; an outsider is still refused), and a plain member asks for a link that a non-Karta of the other family cannot accept, then cancels it. No existing test from before this PR depended on the old rule. **415 passed**, twice in a row on a fresh database; typecheck clean; build OK.
+- **Still open in §8:** the marriage review step and correcting existing wrong-gender relationship rows (OP-02 is now decided, §10).
+
+## 10. Follow-up: OP-02 is 3 generations (your decision)
+- **Your answer:** the tree goes up to 3 generations above the Karta.
+- **This is what was built:** the setting `tree.ancestor_levels` defaults to 3 and the existing tests check the limit. **No code, migration or data change.**
+- **Correction to §1:** the setting is not editable on the Settings page (that page only shows the community name and tagline). Changing it later would take one SQL `UPDATE` on `settings`.
+- **Still open in §8:** the marriage review step and correcting existing wrong-gender relationship rows.
+
+## 11. Follow-up: correcting relationship rows with the wrong gender (your decision)
+- **The problem (§1 e 2):** before P3 the reverse link always used the master's single inverse, so for example a daughter added relative to her mother stored "mother is **father** of daughter". New links have been right since P3. Old rows still carry the wrong label (the tree draws them correctly, since father and mother both mean "parent").
+- **The fix is three SQL scripts, not a migration**, now in `scripts/postgres/data-fixes/` (PostgreSQL; first written for MySQL in `database/data-fixes/`). A migration would run by itself wherever migrations are deployed, production included. These run only when someone imports them, and per your instruction that is **test only** for now.
+  1. `fix_relationship_gender_preview.sql` changes nothing. It lists (1) the rows the fix will correct, with names and the planned action; (2) mismatches it will **not** touch, because the type has no gender counterpart in the master (e.g. "father's elder brother"), for a person to decide; (3) family roles (`family_members.relationshipRole`) that do not fit the person's gender, also for the Karta or an Operator (F18) to fix by hand.
+  2. `fix_relationship_gender_apply.sql` first copies every row it will change (old type, active flag) into a backup table `zz_fix_relationship_gender_backup`. It then gives a wrong row the right type of the same pair (father ↔ mother, son ↔ daughter, and the other 17 gender pairs the app uses). If the correct row already exists, the wrong twin is **switched off** (`isActive = false`), not deleted. Nothing is deleted, and running it twice changes nothing more.
+  3. `fix_relationship_gender_rollback.sql` puts every changed row back exactly (type and active flag) from the backup table, then drops the table. Once you are happy with the fix, you can simply drop the backup table instead.
+- **On the test data here:** the preview finds 1 row (Sita Sharma recorded as Rajesh Sharma's *father*), corrected to *mother*. There are no mismatches without a counterpart and no wrong family roles. On a copy of the test database, apply → second apply (no change) → rollback restored it and dropped the backup table.
+- **To run on the test site** (`psql` or the Neon SQL editor, on the `test` branch): back up (`scripts/backup.sh`); run the preview and check the list; run apply; check a few trees; keep or roll back. Production only on your instruction.
+- **Tests added:** `tests/p3/F21-relationship-gender-fix.test.ts` (3 tests) runs the real scripts:
+  - Preview changes nothing.
+  - Apply retypes a mother stored as "father" (same row, new type), switches off a wrong "daughter" twin of an existing "son" row, leaves "father's elder brother" alone, and a second run changes nothing.
+  - Rollback restores every row and drops the backup table.
+- **No code or schema change.**
+
+## 12. Follow-up: marriages keep the Operator review (your decision)
+- **Your answer:** keep it. A marriage recorded by a member or their Karta first passes the date and legal-age checks (18 F / 21 M). It then waits in the §28 review queue (rule `member.marital_status.change`) until an Operator or Admin approves it. Only then are both people marked Married and linked, and each spouse's family Karta is asked to add the other partner (the F23 family requests).
+- **Why it matters:** without it, one member could mark another registered member as married without that person agreeing, and so take them off the marriage bureau.
+- **Differs from the workbook:** F23 has no review step; this is a deliberate difference, like the Karta hand-over review (P2 §9).
+- **No code, migration or data change.** This was already the behaviour, covered by the existing marriage tests (`tests/uat/marital-karta.test.ts`, `tests/p3/F22-F25-links-marriage-view.test.ts`).
+- **P3 has no open decisions left.**

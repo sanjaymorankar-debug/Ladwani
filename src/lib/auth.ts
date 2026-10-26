@@ -2,7 +2,8 @@ import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { compare, hash } from 'bcryptjs'
 import { prisma } from './prisma'
-import { requireAccountVerification } from './auth-config'
+import { requireAccountVerification, adminSecondFactorRequired } from './auth-config'
+import { verifyOtp } from './otp'
 import { BASE_PATH } from './api-path'
 
 export type LoginErrorCode =
@@ -24,6 +25,34 @@ export interface AuthorizedUser {
 export type LoginResult =
   | { ok: true; user: AuthorizedUser }
   | { ok: false; code: LoginErrorCode }
+
+/** Account states that end any existing session on its next request. */
+export const SESSION_BLOCKING_STATUSES = ['SUSPENDED', 'BLOCKED', 'DEACTIVATED']
+
+/**
+ * Roles and status straight from the database. Expired grants don't count,
+ * and a role held for several areas is listed once.
+ */
+async function loadSessionClaims(userId: string) {
+  const fresh = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      status: true,
+      deletedAt: true,
+      userRoles: {
+        where: { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+        select: { role: { select: { code: true } } },
+      },
+      member: { select: { id: true } },
+    },
+  })
+  if (!fresh || fresh.deletedAt || SESSION_BLOCKING_STATUSES.includes(fresh.status)) return null
+  return {
+    roles: Array.from(new Set(fresh.userRoles.map((ur) => ur.role.code))),
+    memberId: fresh.member?.id ?? null,
+    status: fresh.status as string,
+  }
+}
 
 const MAX_FAILED_ATTEMPTS = 5
 const LOCK_DURATION_MS = 30 * 60 * 1000
@@ -113,28 +142,22 @@ export const authOptions: NextAuthOptions = {
     error: `${BASE_PATH}/login`,
   },
   callbacks: {
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id
         token.roles = (user as any).roles
         token.memberId = (user as any).memberId
         token.status = (user as any).status
-      } else if (trigger === 'update' && token.id) {
-        // Lets the client call useSession().update() to pick up a role/status
-        // change (e.g. just became Karta) without forcing a full re-login —
-        // JWT sessions otherwise only refresh these claims at sign-in time.
-        const fresh = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          include: {
-            userRoles: { include: { role: true } },
-            member: { select: { id: true } },
-          },
-        })
-        if (fresh) {
-          token.roles = fresh.userRoles.map((ur) => ur.role.code)
-          token.memberId = fresh.member?.id ?? null
-          token.status = fresh.status
-        }
+      } else if (token.id) {
+        // Roles and status are re-read from the database on every request,
+        // so a revoked role or a suspended account takes effect at once
+        // rather than when the 30-day token expires. Throwing here makes
+        // getServerSession() return null and clears the session cookie.
+        const claims = await loadSessionClaims(token.id as string)
+        if (!claims) throw new Error('ACCOUNT_INACTIVE')
+        token.roles = claims.roles
+        token.memberId = claims.memberId
+        token.status = claims.status
       }
       return token
     },
@@ -154,6 +177,7 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         identifier: { label: 'Email or Mobile', type: 'text' },
         password: { label: 'Password', type: 'password' },
+        otp: { label: 'Admin verification code', type: 'text' },
       },
       async authorize(credentials) {
         if (!credentials?.identifier || !credentials?.password) {
@@ -162,6 +186,12 @@ export const authOptions: NextAuthOptions = {
         const result = await validateLogin(credentials.identifier, credentials.password)
         if (!result.ok) {
           throw new Error(result.code)
+        }
+        // F32: Admin login needs the emailed second-factor code as well.
+        if (result.user.roles.includes('ADMIN') && adminSecondFactorRequired()) {
+          if (!credentials.otp) throw new Error('OTP_REQUIRED')
+          const check = await verifyOtp(result.user.id, 'ADMIN_2FA', credentials.otp)
+          if (!check.ok) throw new Error('OTP_INVALID')
         }
         return result.user
       },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { redactMembersForViewer } from '@/lib/visibility'
 import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 export async function GET(req: NextRequest) {
@@ -39,5 +40,7 @@ export async function GET(req: NextRequest) {
     prisma.member.count({ where }),
   ])
 
-  return NextResponse.json({ members, total, page, limit })
+  // Same per-member privacy settings as GET /api/members/[id] (security
+  // finding 2: the list used to return contact details and DOB unredacted).
+  return NextResponse.json({ members: await redactMembersForViewer(session, members), total, page, limit })
 }

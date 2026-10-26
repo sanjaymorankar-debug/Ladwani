@@ -26,6 +26,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         qualification: body.qualification || null,
         specialization: body.specialization || null,
         institution: body.institution || null,
+        // F02 education rows: university and grade.
+        university: body.university || null,
+        grade: body.grade || null,
         yearCompleted: body.yearCompleted ? parseInt(body.yearCompleted) : null,
         isHighest: !!body.isHighest,
         isOngoing: !!body.isOngoing,

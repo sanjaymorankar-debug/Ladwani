@@ -37,6 +37,10 @@ export default withAuth(
           pathname.startsWith('/privacy') ||
           pathname.startsWith('/terms') ||
           pathname.startsWith('/api/auth') ||
+          // Location master read for the registration form (F01), and the
+          // cron endpoint, which authenticates with CRON_SECRET (F06).
+          pathname === '/api/areas' ||
+          pathname.startsWith('/api/cron/') ||
           // Claiming an invited profile happens before the person has any
           // account at all — the single-use token in the URL is the
           // credential, checked server-side by the route itself.

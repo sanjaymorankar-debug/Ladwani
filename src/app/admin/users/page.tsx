@@ -15,7 +15,7 @@ export default async function UsersPage() {
     where: { deletedAt: null },
     include: {
       member: { select: { firstName: true, lastName: true, memberNumber: true } },
-      userRoles: { include: { role: { select: { code: true, label: true } } } },
+      userRoles: { include: { role: { select: { code: true, label: true } }, area: { select: { name: true } } } },
     },
     orderBy: { createdAt: 'desc' },
     take: 100,
@@ -96,12 +96,12 @@ export default async function UsersPage() {
                     <td className="py-3 pr-4">
                       <div className="flex flex-wrap gap-1">
                         {user.userRoles.map((ur: any) => (
-                          <span key={ur.role.code} className={`badge text-xs ${
+                          <span key={ur.id} className={`badge text-xs ${
                             ur.role.code === 'ADMIN' ? 'badge-red' :
                             ur.role.code === 'OPERATOR' ? 'badge-blue' :
                             ur.role.code === 'KARTA' ? 'badge-orange' :
                             'badge-gray'
-                          }`}>{ur.role.code}</span>
+                          }`}>{ur.role.code}{ur.area ? ` · ${ur.area.name}` : ''}</span>
                         ))}
                       </div>
                     </td>

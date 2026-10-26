@@ -3,6 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { raiseFamilyRegistrationInvoice } from '@/lib/fees'
+import { requireActiveAccount } from '@/lib/account-state'
+import { kartaFamilyOf } from '@/lib/family-rules'
+import { validateSettlement, chainText } from '@/lib/locations'
+import { recordAudit } from '@/lib/audit'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -13,21 +17,36 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') ?? '20')))
   const q = url.searchParams.get('q')
 
-  const where: any = { status: 'ACTIVE', deletedAt: null }
+  // F14: search by family name, Karta name, Mul Gaon, Gotra or district.
+  const where: any = { status: { in: ['ACTIVE', 'KARTA_VACANT'] }, deletedAt: null }
+  const and: any[] = []
   if (q) {
-    where.OR = [
+    and.push({ OR: [
       { name: { contains: q, mode: 'insensitive' } },
       { surname: { contains: q, mode: 'insensitive' } },
       { nativeVillage: { contains: q, mode: 'insensitive' } },
-    ]
+      { karta: { OR: [{ firstName: { contains: q, mode: 'insensitive' } }, { lastName: { contains: q, mode: 'insensitive' } }] } },
+    ] })
   }
+  const gotra = url.searchParams.get('gotra')
+  if (gotra) and.push({ gotra: { contains: gotra, mode: 'insensitive' } })
+  const district = url.searchParams.get('district')
+  if (district) and.push({ nativeDistrict: { contains: district, mode: 'insensitive' } })
+  const kartaName = url.searchParams.get('karta')
+  if (kartaName) and.push({ karta: { OR: [{ firstName: { contains: kartaName, mode: 'insensitive' } }, { lastName: { contains: kartaName, mode: 'insensitive' } }] } })
+  const mulGaon = url.searchParams.get('mulGaon')
+  if (mulGaon) and.push({ nativeVillage: { contains: mulGaon, mode: 'insensitive' } })
+  if (and.length) where.AND = and
 
   const [families, total] = await Promise.all([
     prisma.family.findMany({
       where,
-      include: {
-        addresses: { where: { isPrimary: true }, take: 1 },
-        _count: { select: { members: true } },
+      // F14: only a limited summary before joining — no addresses, no description.
+      select: {
+        id: true, registrationNumber: true, name: true, surname: true, gotra: true, kuladevata: true,
+        nativeVillage: true, nativeDistrict: true, nativeState: true, status: true,
+        karta: { select: { firstName: true, lastName: true } },
+        _count: { select: { members: { where: { leftAt: null } } } },
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -42,6 +61,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // F01: a DRAFT / unapproved account may only fill in its own profile.
+  const notActive = await requireActiveAccount(session.user?.id as string)
+  if (notActive) return notActive
 
   const memberId = (session.user as any).memberId as string | null
   if (!memberId) {
@@ -51,13 +73,43 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   if (!body.name) return NextResponse.json({ error: 'Family name is required' }, { status: 400 })
 
-  // A member can only actively belong to one family at a time — registering
-  // a second one while already linked would silently orphan the first.
-  const existingMembership = await prisma.familyMember.findFirst({
-    where: { memberId, leftAt: null },
-  })
-  if (existingMembership) {
-    return NextResponse.json({ error: 'You are already linked to a family.' }, { status: 409 })
+  // F09: a person can be Karta of only one family — but a member of many
+  // (rule 1), so belonging to other families is no longer a bar.
+  if (await kartaFamilyOf(memberId)) {
+    return NextResponse.json({ error: 'You are already the Karta of a family. Hand that over first (F16) to head another.' }, { status: 409 })
+  }
+
+  // F09 step 2: Mul Gaon from the location master (optional for older clients).
+  let native: { village: string | null; district: string | null; state: string | null } | null = null
+  let mulGaonAreaId: string | null = null
+  if (body.mulGaonAreaId) {
+    const place = await validateSettlement(body.mulGaonAreaId)
+    if ('error' in place) return NextResponse.json({ error: place.error }, { status: 400 })
+    native = chainText(place.chain)
+    mulGaonAreaId = place.chain[0].id
+  }
+  const nativeVillage = native?.village ?? body.nativeVillage ?? null
+
+  // F09 step 3: same surname + Mul Gaon + Gotra looks like a family already
+  // on the site. Show the matches; the user confirms to go ahead.
+  const surname = (body.surname ?? body.name ?? '').trim()
+  if (!body.confirmNotDuplicate && surname && nativeVillage && body.gotra) {
+    const matches = await prisma.family.findMany({
+      where: {
+        deletedAt: null,
+        OR: [{ surname: { equals: surname } }, { name: { equals: surname } }],
+        nativeVillage: { equals: nativeVillage },
+        gotra: { equals: body.gotra },
+      },
+      select: { id: true, registrationNumber: true, name: true, gotra: true, nativeVillage: true, karta: { select: { firstName: true, lastName: true } } },
+      take: 5,
+    })
+    if (matches.length) {
+      return NextResponse.json({
+        error: 'A family with the same surname, Mul Gaon and Gotra is already registered. Ask to join it, or confirm this is a different family.',
+        possibleDuplicates: matches,
+      }, { status: 409 })
+    }
   }
 
   const family = await prisma.$transaction(async (tx) => {
@@ -71,9 +123,9 @@ export async function POST(req: NextRequest) {
         kuladevi: body.kuladevi ?? null,
         gotra: body.gotra ?? null,
         traditionalOccupation: body.traditionalOccupation ?? null,
-        nativeVillage: body.nativeVillage ?? null,
-        nativeDistrict: body.nativeDistrict ?? null,
-        nativeState: body.nativeState ?? null,
+        nativeVillage,
+        nativeDistrict: native?.district ?? body.nativeDistrict ?? null,
+        nativeState: native?.state ?? body.nativeState ?? null,
         nativeCountry: body.nativeCountry ?? 'India',
         status: 'PENDING',
         kartaMemberId: memberId,
@@ -82,8 +134,11 @@ export async function POST(req: NextRequest) {
     })
 
     await tx.familyMember.create({
-      data: { familyId: created.id, memberId, isKarta: true, joinedBy: session.user.id },
+      data: { familyId: created.id, memberId, isKarta: true, joinedBy: session.user.id, relationshipRole: 'karta' },
     })
+    if (mulGaonAreaId) {
+      await tx.familyArea.create({ data: { familyId: created.id, areaId: mulGaonAreaId, isPrimary: true } })
+    }
 
     let kartaRole = await tx.role.findUnique({ where: { code: 'KARTA' } })
     if (!kartaRole) {
@@ -109,16 +164,13 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    await tx.auditLog.create({
-      data: {
-        actorId: session.user.id,
-        actorRole: 'KARTA',
-        action: 'family.create',
-        entityType: 'family',
-        entityId: created.id,
-        newValue: { name: created.name },
+    await recordAudit({
+      actorId: session.user.id, actorRole: 'KARTA', action: 'family.create', entityType: 'family', entityId: created.id,
+      newValue: {
+        name: created.name, registrationNumber: created.registrationNumber, gotra: created.gotra,
+        kuladevata: created.kuladevata, nativeVillage: created.nativeVillage, kartaMemberId: memberId,
       },
-    })
+    }, req, tx)
 
     // One-time registration fee, billed to the Karta who registered the
     // family. Members who join later are never billed.

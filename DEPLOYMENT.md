@@ -65,7 +65,7 @@ PostgreSQL features. Moving back restored both, plus case-insensitive email:
 # Part 1 — The database: Neon
 
 Its own Neon project, `bkesari-ladwani` (Singapore), one Neon branch per tier. On every branch the database is
-`ladwani`, owned by the role `bk_ladwani_app`:
+`bk_ladwani`, owned by the role `bk_ladwani_app`:
 
 | Neon branch | Tier | Site |
 |---|---|---|
@@ -84,7 +84,7 @@ migration run `CREATE EXTENSION citext` and `btree_gist` without being a
 superuser.
 
 **Connection strings.** Console → the branch → **Connect** → database
-`ladwani`, role `bk_ladwani_app`, then copy two strings:
+`bk_ladwani`, role `bk_ladwani_app`, then copy two strings:
 
 | `.env` key | "Connection pooling" | Used by |
 |---|---|---|

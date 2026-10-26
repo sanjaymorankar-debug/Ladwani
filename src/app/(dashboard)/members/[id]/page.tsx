@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { calculateAge, genderLabel, maritalLabel, formatDate, GENDER_LABELS, MARITAL_STATUS_LABELS, getInitials } from '@/lib/utils'
 import { getMemberAccess } from '@/lib/member-auth'
+import { hasStaffView } from '@/lib/visibility'
 import InviteToClaimPanel from '@/components/members/InviteToClaimPanel'
 import MarkDeceasedPanel from '@/components/members/MarkDeceasedPanel'
 import DetailsSummary from '@/components/additional-details/DetailsSummary'
@@ -19,8 +20,8 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
   const session = await getServerSession(authOptions)
   if (!session) return null
   const viewerUserId = session.user?.id as string
-  const viewerRoles: string[] = (session.user as any)?.roles ?? ['MEMBER']
-  const isAdmin = viewerRoles.includes('ADMIN') || viewerRoles.includes('OPERATOR')
+  // Contact details: Admin, or an Operator with an open verification task for this member (decision 3).
+  const isAdmin = await hasStaffView(session, params.id)
 
   const member = await prisma.member.findUnique({
     where: { id: params.id, deletedAt: null },

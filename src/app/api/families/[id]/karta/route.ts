@@ -3,12 +3,17 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFamilyAccess } from '@/lib/family-auth'
-import { requiresApproval, createApprovalRecord, applyKartaChange } from '@/lib/approvals'
+import { applyKartaChange } from '@/lib/approvals'
+import { closeKartaTransfer } from '@/lib/family-rules'
+import { notifyUser } from '@/lib/notify'
+import { recordAudit } from '@/lib/audit'
 
 /**
- * Hands the Karta role to another member of the family (§28). Requested by the
- * current Karta (or staff); gated by ApprovalRule('family.karta.change'), whose
- * default approver is an Admin.
+ * F16 voluntary hand-over. The current Karta nominates an adult, active,
+ * account-holding member; that member must accept (POST
+ * /api/karta-transfers/[id]); after acceptance the existing Admin review
+ * (ApprovalRule family.karta.change, §28) applies when it is switched on. An
+ * Admin acting here applies the change directly.
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -38,23 +43,31 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const actorId = session.user.id as string
   const payload = { familyId: params.id, newKartaMemberId }
 
-  if (!access.isStaff && (await requiresApproval('family.karta.change'))) {
-    const pending = await prisma.approval.findFirst({
-      where: { actionCode: 'family.karta.change', entityId: params.id, status: { in: ['SUBMITTED', 'UNDER_REVIEW'] } },
+  if (!access.isStaff) {
+    const open = await prisma.kartaTransfer.findFirst({ where: { familyId: params.id, status: { in: ['PENDING', 'ACCEPTED'] } } })
+    if (open) return NextResponse.json({ message: 'A Karta hand-over for this family is already in progress' }, { status: 409 })
+    const transfer = await prisma.kartaTransfer.create({
+      data: { familyId: params.id, kind: 'VOLUNTARY', fromMemberId: access.memberId ?? null, toMemberId: newKartaMemberId, requestedBy: actorId },
     })
-    if (pending) return NextResponse.json({ message: 'A Karta change for this family is already awaiting review' }, { status: 409 })
-    await prisma.$transaction((tx) =>
-      createApprovalRecord(tx, {
-        actionCode: 'family.karta.change', entityType: 'family', entityId: params.id,
-        newValue: payload, submittedBy: actorId, reason: body.reason,
-      })
-    )
-    return NextResponse.json({ message: 'Karta change submitted for Admin review.' }, { status: 202 })
+    await recordAudit({
+      actorId, actorRole: 'KARTA', action: 'family.karta.nominate', entityType: 'karta_transfer', entityId: transfer.id,
+      newValue: { familyId: params.id, toMemberId: newKartaMemberId, status: 'PENDING' },
+    }, req)
+    await notifyUser({
+      userId: target.member.userId, type: 'KARTA_NOMINATION', title: 'You have been asked to become Karta',
+      body: 'The current Karta of your family has nominated you. Accept or decline from your notifications.',
+      data: { familyId: params.id, transferId: transfer.id }, also: ['SMS'],
+    })
+    return NextResponse.json({ message: 'Nomination sent. The new Karta must accept it.', transferId: transfer.id }, { status: 202 })
   }
 
   await prisma.$transaction(async (tx) => {
     await applyKartaChange(tx, payload, actorId)
-    await tx.auditLog.create({ data: { actorId, action: 'family.karta.change', entityType: 'family', entityId: params.id } })
+    await recordAudit({
+      actorId, actorRole: 'ADMIN', action: 'family.karta.change', entityType: 'family', entityId: params.id,
+      newValue: payload,
+    }, req, tx)
   })
+  await closeKartaTransfer(params.id, newKartaMemberId, actorId)
   return NextResponse.json({ message: 'Karta changed.' })
 }

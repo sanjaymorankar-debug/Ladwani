@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { Edit, Shield, Bell, Lock, User } from 'lucide-react'
+import { profileCompleteness } from '@/lib/registration'
 import { calculateAge, genderLabel, maritalLabel, formatDate, GENDER_LABELS, MARITAL_STATUS_LABELS, getInitials } from '@/lib/utils'
 import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
@@ -35,22 +36,10 @@ export default async function ProfilePage() {
   const edu = member?.education[0]
   const job = member?.employment[0]
 
-  const completionChecks = member
-    ? [
-        { label: 'Date of birth', done: !!member.dateOfBirth },
-        { label: 'Profile photo', done: member.photos.length > 0 },
-        { label: 'Education', done: member._count.education > 0 },
-        { label: 'Employment / occupation', done: member._count.employment > 0 || !!member.employmentStatus },
-        { label: 'Skills', done: member._count.skills > 0 },
-        { label: 'Current address', done: member.addresses.some((a) => a.addressType === 'CURRENT') },
-        { label: 'Native address', done: member.addresses.some((a) => a.addressType === 'NATIVE') },
-        { label: 'Biography', done: !!member.biography },
-      ]
-    : []
-  const completionPct = completionChecks.length
-    ? Math.round((completionChecks.filter((c) => c.done).length / completionChecks.length) * 100)
-    : 0
-  const missing = completionChecks.filter((c) => !c.done).map((c) => c.label)
+  // F02: the same completeness rules the verification submission enforces.
+  const completeness = member ? await profileCompleteness(member.id) : null
+  const completionPct = completeness?.percent ?? 0
+  const missing = completeness ? completeness.items.filter((c) => !c.done).map((c) => c.label) : []
 
   const settingsLinks = [
     { href: '/members/' + (member?.id ?? '') + '/edit', icon: Edit, label: 'Edit Profile', desc: 'Update your personal information' },

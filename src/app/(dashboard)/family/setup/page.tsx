@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Link from 'next/link'
+import AreaCascadePicker from '@/components/shared/AreaCascadePicker'
 import { ArrowLeft, Building2, Loader2, Search, CheckCircle2, Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -51,6 +52,9 @@ function FamilySetup() {
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [joiningFamilyId, setJoiningFamilyId] = useState<string | null>(null)
+  // F09: Mul Gaon from the location master, and the duplicate-family check.
+  const [mulGaonAreaId, setMulGaonAreaId] = useState('')
+  const [duplicates, setDuplicates] = useState<any[] | null>(null)
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -92,9 +96,13 @@ function FamilySetup() {
       const res = await fetch(`${BASE_PATH}/api/families`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, mulGaonAreaId: mulGaonAreaId || undefined, confirmNotDuplicate: duplicates !== null }),
       })
       const json = await res.json()
+      if (res.status === 409 && json.possibleDuplicates) {
+        setDuplicates(json.possibleDuplicates)
+        throw new Error(json.error)
+      }
       if (!res.ok) throw new Error(json.error ?? json.message ?? 'Failed')
       // Pick up the freshly-granted KARTA role without forcing a re-login.
       await update()
@@ -176,7 +184,9 @@ function FamilySetup() {
                       <p className="font-medium text-gray-900">{f.name} Family</p>
                       <div className="flex gap-2 mt-0.5 text-xs text-gray-500">
                         <span>{f.registrationNumber}</span>
-                        {f.addresses?.[0]?.city && <span>· {f.addresses[0].city}</span>}
+                        {f.karta && <span>· Karta {f.karta.firstName} {f.karta.lastName ?? ''}</span>}
+                        {f.nativeVillage && <span>· {f.nativeVillage}</span>}
+                        {f.gotra && <span>· {f.gotra}</span>}
                         <span>· {f._count?.members ?? 0} members</span>
                       </div>
                     </div>
@@ -212,7 +222,23 @@ function FamilySetup() {
           <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-sm text-amber-800">
             <strong>Before registering:</strong> Please search to make sure your family isn&apos;t already registered. Duplicate registrations will be merged by our team.
           </div>
+          {duplicates && (
+            <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-sm text-red-800 space-y-2">
+              <p><strong>This may already be registered</strong> (same surname, Mul Gaon and Gotra):</p>
+              <ul className="list-disc ml-5">
+                {duplicates.map((d) => (
+                  <li key={d.id}><Link className="underline" href={`/family/${d.id}`}>{d.name} ({d.registrationNumber})</Link>
+                    {d.karta ? ` — Karta ${d.karta.firstName} ${d.karta.lastName ?? ''}` : ''}</li>
+                ))}
+              </ul>
+              <p>Ask to join it instead, or submit again to confirm yours is a different family.</p>
+            </div>
+          )}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="card space-y-3">
+              <h2 className="font-semibold text-gray-900 border-b border-gray-100 pb-2">Mul Gaon (family&apos;s native village)</h2>
+              <AreaCascadePicker idPrefix="family-mulgaon" onChange={setMulGaonAreaId} />
+            </div>
             <div className="card space-y-4">
               <h2 className="font-semibold text-gray-900 border-b border-gray-100 pb-2">Family Information</h2>
               <div className="grid grid-cols-2 gap-3">

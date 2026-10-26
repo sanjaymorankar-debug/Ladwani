@@ -2,20 +2,21 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { canModeratePost, alertAudience } from '@/lib/posts'
 import { getPostAccess } from '@/lib/interest-groups'
 
-/** Operator/Admin approve or reject a submitted post. */
+/**
+ * Approve or reject a submitted post, or hide a published one. Community
+ * posts: Operator / Admin (as before). F36: District / State / National posts
+ * are moderated by that LadWani body's President or Secretary, or an Admin.
+ * Interest-group posts: staff, or that group's moderators. A FLAGGED post
+ * (hidden after reports) is restored with approve or kept down with hide.
+ */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
   const roles = ((session.user as any).roles ?? []) as string[]
-  // Staff moderate everything; an interest group's moderators moderate the
-  // posts in their own group through this same flow.
-  if (!roles.includes('ADMIN') && !roles.includes('OPERATOR') && !(await getPostAccess(session, params.id)).isModerator) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
-  }
-
   const body = await req.json()
   const action = body.action as 'approve' | 'reject' | 'hide'
   if (!['approve', 'reject', 'hide'].includes(action)) {
@@ -24,6 +25,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const post = await prisma.post.findUnique({ where: { id: params.id } })
   if (!post || post.deletedAt) return NextResponse.json({ message: 'Post not found' }, { status: 404 })
+  const allowed = post.groupId
+    ? roles.includes('ADMIN') || roles.includes('OPERATOR') || (await getPostAccess(session, post.id)).isModerator
+    : await canModeratePost(session, post)
+  if (!allowed) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+  // Only a waiting (or flagged) post is approved; only a waiting one rejected; only a live (or flagged) one hidden.
+  const from = action === 'hide' ? ['PUBLISHED', 'FLAGGED'] : action === 'approve' ? ['PENDING_APPROVAL', 'FLAGGED'] : ['PENDING_APPROVAL']
+  if (!from.includes(post.status)) return NextResponse.json({ message: `A ${post.status.toLowerCase().replace('_', ' ')} post cannot be ${action}d` }, { status: 409 })
+
+  if (action === 'reject' && !String(body.note ?? '').trim()) return NextResponse.json({ message: 'Give a reason for rejecting the post' }, { status: 400 })
 
   const status = action === 'approve' ? 'PUBLISHED' : action === 'reject' ? 'REJECTED' : 'HIDDEN'
 
@@ -59,7 +69,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     await tx.auditLog.create({
       data: {
         actorId: session.user!.id as string,
-        actorRole: roles[0] ?? 'GROUP_MODERATOR',
+        actorRole: roles.includes('ADMIN') ? 'ADMIN' : roles.includes('OPERATOR') ? 'OPERATOR' : post.groupId ? 'GROUP_MODERATOR' : 'BODY_OFFICER',
         action: `post.${action}`,
         entityType: 'post',
         entityId: post.id,
@@ -71,5 +81,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return result
   })
 
+  if (updated.status === 'PUBLISHED' && !updated.groupId) await alertAudience(updated)
   return NextResponse.json({ message: `Post ${action}d`, status: updated.status })
 }

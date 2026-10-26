@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { tooManyRequests, LIMITS } from '@/lib/rate-limit'
 import { prisma } from '@/lib/prisma'
+import { redactMembersForViewer } from '@/lib/visibility'
 import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  const limited = tooManyRequests([`search:${session.user?.id}`, LIMITS.search])
+  if (limited) return limited
 
   const url = new URL(req.url)
   const q = url.searchParams.get('q')
@@ -57,5 +61,7 @@ export async function GET(req: Request) {
     prisma.member.count({ where }),
   ])
 
-  return NextResponse.json({ members, total })
+  // Same per-member privacy settings as GET /api/members/[id] (security
+  // finding 2: search used to return contact details and DOB unredacted).
+  return NextResponse.json({ members: await redactMembersForViewer(session, members), total })
 }

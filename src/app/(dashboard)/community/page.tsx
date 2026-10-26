@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Plus, Newspaper } from 'lucide-react'
 import { timeAgo, getInitials } from '@/lib/utils'
 import PostCard from '@/components/community/PostCard'
+import { feedWhere, AUTHOR_SELECT } from '@/lib/posts'
 
 export default async function CommunityFeedPage() {
   const session = await getServerSession(authOptions)
@@ -12,10 +13,11 @@ export default async function CommunityFeedPage() {
 
   const [posts, postTypes] = await Promise.all([
     prisma.post.findMany({
+      // F36: only posts whose audience includes the viewer (and their own); authors' names only.
       // Interest-group posts stay inside their group.
-      where: { status: 'PUBLISHED', deletedAt: null, groupId: null },
+      where: { AND: [await feedWhere(session), { groupId: null }] },
       include: {
-        author: { include: { member: { select: { firstName: true, lastName: true } } } },
+        author: AUTHOR_SELECT,
         postType: { select: { label: true, icon: true, code: true } },
         _count: { select: { comments: true, reactions: true } },
       },

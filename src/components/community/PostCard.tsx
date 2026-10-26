@@ -111,7 +111,18 @@ export default function PostCard({ post, viewerUserId }: PostCardProps) {
         >
           <Share2 className="w-4 h-4" />
         </button>
-        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-50 hover:text-red-500 transition-colors ml-auto">
+        <button
+          title="Report abuse"
+          onClick={async () => {
+            // F36 report-abuse: hidden after several reports until a moderator reviews it.
+            const reason = window.prompt('What is wrong with this post?')?.trim()
+            if (!reason) return
+            const res = await fetch(`${BASE_PATH}/api/reports`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'post', id: post.id, reason }) })
+            const json = await res.json()
+            if (res.ok) toast.success(json.message)
+            else toast.error(json.message)
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-50 hover:text-red-500 transition-colors ml-auto">
           <Flag className="w-3.5 h-3.5" />
         </button>
       </div>

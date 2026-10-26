@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getMemberAccess } from '@/lib/member-auth'
-import { canViewByVisibility } from '@/lib/visibility'
+import { canViewByVisibility, PHOTO_VISIBILITIES } from '@/lib/visibility'
 import { validatePhotoUpload, uploadMemberPhoto, isStorageConfigured } from '@/lib/storage'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
@@ -15,7 +15,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     // Explicit selection: storage keys stay server-side, and fileSizeBytes
     // (a BigInt) is excluded because JSON cannot serialize it.
     select: {
-      id: true, isProfilePhoto: true, visibility: true, caption: true,
+      id: true, isProfilePhoto: true, visibility: true, audienceListId: true, caption: true,
       width: true, height: true, createdAt: true,
     },
     orderBy: { createdAt: 'desc' },
@@ -23,7 +23,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
   const visible = []
   for (const photo of photos) {
-    if (await canViewByVisibility(session, params.id, photo.visibility)) {
+    if (await canViewByVisibility(session, params.id, photo.visibility, photo.audienceListId)) {
       visible.push(photo)
     }
   }
@@ -50,6 +50,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ message: 'No file provided' }, { status: 400 })
   }
 
+  // An unknown value would otherwise be stored as-is; refuse it (F34).
+  const visibility = (form.get('visibility') as string) || 'PRIVATE'
+  if (!PHOTO_VISIBILITIES.includes(visibility)) return NextResponse.json({ message: 'Choose who can see the photo' }, { status: 400 })
+  const audienceListId = visibility === 'FRIEND_LIST' ? String(form.get('audienceListId') ?? '') : null
+  if (visibility === 'FRIEND_LIST') {
+    const list = audienceListId ? await prisma.friendList.findUnique({ where: { id: audienceListId } }) : null
+    if (!list || list.ownerMemberId !== params.id) return NextResponse.json({ message: 'Choose one of your friend lists' }, { status: 400 })
+  }
+
   let validated
   try {
     validated = await validatePhotoUpload(file)
@@ -59,7 +68,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const keys = await uploadMemberPhoto(params.id, validated)
   const setAsProfile = form.get('setAsProfile') === 'true'
-  const visibility = (form.get('visibility') as string) || 'PRIVATE'
 
   const photo = await prisma.$transaction(async (tx) => {
     const created = await tx.photo.create({
@@ -77,6 +85,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         height: validated.height,
         isProfilePhoto: setAsProfile,
         visibility,
+        audienceListId,
       },
     })
 

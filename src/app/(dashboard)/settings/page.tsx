@@ -159,10 +159,23 @@ export default function SettingsPage() {
             <h2 className="font-semibold text-gray-900 border-b border-gray-100 pb-2">Data Requests</h2>
             <p className="text-sm text-gray-600">You have rights under the DPDP Act 2023 to access, correct, or request deletion of your data.</p>
             <div className="flex flex-wrap gap-2">
-              <button className="btn-secondary text-sm">Request My Data</button>
-              <button className="btn-secondary text-sm text-red-600 border-red-200 hover:border-red-400 hover:bg-red-50">
+              {/* F40: download my data; ask for deletion (an Admin processes it; family trees keep an anonymous entry). */}
+              <a href={`${BASE_PATH}/api/my/data`} className="btn-secondary text-sm">Download My Data</a>
+              <button className="btn-secondary text-sm text-red-600 border-red-200 hover:border-red-400 hover:bg-red-50"
+                onClick={async () => {
+                  if (!window.confirm('Ask the Admin to delete your account? Your personal data will be erased; family trees keep an anonymous entry. This cannot be undone once processed.')) return
+                  const reason = window.prompt('Reason (optional)') ?? ''
+                  const res = await fetch(`${BASE_PATH}/api/my/deletion-request`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) })
+                  const json = await res.json()
+                  res.ok ? toast.success(json.message) : toast.error(json.message)
+                }}>
                 <Trash2 className="w-3.5 h-3.5 inline mr-1" />Request Deletion
               </button>
+              <button className="btn-ghost text-sm" onClick={async () => {
+                const res = await fetch(`${BASE_PATH}/api/my/deletion-request`, { method: 'DELETE' })
+                const json = await res.json()
+                res.ok ? toast.success(json.message) : toast.error(json.message)
+              }}>Cancel my deletion request</button>
             </div>
           </div>
         </div>

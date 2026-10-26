@@ -5,7 +5,7 @@ import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { canViewByVisibility } from '@/lib/visibility'
+import { canViewPhoto } from '@/lib/photo-access'
 import { activeStorageDriver } from '@/lib/storage'
 
 /**
@@ -24,7 +24,7 @@ export async function GET(req: Request, { params }: { params: { photoId: string 
     return NextResponse.json({ message: 'Not found' }, { status: 404 })
   }
 
-  if (photo.memberId && !(await canViewByVisibility(session, photo.memberId, photo.visibility))) {
+  if (!(await canViewPhoto(session, photo))) {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
   }
 

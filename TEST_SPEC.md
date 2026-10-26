@@ -179,7 +179,7 @@ ADMIN_PASSWORD='SmokeAdmin123!' SEED_TEST_ACCOUNTS=true npm run db:seed
 npm run db:seed:uat
 BASE_PATH=/ladwani NEXTAUTH_SECRET=smoke-only NEXTAUTH_URL=http://127.0.0.1:3103/ladwani/api/auth \
   NEXT_PUBLIC_APP_URL=http://127.0.0.1:3103/ladwani STORAGE_DRIVER=LOCAL UPLOAD_DIR=/tmp/ladwani-smoke-uploads \
-  PAYMENT_GATEWAY=MOCK PAYMENT_SIGNING_SECRET=smoke CRON_SECRET=smoke \
+  PAYMENT_GATEWAY=MOCK PAYMENT_SIGNING_SECRET=smoke CRON_SECRET=smoke AUTH_ADMIN_2FA=false \
   node node_modules/next/dist/bin/next start -p 3103 &   # no -H, as `npm start`
 echo $! > /tmp/ladwani-smoke.pid
 until curl -sf -o /dev/null http://127.0.0.1:3103/ladwani/login; do sleep 1; done
@@ -194,7 +194,10 @@ The probes cover the public pages and a `/ladwani/_next/static` chunk, the
 `/ladwani/api/auth`, role checks on pages and APIs, the middleware redirect
 and a server-side `redirect()` both staying under `/ladwani`, and, signed
 in (anonymous requests get the login redirect first), 404s for `/.env`,
-`/prisma/schema.prisma` and `/package.json`. Start without `-H`: with `-H`, Next 14
+`/prisma/schema.prisma` and `/package.json`. `AUTH_ADMIN_2FA=false` is for
+this local smoke only: since the workbook PR (#10) an Admin also needs an
+emailed sign-in code (F32), which the script cannot read. Never set it on a
+deployed tier. Start without `-H`: with `-H`, Next 14
 builds middleware redirects from its own hostname (`http://localhost:3103/...`);
 `npm start` on the servers runs without it and sends relative Locations.
 
@@ -376,6 +379,12 @@ Measured 2026-10-24 on branch `claude/fervent-bell-wcmmdu` (base commit
 
 Before this run the suite was 302 tests on PostgreSQL (296 on MySQL before
 the move). The 30 added tests cover D1–D5. Expected skips: none.
+
+**After the workbook PR (#10) was ported onto this branch (2026-10-25):** S3.4
+`npm test` is **42 files, 560 passed, 0 failed, 0 skipped** (twice in a row on
+a fresh database); S2 unchanged (5 files, 59 passed); S5 smoke 24 passed (with
+`AUTH_ADMIN_2FA=false`, above); `01-schema.sql` now has 85 tables. See
+`docs/POSTGRESQL-PORT.md`.
 
 ## 6. Pass criteria
 

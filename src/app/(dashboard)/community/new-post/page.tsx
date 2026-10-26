@@ -23,6 +23,9 @@ export default function NewPostPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [postTypes, setPostTypes] = useState<any[]>([])
+  // F36: who the post is for.
+  const [audiences, setAudiences] = useState<{ type: string; id: string | null; label: string }[]>([])
+  const [audience, setAudience] = useState('COMMUNITY:')
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -34,6 +37,7 @@ export default function NewPostPage() {
 
   useEffect(() => {
     fetch(`${BASE_PATH}/api/post-types`).then((r) => r.json()).then((d) => setPostTypes(d?.types ?? []))
+    fetch(`${BASE_PATH}/api/posts/audiences`).then((r) => r.json()).then((d) => setAudiences(d?.options ?? []))
   }, [])
 
   const onSubmit = async (data: FormData) => {
@@ -42,11 +46,11 @@ export default function NewPostPage() {
       const res = await fetch(`${BASE_PATH}/api/posts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, audienceType: audience.split(':')[0], audienceId: audience.split(':')[1] || null }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || 'Failed to create post')
-      toast.success('Post published!')
+      toast.success(json.message)
       router.push('/community')
     } catch (e: any) {
       toast.error(e.message)
@@ -108,12 +112,9 @@ export default function NewPostPage() {
 
           {/* Visibility */}
           <div>
-            <label className="form-label">Visibility</label>
-            <select {...register('visibility')} className="form-input">
-              <option value="COMMUNITY">Entire Community</option>
-              <option value="STATE">State Level</option>
-              <option value="CITY">City Level</option>
-              <option value="LOCAL_AREA">Local Area Only</option>
+            <label className="form-label">Who is this for?</label>
+            <select className="form-input" value={audience} onChange={(e) => setAudience(e.target.value)}>
+              {audiences.map((a) => <option key={`${a.type}:${a.id ?? ''}`} value={`${a.type}:${a.id ?? ''}`}>{a.label}</option>)}
             </select>
           </div>
         </div>

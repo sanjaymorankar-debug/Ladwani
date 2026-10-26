@@ -11,7 +11,7 @@ import { PATCH as patchApproval } from '@/app/api/approvals/[id]/route'
 import { POST as createPost } from '@/app/api/posts/route'
 import { PATCH as moderatePost } from '@/app/api/posts/[id]/moderate/route'
 import { POST as postFamilies } from '@/app/api/families/route'
-import { account, actAs, jsonReq } from './helpers'
+import { account, actAs, jsonReq, bureauReady } from './helpers'
 import { computeSignature } from '@/lib/payments'
 
 const tomorrow = (days = 1, hour = 10) => {
@@ -428,39 +428,59 @@ describe('TC-MAT — matrimony opt-in is restricted to those free to marry', () 
     await prisma.member.update({ where: { id: m.memberId }, data: { maritalStatus: 'UNMARRIED' } })
   })
 
-  it('TC-MAT-012 an UNMARRIED member can opt in, and only opted-in profiles are listed', async () => {
+  it('TC-MAT-012 an UNMARRIED and earning member can opt in, and only opted-in profiles are listed', async () => {
     const { PATCH: patchProfile } = await import('@/app/api/matrimony/profiles/[id]/route')
     const { GET: listProfiles } = await import('@/app/api/matrimony/profiles/route')
     const m = await account('MEMBER-02')
-    const viewer = await account('KARTA-02')
+    // Workbook rules: the viewer must be listed in the bureau to browse it.
+    const viewer = await account('MEMBER-01')
     const profile = await prisma.matrimonialProfile.findUniqueOrThrow({ where: { memberId: m.memberId } })
+    const restoreViewer = await bureauReady(viewer.memberId)
+    let restoreMember: (() => Promise<void>) | null = null
+    try {
+      // Not opted in yet -> absent.
+      actAs({ userId: viewer.userId, roles: viewer.roles, memberId: viewer.memberId })
+      let { profiles } = await (await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)).json()
+      expect(profiles.map((p: any) => p.memberId)).not.toContain(m.memberId)
 
-    // Not opted in yet -> absent.
-    actAs({ userId: viewer.userId, roles: viewer.roles, memberId: viewer.memberId })
-    let { profiles } = await (await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)).json()
-    expect(profiles.map((p: any) => p.memberId)).not.toContain(m.memberId)
+      // Workbook rule: unmarried is not enough — the member must also be earning.
+      await prisma.member.update({ where: { id: m.memberId }, data: { employmentStatus: 'STUDENT' } })
+      actAs({ userId: m.userId, roles: m.roles, memberId: m.memberId })
+      const refused = await patchProfile(jsonReq('http://x', 'PATCH', { isVisible: true }) as any, { params: { id: profile.id } })
+      expect(refused.status).toBe(403)
+      expect((await refused.json()).message).toMatch(/earning/i)
 
-    // Opt in -> present.
-    actAs({ userId: m.userId, roles: m.roles, memberId: m.memberId })
-    expect((await patchProfile(jsonReq('http://x', 'PATCH', { isVisible: true }) as any, { params: { id: profile.id } })).status).toBe(200)
+      // Earning -> opt in -> present.
+      restoreMember = await bureauReady(m.memberId, { listed: false })
+      actAs({ userId: m.userId, roles: m.roles, memberId: m.memberId })
+      expect((await patchProfile(jsonReq('http://x', 'PATCH', { isVisible: true }) as any, { params: { id: profile.id } })).status).toBe(200)
 
-    actAs({ userId: viewer.userId, roles: viewer.roles, memberId: viewer.memberId })
-    ;({ profiles } = await (await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)).json())
-    expect(profiles.map((p: any) => p.memberId)).toContain(m.memberId)
+      actAs({ userId: viewer.userId, roles: viewer.roles, memberId: viewer.memberId })
+      ;({ profiles } = await (await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)).json())
+      expect(profiles.map((p: any) => p.memberId)).toContain(m.memberId)
+    } finally {
+      await restoreViewer()
+      if (restoreMember) await restoreMember()
+    }
   })
 
   it('TC-MAT-013 becoming married withdraws the listing automatically', async () => {
     const { GET: listProfiles } = await import('@/app/api/matrimony/profiles/route')
     const { applySpouseLink } = await import('@/lib/approvals')
     const m = await account('MEMBER-02')
-    const viewer = await account('KARTA-02')
+    // Workbook rules: a listed, earning viewer; the member starts listed and eligible.
+    const viewer = await account('MEMBER-01')
+    const restore = [await bureauReady(m.memberId), await bureauReady(viewer.memberId)]
 
     await prisma.$transaction((tx) => applySpouseLink(tx, m.memberId, { externalSpouseName: 'Someone' }, m.userId))
 
     actAs({ userId: viewer.userId, roles: viewer.roles, memberId: viewer.memberId })
-    const { profiles } = await (await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)).json()
+    const res = await listProfiles(jsonReq('http://x/api/matrimony/profiles', 'GET') as any)
+    expect(res.status).toBe(200)
+    const { profiles } = await res.json()
     expect(profiles.map((p: any) => p.memberId)).not.toContain(m.memberId)
     expect((await prisma.matrimonialProfile.findUniqueOrThrow({ where: { memberId: m.memberId } })).isVisible).toBe(false)
+    for (const r of restore) await r()
 
     // reset for other runs
     await prisma.marriageRecord.deleteMany({ where: { memberId1: m.memberId } })

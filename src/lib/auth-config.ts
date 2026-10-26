@@ -18,3 +18,14 @@
  */
 export const requireAccountVerification =
   process.env.NEXT_PUBLIC_AUTH_REQUIRE_VERIFICATION === 'true'
+
+/**
+ * F32: Admin accounts need a second factor — a 6-digit code emailed after the
+ * password is accepted (src/lib/otp.ts). On by default; set
+ * AUTH_ADMIN_2FA=false only for a local environment with no mail at all.
+ * Server-only, so it is not a NEXT_PUBLIC_ flag: the login form learns that a
+ * code is needed from /api/auth/login-check.
+ */
+export function adminSecondFactorRequired(): boolean {
+  return process.env.AUTH_ADMIN_2FA !== 'false'
+}

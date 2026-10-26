@@ -34,6 +34,9 @@ function LoginForm() {
   )
   const [showPwd, setShowPwd] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  // F32: Admin accounts get an emailed second-factor code after the password.
+  const [otpRequired, setOtpRequired] = useState(false)
+  const [otp, setOtp] = useState('')
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -42,6 +45,23 @@ function LoginForm() {
   const onSubmit = async (data: LoginInput) => {
     setIsLoading(true)
     try {
+      if (otpRequired) {
+        const res = await signIn('credentials', {
+          identifier: data.identifier,
+          password: data.password,
+          otp,
+          redirect: false,
+          callbackUrl: explicitCallbackUrl ?? '/dashboard',
+        })
+        if (res?.error) {
+          toast.error('That code is wrong or has expired. Check your email, or sign in again for a new code.')
+        } else if (res?.ok) {
+          router.push(explicitCallbackUrl ?? '/admin')
+          router.refresh()
+        }
+        return
+      }
+
       // Pre-flight check first: NextAuth collapses every authorize() failure
       // into a generic "CredentialsSignin" error, so we can't tell suspended
       // from locked from wrong-password through signIn() alone.
@@ -53,6 +73,11 @@ function LoginForm() {
       const checkJson = await checkRes.json()
       if (!checkRes.ok) {
         toast.error(checkJson.message ?? 'Something went wrong. Please try again.')
+        return
+      }
+      if (checkJson.otpRequired) {
+        setOtpRequired(true)
+        toast.success(checkJson.message ?? 'We emailed you a sign-in code.')
         return
       }
 
@@ -146,6 +171,22 @@ function LoginForm() {
                 </div>
                 {errors.password && <p className="form-error">{errors.password.message}</p>}
               </div>
+
+              {otpRequired && (
+                <div>
+                  <label className="form-label">Admin sign-in code</label>
+                  <input
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="form-input tracking-widest"
+                    placeholder="6-digit code from your email"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    autoFocus
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Sent to your Admin email. It expires in 10 minutes.</p>
+                </div>
+              )}
 
               <button
                 type="submit"

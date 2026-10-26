@@ -16,6 +16,9 @@ async function cleanupNew() {
   if (!u) return
   await prisma.verificationToken.deleteMany({ where: { userId: u.id } })
   await prisma.consentRecord.deleteMany({ where: { userId: u.id } })
+  // P1 (F01): sign-up also links the Mul Gaon and sends a welcome notification.
+  await prisma.notification.deleteMany({ where: { recipientId: u.id } })
+  if (u.member) await prisma.memberArea.deleteMany({ where: { memberId: u.member.id } })
   await prisma.userRole.deleteMany({ where: { userId: u.id } })
   if (u.member) await prisma.member.delete({ where: { id: u.member.id } })
   await prisma.user.delete({ where: { id: u.id } })
@@ -23,7 +26,8 @@ async function cleanupNew() {
 beforeAll(cleanupNew)
 afterAll(cleanupNew)
 
-const base = { firstName: 'New', lastName: 'Signup', password: 'ValidPass123', joinIntent: 'JOIN_EXISTING' }
+// P1 (F01): gender, date of birth (18+) and Mul Gaon are mandatory at sign-up.
+const base = { firstName: 'New', lastName: 'Signup', password: 'ValidPass123', joinIntent: 'JOIN_EXISTING', gender: 'MALE', dateOfBirth: '1990-05-01', mulGaonAreaId: 'area-mh-vil-loni-kalbhor' }
 const register = (body: any) => postRegister(jsonReq('http://x/api/auth/register', 'POST', body))
 
 describe('TC-AUTH — registration', () => {

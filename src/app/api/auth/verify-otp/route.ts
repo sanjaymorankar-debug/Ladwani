@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { compare } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { verifyOtp } from '@/lib/otp'
+import { tooManyRequests, LIMITS } from '@/lib/rate-limit'
 
 export async function POST(req: Request) {
   try {
@@ -9,55 +10,37 @@ export async function POST(req: Request) {
     if (!identifier || !otp) {
       return NextResponse.json({ message: 'Identifier and OTP are required' }, { status: 400 })
     }
+    const limited = tooManyRequests([`otp-verify:${String(identifier).toLowerCase()}`, LIMITS.otpVerify])
+    if (limited) return limited
 
-    const user = await prisma.user.findFirst({
-      where: mobile ? { mobile } : { email },
-      include: {
-        verificationTokens: {
-          where: {
-            // Accept either kind: sign-up now verifies by email, but older
-            // accounts may still hold an unused mobile token.
-            type: { in: ['EMAIL_VERIFY', 'MOBILE_VERIFY'] },
-            usedAt: null,
-            expiresAt: { gt: new Date() },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-        },
+    const user = await prisma.user.findFirst({ where: mobile ? { mobile } : { email } })
+    // Same answer for an unknown account as for a wrong code — no enumeration.
+    if (!user) {
+      return NextResponse.json({ message: 'Invalid or expired code. Please try again.' }, { status: 400 })
+    }
+
+    // Accept either kind: sign-up now verifies by email, but older accounts
+    // may still hold an unused mobile token. A code dies after 5 wrong tries.
+    const check = await verifyOtp(user.id, ['EMAIL_VERIFY', 'MOBILE_VERIFY'], otp.toString())
+    if (!check.ok) {
+      const message = check.reason === 'NO_CODE' ? 'No valid OTP found. Please request a new one.'
+        : check.reason === 'TOO_MANY_ATTEMPTS' ? 'Too many wrong attempts. Please request a new code.'
+        : 'Invalid OTP. Please try again.'
+      return NextResponse.json({ message }, { status: 400 })
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        // Mark whichever channel the token was actually issued for, not
+        // whichever identifier the caller happened to log in with.
+        emailVerified: check.type === 'EMAIL_VERIFY' ? true : undefined,
+        mobileVerified: check.type === 'MOBILE_VERIFY' ? true : undefined,
+        // F01: verified accounts start DRAFT; accounts verified before P1
+        // (status PENDING from the old flow) follow the same path.
+        ...(user.status === 'PENDING' ? { status: 'DRAFT' as const } : {}),
       },
     })
-
-    if (!user) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 })
-    }
-
-    const token = user.verificationTokens[0]
-    if (!token) {
-      return NextResponse.json({ message: 'No valid OTP found. Please request a new one.' }, { status: 400 })
-    }
-
-    const isValid = await compare(otp.toString(), token.tokenHash)
-    if (!isValid) {
-      return NextResponse.json({ message: 'Invalid OTP. Please try again.' }, { status: 400 })
-    }
-
-    // Mark token as used and activate user
-    await prisma.$transaction([
-      prisma.verificationToken.update({
-        where: { id: token.id },
-        data: { usedAt: new Date() },
-      }),
-      prisma.user.update({
-        where: { id: user.id },
-        data: {
-          // Mark whichever channel the token was actually issued for, not
-          // whichever identifier the caller happened to log in with.
-          emailVerified: token.type === 'EMAIL_VERIFY' ? true : undefined,
-          mobileVerified: token.type === 'MOBILE_VERIFY' ? true : undefined,
-          status: 'ACTIVE',
-        },
-      }),
-    ])
 
     return NextResponse.json({ message: 'Verified successfully' })
   } catch (e) {

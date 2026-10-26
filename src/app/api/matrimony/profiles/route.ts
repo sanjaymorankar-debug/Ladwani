@@ -1,89 +1,92 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { tooManyRequests, LIMITS } from '@/lib/rate-limit'
 import { prisma } from '@/lib/prisma'
-import {
-  visibleMatrimonyWhere, MATRIMONY_ELIGIBLE_STATUSES,
-  isEligibleForMatrimony, matrimonyIneligibleReason,
-} from '@/lib/matrimony'
-import { EDUCATION_CORE_SELECT } from '@/lib/additional-details/core-selects'
+import { visibleMatrimonyWhere } from '@/lib/matrimony'
+import { requireActiveAccount } from '@/lib/account-state'
+import { canBrowse, bureauEligibility, workbookRules, profileCards } from '@/lib/bureau'
+import { profileFields } from '@/lib/bureau-fields'
 
+/**
+ * F38 search: age, education, occupation, district, Gotra (plus gender, city).
+ * Returns limited cards only — no contact details, income as a band, same-Gotra
+ * matches flagged.
+ */
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  const limited = tooManyRequests([`search:${session.user?.id}`, LIMITS.search])
+  if (limited) return limited
+  if (!(await canBrowse(session))) {
+    return NextResponse.json({ message: 'Only members listed in the marriage bureau, and their Karta, can browse it.' }, { status: 403 })
+  }
 
   const url = new URL(req.url)
-  const gender = url.searchParams.get('gender')
-  const minAge = url.searchParams.get('minAge')
-  const maxAge = url.searchParams.get('maxAge')
-  const city = url.searchParams.get('city')
-  const education = url.searchParams.get('education')
-
+  const p = (k: string) => url.searchParams.get(k)
   const memberWhere: any = { status: 'ACTIVE' }
-  if (gender) memberWhere.gender = gender
-  if (city) memberWhere.currentCity = { contains: city, mode: 'insensitive' }
-  if (minAge || maxAge) {
+  if (p('gender')) memberWhere.gender = p('gender')
+  if (p('city')) memberWhere.currentCity = { contains: p('city'), mode: 'insensitive' }
+  if (p('minAge') || p('maxAge')) {
     const now = new Date()
     memberWhere.dateOfBirth = {}
-    if (maxAge) memberWhere.dateOfBirth.gte = new Date(now.getFullYear() - parseInt(maxAge), now.getMonth(), now.getDate())
-    if (minAge) memberWhere.dateOfBirth.lte = new Date(now.getFullYear() - parseInt(minAge), now.getMonth(), now.getDate())
+    if (p('maxAge')) memberWhere.dateOfBirth.gte = new Date(now.getFullYear() - parseInt(p('maxAge')!) - 1, now.getMonth(), now.getDate() + 1)
+    if (p('minAge')) memberWhere.dateOfBirth.lte = new Date(now.getFullYear() - parseInt(p('minAge')!), now.getMonth(), now.getDate())
   }
-  if (education) memberWhere.education = { some: { level: education } }
+  if (p('education')) memberWhere.education = { some: { level: p('education') } }
+  if (p('occupation')) memberWhere.OR = [{ occupationCategory: { contains: p('occupation'), mode: 'insensitive' } }, { employmentStatus: { contains: p('occupation'), mode: 'insensitive' } }]
+  if (p('gotra')) memberWhere.families = { some: { leftAt: null, family: { gotra: { contains: p('gotra'), mode: 'insensitive' } } } }
+  if (p('district')) {
+    const talukas = await prisma.area.findMany({ where: { parentId: p('district')! }, select: { id: true } })
+    const villages = await prisma.area.findMany({ where: { parentId: { in: talukas.map((t) => t.id) } }, select: { id: true } })
+    memberWhere.memberAreas = { some: { isPrimary: true, areaId: { in: [p('district')!, ...talukas.map((t) => t.id), ...villages.map((v) => v.id)] } } }
+  }
 
-  // Only members who opted in AND are still eligible (never married, or free
-  // to remarry) appear here.
-  const profiles = await prisma.matrimonialProfile.findMany({
-    where: {
-      ...visibleMatrimonyWhere,
-      member: { ...memberWhere, maritalStatus: { in: MATRIMONY_ELIGIBLE_STATUSES } },
-    },
-    include: {
-      member: {
-        include: {
-          education: { where: { isHighest: true }, take: 1, select: EDUCATION_CORE_SELECT },
-          employment: { where: { isCurrent: true }, take: 1 },
-        },
-      },
-    },
-    take: 30,
+  // Only members who opted in AND are still eligible appear here.
+  const rows = await prisma.matrimonialProfile.findMany({
+    where: { ...visibleMatrimonyWhere, member: { ...(visibleMatrimonyWhere.member as object), ...memberWhere } },
+    select: { id: true, memberId: true },
     orderBy: { updatedAt: 'desc' },
+    take: 60,
   })
-
-  return NextResponse.json({ profiles })
+  const strict = await workbookRules()
+  const ids: string[] = []
+  for (const r of rows) {
+    if (ids.length >= 30) break
+    if (!strict || (await bureauEligibility(r.memberId)).ok) ids.push(r.id)
+  }
+  return NextResponse.json({ profiles: await profileCards(ids, (session.user as any).memberId ?? null) })
 }
 
+/** F37: create one's bureau profile (hidden until the member turns it on). */
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  // F01: a DRAFT / unapproved account may only fill in its own profile.
+  const notActive = await requireActiveAccount(session.user?.id as string)
+  if (notActive) return notActive
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    include: { member: true },
-  })
-
+  const user = await prisma.user.findUnique({ where: { id: session.user.id }, include: { member: true } })
   if (!user?.member) return NextResponse.json({ message: 'Member profile required' }, { status: 400 })
 
-  // Only members who are actually free to marry may create a listing.
-  if (!isEligibleForMatrimony(user.member.maritalStatus)) {
-    return NextResponse.json({ message: matrimonyIneligibleReason(user.member.maritalStatus) }, { status: 403 })
-  }
+  const eligible = await bureauEligibility(user.member.id)
+  if (!eligible.ok) return NextResponse.json({ message: eligible.reason }, { status: 403 })
 
   const existing = await prisma.matrimonialProfile.findUnique({ where: { memberId: user.member.id } })
   if (existing) return NextResponse.json({ message: 'Profile already exists', profileId: existing.id })
 
-  const body = await req.json()
+  const fields = profileFields(await req.json().catch(() => ({})))
+  if ('error' in fields) return NextResponse.json({ message: fields.error }, { status: 400 })
   const profile = await prisma.matrimonialProfile.create({
     data: {
       memberId: user.member.id,
-      // Opt-in is explicit: a new profile is hidden until the member chooses
-      // to publish it.
+      // Opt-in is explicit: a new profile is hidden until the member chooses to publish it.
       isVisible: false,
-      about: body.about ?? null,
-      heightCm: body.heightCm ?? null,
-      languages: body.languages ?? [],
+      ...fields.data,
+      languages: (fields.data.languages as any) ?? [],
       createdBy: session.user.id as string,
     },
   })
-
   return NextResponse.json({ profileId: profile.id }, { status: 201 })
 }
+

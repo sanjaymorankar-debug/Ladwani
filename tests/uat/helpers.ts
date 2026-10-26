@@ -50,3 +50,37 @@ export function jsonReq(url: string, method: string, body?: unknown) {
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 }
+
+/**
+ * Marriage bureau (workbook rules, F37/F38): make a seeded member eligible —
+ * earning (Working + an income band) and, unless `listed: false`, listed.
+ * Returns a function that puts back exactly what was there before, so other
+ * test files see the seed state unchanged.
+ */
+export async function bureauReady(memberId: string, opts: { listed?: boolean } = {}) {
+  const before = await prisma.member.findUniqueOrThrow({
+    where: { id: memberId },
+    select: { employmentStatus: true, profileDetails: { select: { annualIncomeRange: true } }, matrimonialProfile: { select: { id: true, isVisible: true } } },
+  })
+  await prisma.member.update({ where: { id: memberId }, data: { employmentStatus: 'WORKING' } })
+  await prisma.memberProfileDetail.upsert({
+    where: { memberId }, update: { annualIncomeRange: '5L_10L' }, create: { memberId, annualIncomeRange: '5L_10L' },
+  })
+  if (opts.listed !== false) {
+    await prisma.matrimonialProfile.upsert({ where: { memberId }, update: { isVisible: true }, create: { memberId, isVisible: true, about: 'UAT profile' } })
+  }
+  return async () => {
+    await prisma.member.update({ where: { id: memberId }, data: { employmentStatus: before.employmentStatus } })
+    if (before.profileDetails) await prisma.memberProfileDetail.update({ where: { memberId }, data: { annualIncomeRange: before.profileDetails.annualIncomeRange } })
+    else await prisma.memberProfileDetail.deleteMany({ where: { memberId } })
+    if (before.matrimonialProfile) await prisma.matrimonialProfile.update({ where: { memberId }, data: { isVisible: before.matrimonialProfile.isVisible } })
+    else {
+      const p = await prisma.matrimonialProfile.findUnique({ where: { memberId } })
+      if (p) {
+        await prisma.matrimonialInterest.deleteMany({ where: { OR: [{ fromMemberId: memberId }, { toMemberId: memberId }] } })
+        await prisma.matrimonialPreference.deleteMany({ where: { matrimonialProfileId: p.id } })
+        await prisma.matrimonialProfile.delete({ where: { id: p.id } })
+      }
+    }
+  }
+}

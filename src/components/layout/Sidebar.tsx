@@ -6,7 +6,8 @@ import { usePathname } from 'next/navigation'
 import {
   Home, Users, Heart, Bell, Search,
   Settings, LogOut, ChevronLeft, ChevronRight,
-  Building2, Newspaper, UserCircle, ShieldCheck, Receipt, UsersRound, Sparkles, Droplet, HeartHandshake
+  Building2, Newspaper, UserCircle, ShieldCheck, Receipt, UsersRound,
+  BadgeCheck, ClipboardCheck, Activity, Landmark, Sparkles, Droplet, HeartHandshake,
 } from 'lucide-react'
 import { signOut, useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
@@ -24,12 +25,15 @@ const nav = [
   { href: '/matrimony', icon: Heart, label: 'Matrimony' },
   { href: '/assets', icon: Building2, label: 'Assets & Booking' },
   { href: '/groups', icon: UsersRound, label: 'Community Groups' },
+  { href: '/organisations', icon: Landmark, label: 'Organisations' },
+  { href: '/friends', icon: UserCircle, label: 'Friends' },
   { href: '/interest-groups', icon: Sparkles, label: 'Interest Groups' },
   { href: '/blood-donors', icon: Droplet, label: 'Blood Donors' },
   { href: '/fees', icon: Receipt, label: 'Fees' },
   { href: '/community', icon: Newspaper, label: 'Community' },
   { href: '/search', icon: Search, label: 'Search' },
   { href: '/profile', icon: UserCircle, label: 'My Profile' },
+  { href: '/verification', icon: BadgeCheck, label: 'Verification' },
   { href: '/notifications', icon: Bell, label: 'Notifications' },
 ]
 
@@ -39,12 +43,17 @@ export default function Sidebar() {
   const { data: session } = useSession()
   const isAdmin = (session?.user as any)?.roles?.includes('ADMIN')
   const isOperator = (session?.user as any)?.roles?.includes('OPERATOR')
+  // F33: the link is a convenience only — /team-directory re-checks scope server-side.
+  const hasTeamView = ['ADMIN', 'NATIONAL_TEAM', 'STATE_TEAM', 'DISTRICT_TEAM']
+    .some((r) => (session?.user as any)?.roles?.includes(r))
+  // F07: per-operator approval status is Admin and State team only.
+  const hasMonitor = ['ADMIN', 'STATE_TEAM'].some((r) => (session?.user as any)?.roles?.includes(r))
   const isTeam = ['DISTRICT_TEAM', 'STATE_TEAM', 'NATIONAL_TEAM'].some((r) => (session?.user as any)?.roles?.includes(r))
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href)
 
   return (
-    <aside className={cn('hidden md:flex flex-col bg-white border-r border-gray-100 transition-all duration-300 shadow-sm',
+    <aside className={cn('hidden md:flex print:hidden flex-col bg-white border-r border-gray-100 transition-all duration-300 shadow-sm',
       collapsed ? 'w-16' : 'w-60')}>
       <div className="h-16 flex items-center px-4 border-b border-gray-100">
         {!collapsed ? (
@@ -75,6 +84,42 @@ export default function Sidebar() {
             {!collapsed && <span className="truncate">{item.label}</span>}
           </Link>
         ))}
+        {hasTeamView && (
+          <Link href="/team-directory" title={collapsed ? 'Team Directory' : undefined}
+            className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-2',
+              isActive('/team-directory') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
+            <Users className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>Team Directory</span>}
+          </Link>
+        )}
+        {hasTeamView && (
+          <Link href="/reports" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+            isActive('/reports') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
+            <Activity className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>Reports</span>}
+          </Link>
+        )}
+        {isOperator && (
+          <Link href="/admin/verification" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+            isActive('/admin/verification') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
+            <ClipboardCheck className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>My Verification Tasks</span>}
+          </Link>
+        )}
+        {(isOperator || isAdmin) && (
+          <Link href="/admin/moderation" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+            isActive('/admin/moderation') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
+            <ShieldCheck className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>Moderation</span>}
+          </Link>
+        )}
+        {hasMonitor && (
+          <Link href="/approval-monitor" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+            isActive('/approval-monitor') ? 'bg-saffron-50 text-saffron-700 border border-saffron-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
+            <Activity className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>Approval Monitor</span>}
+          </Link>
+        )}
         {(isAdmin || isOperator || isTeam) && (
           <Link href="/community-support" title={collapsed ? 'Community Support' : undefined}
             className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',

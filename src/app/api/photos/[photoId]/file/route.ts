@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { canViewByVisibility } from '@/lib/visibility'
+import { canViewPhoto, canGetOriginal } from '@/lib/photo-access'
 import { getObject } from '@/lib/storage'
 import { getPostAccess } from '@/lib/interest-groups'
 
@@ -18,16 +18,14 @@ export async function GET(req: Request, { params }: { params: { photoId: string 
   if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
   const photo = await prisma.photo.findUnique({ where: { id: params.photoId } })
-  if (!photo || photo.status !== 'ACTIVE') {
+  if (!photo || photo.status === 'REMOVED') {
     return NextResponse.json({ message: 'Not found' }, { status: 404 })
   }
 
-  // Member photos are governed by the member's visibility setting. Asset
-  // photos belong to a listing every signed-in member can already see.
-  if (photo.memberId) {
-    if (!(await canViewByVisibility(session, photo.memberId, photo.visibility))) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
-    }
+  // F34: member, family-album and post photos each follow their own audience
+  // (photo-access.ts); a reported-and-hidden photo only its uploader and staff.
+  if (!(await canViewPhoto(session, photo))) {
+    return NextResponse.json({ message: photo.status === 'ACTIVE' ? 'Forbidden' : 'Not found' }, { status: photo.status === 'ACTIVE' ? 403 : 404 })
   }
 
   // Photos on interest-group posts are visible only inside that group.
@@ -36,7 +34,8 @@ export async function GET(req: Request, { params }: { params: { photoId: string 
   }
 
   const { searchParams } = new URL(req.url)
-  const variant = searchParams.get('variant')
+  // The original keeps camera metadata (location); others get the re-encoded copy.
+  const variant = searchParams.get('variant') === 'original' && !(await canGetOriginal(session, photo)) ? null : searchParams.get('variant')
   const key =
     (variant === 'thumbnail' ? photo.thumbnailKey : variant === 'original' ? photo.storageKey : photo.optimizedKey)
     || photo.storageKey

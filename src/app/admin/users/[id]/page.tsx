@@ -3,12 +3,19 @@ import { BASE_PATH } from '@/lib/api-path'
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, Shield, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Loader2, Shield, CheckCircle2, XCircle, AlertTriangle, MapPin } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDate } from '@/lib/utils'
 import TeamRolesPanel from '@/components/admin/TeamRolesPanel'
 
-const ROLES = ['MEMBER', 'KARTA', 'OPERATOR', 'ADMIN']
+const ROLES = ['MEMBER', 'KARTA', 'OPERATOR', 'ADMIN', 'NATIONAL_TEAM', 'DATA_EXPORT']
+// F32: roles mapped to a location. Operators and District teams take a
+// district, State teams a state (enforced again by the API).
+const SCOPED_ROLES: { code: string; label: string; areaType: 'DISTRICT' | 'STATE' }[] = [
+  { code: 'OPERATOR', label: 'Operator', areaType: 'DISTRICT' },
+  { code: 'DISTRICT_TEAM', label: 'District team', areaType: 'DISTRICT' },
+  { code: 'STATE_TEAM', label: 'State team', areaType: 'STATE' },
+]
 const STATUSES = ['ACTIVE', 'PENDING', 'SUSPENDED', 'BLOCKED']
 
 export default function UserDetailPage() {
@@ -16,12 +23,21 @@ export default function UserDetailPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [areas, setAreas] = useState<{ id: string; name: string; type: string; parent?: { name: string } | null }[]>([])
+  const [scopedRole, setScopedRole] = useState(SCOPED_ROLES[0].code)
+  const [scopedArea, setScopedArea] = useState('')
 
   useEffect(() => {
     fetch(`${BASE_PATH}/api/admin/users/${params.id}`)
       .then((r) => r.json())
       .then(setUser)
   }, [params.id])
+
+  useEffect(() => {
+    Promise.all(['DISTRICT', 'STATE'].map((t) => fetch(`${BASE_PATH}/api/admin/areas?type=${t}`).then((r) => r.json())))
+      .then((lists) => setAreas(lists.flatMap((l) => l.areas ?? [])))
+      .catch(() => setAreas([]))
+  }, [])
 
   const updateStatus = async (status: string) => {
     setIsSaving(true)
@@ -31,7 +47,7 @@ export default function UserDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       })
-      if (!res.ok) throw new Error('Update failed')
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? 'Update failed')
       setUser((u: any) => ({ ...u, status }))
       toast.success(`User status updated to ${status}`)
     } catch (e: any) {
@@ -41,16 +57,16 @@ export default function UserDetailPage() {
     }
   }
 
-  const toggleRole = async (roleCode: string) => {
-    const hasRole = user?.userRoles?.some((ur: any) => ur.role.code === roleCode)
+  const toggleRole = async (roleCode: string, areaId: string | null = null) => {
+    const hasRole = user?.userRoles?.some((ur: any) => ur.role.code === roleCode && (ur.areaId ?? null) === areaId)
     setIsSaving(true)
     try {
       const res = await fetch(`${BASE_PATH}/api/admin/users/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ toggleRole: roleCode }),
+        body: JSON.stringify({ toggleRole: roleCode, areaId }),
       })
-      if (!res.ok) throw new Error('Update failed')
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? 'Update failed')
       toast.success(hasRole ? `Role ${roleCode} removed` : `Role ${roleCode} added`)
       const updated = await fetch(`${BASE_PATH}/api/admin/users/${params.id}`).then((r) => r.json())
       setUser(updated)
@@ -72,6 +88,11 @@ export default function UserDetailPage() {
     : user.email ?? user.mobile ?? 'Unknown'
 
   const currentRoles = user.userRoles?.map((ur: any) => ur.role.code) ?? []
+  // Area-free grants drive the toggle grid; area-mapped ones are listed below it.
+  const unscopedRoles = user.userRoles?.filter((ur: any) => !ur.areaId).map((ur: any) => ur.role.code) ?? []
+  const scopedGrants = user.userRoles?.filter((ur: any) => ur.areaId) ?? []
+  const scopedType = SCOPED_ROLES.find((r) => r.code === scopedRole)!.areaType
+  const areaChoices = areas.filter((a) => a.type === scopedType)
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -89,7 +110,7 @@ export default function UserDetailPage() {
             <h2 className="text-lg font-bold text-gray-900">{memberName}</h2>
             <p className="text-gray-500 text-sm">{user.email ?? '—'} {user.mobile ? `· ${user.mobile}` : ''}</p>
             <div className="flex gap-2 mt-1">
-              {currentRoles.map((role: string) => (
+              {Array.from(new Set<string>(currentRoles)).map((role: string) => (
                 <span key={role} className={`badge text-xs ${
                   role === 'ADMIN' ? 'badge-red' : role === 'OPERATOR' ? 'badge-blue' :
                   role === 'KARTA' ? 'badge-orange' : 'badge-gray'
@@ -119,7 +140,7 @@ export default function UserDetailPage() {
         </h3>
         <div className="grid grid-cols-2 gap-2">
           {ROLES.map((role) => {
-            const has = currentRoles.includes(role)
+            const has = unscopedRoles.includes(role)
             return (
               <button
                 key={role}
@@ -135,6 +156,52 @@ export default function UserDetailPage() {
             )
           })}
         </div>
+        <p className="text-xs text-gray-500">
+          Admin and role changes are audit-logged and the user is notified. At least 2 active Admins are always kept.
+        </p>
+      </div>
+
+      <div className="card space-y-3">
+        <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+          <MapPin className="w-4 h-4" /> Location-mapped roles
+        </h3>
+        {scopedGrants.length === 0 ? (
+          <p className="text-sm text-gray-500">No district or state mappings.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {scopedGrants.map((ur: any) => (
+              <li key={ur.id} className="flex items-center justify-between py-2 text-sm">
+                <span>
+                  <span className="font-medium">{ur.role.label}</span>
+                  <span className="text-gray-500"> — {ur.area?.name ?? ur.areaId} ({ur.area?.type?.toLowerCase()})</span>
+                </span>
+                <button onClick={() => toggleRole(ur.role.code, ur.areaId)} disabled={isSaving}
+                  className="text-red-600 hover:text-red-700 text-xs font-medium">Remove</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select className="form-input sm:w-44" value={scopedRole}
+            onChange={(e) => { setScopedRole(e.target.value); setScopedArea('') }}>
+            {SCOPED_ROLES.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+          </select>
+          <select className="form-input flex-1" value={scopedArea} onChange={(e) => setScopedArea(e.target.value)}>
+            <option value="">Select {scopedType.toLowerCase()}…</option>
+            {areaChoices.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}{a.parent ? ` (${a.parent.name})` : ''}</option>
+            ))}
+          </select>
+          <button className="btn-primary" disabled={isSaving || !scopedArea}
+            onClick={() => toggleRole(scopedRole, scopedArea).then(() => setScopedArea(''))}>
+            Assign
+          </button>
+        </div>
+        {areaChoices.length === 0 && (
+          <p className="text-xs text-amber-600">
+            No {scopedType.toLowerCase()} in the location master yet — add one under <Link href="/admin/areas" className="underline">Locations</Link>.
+          </p>
+        )}
       </div>
 
       <TeamRolesPanel userId={String(params.id)} user={user} onChange={setUser} />

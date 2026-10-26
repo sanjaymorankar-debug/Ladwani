@@ -25,6 +25,8 @@ import {
   UNMARRIED_FLOW_FIELDS, BOOLEAN_FIELDS, profileDetailsToForm, addressToForm, validateProfileDetails,
   validateAddress, validateMobile, type ToggleField,
 } from '@/lib/profile-details'
+import { SOCIAL_STATUSES, INCOME_SOURCES, SERVICE_TYPES, PROFESSIONS, LEGACY_SOCIAL_STATUS, canonicalSocialStatus } from '@/lib/occupation'
+import RegistrationDetailsPanel from '@/components/profile/RegistrationDetailsPanel'
 
 const OTHER_MARITAL_STATUSES = [
   { value: 'WIDOWED', label: 'Widowed' },
@@ -68,6 +70,11 @@ const makeSchema = (savedMobile: string) => z.object({
   }),
   employmentStatus: z.string().optional(),
   occupationCategory: z.string().optional(),
+  // F02 occupation details (stored in member_profile_details).
+  occupation: z.object({
+    incomeSource: text, serviceType: text, employerName: text, occBusinessType: text, occBusinessName: text,
+    profession: text, professionOther: text,
+  }),
   biography: z.string().optional(),
   nationality: z.string().optional(),
   languages: z.string().optional(), // comma-separated in the form, sent as a list
@@ -145,7 +152,14 @@ export default function EditMemberPage() {
           mobilePrimary: data.mobilePrimary ?? '',
           email: data.email ?? '',
           maritalStatus: data.maritalStatus,
-          employmentStatus: data.employmentStatus ?? '',
+          // Older social-status values (EMPLOYED, BUSINESS…) load as their F02 equivalent.
+          employmentStatus: canonicalSocialStatus(data.employmentStatus) ?? '',
+          occupation: {
+            incomeSource: extra.details?.incomeSource ?? LEGACY_SOCIAL_STATUS[data.employmentStatus ?? '']?.source ?? '',
+            serviceType: extra.details?.serviceType ?? '', employerName: extra.details?.employerName ?? '',
+            occBusinessType: extra.details?.occBusinessType ?? '', occBusinessName: extra.details?.occBusinessName ?? '',
+            profession: extra.details?.profession ?? '', professionOther: extra.details?.professionOther ?? '',
+          },
           occupationCategory: data.occupationCategory ?? '',
           biography: data.biography ?? '',
           nationality: data.nationality ?? 'Indian',
@@ -197,7 +211,7 @@ export default function EditMemberPage() {
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
     try {
-      const { details, address: currentAddress, ...rest } = data
+      const { details, address: currentAddress, occupation, ...rest } = data
       const res = await fetch(`${BASE_PATH}/api/members/${memberId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -206,11 +220,15 @@ export default function EditMemberPage() {
           languages: (data.languages ?? '').split(',').map((l) => l.trim()).filter(Boolean),
           profileDetails: details,
           currentAddress,
+          // F02: only meaningful once a social status is chosen.
+          ...(rest.employmentStatus ? { occupation } : {}),
         }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || 'Update failed')
-      if (json.addressStatus === 'pending') {
+      if (json.pendingChange) {
+        toast('Profile saved. Your change to name / date of birth / gender is waiting for operator approval.', { icon: '🕓' })
+      } else if (json.addressStatus === 'pending') {
         toast('Profile saved. Your address change has been sent for review.', { icon: '🕓' })
       } else if (json.addressStatus === 'already_pending') {
         toast('Profile saved. An earlier address change is still awaiting review, so the new address was not submitted.', { icon: '🕓' })
@@ -500,20 +518,75 @@ export default function EditMemberPage() {
           <h3 className="font-semibold text-gray-900 border-b border-gray-100 pb-2">Employment &amp; Income</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="form-label">Employment Status</label>
+              <label className="form-label">Social Status</label>
               <select {...register('employmentStatus')} className="form-input">
                 <option value="">Not specified</option>
-                {['EMPLOYED', 'SELF_EMPLOYED', 'BUSINESS', 'PROFESSIONAL', 'STUDENT', 'RETIRED', 'NOT_EARNING'].map((s) => (
-                  <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
-                ))}
+                {SOCIAL_STATUSES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
+            {watch('employmentStatus') === 'WORKING' && (
+              <>
+                <div>
+                  <label className="form-label">Source of Income<Req /></label>
+                  <select {...register('occupation.incomeSource')} className="form-input">
+                    <option value="">Select</option>
+                    {INCOME_SOURCES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                {watch('occupation.incomeSource') === 'SERVICE' && (
+                  <>
+                    <div>
+                      <label className="form-label">Type of Service<Req /></label>
+                      <select {...register('occupation.serviceType')} className="form-input">
+                        <option value="">Select</option>
+                        {SERVICE_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Employer<Req /></label>
+                      <input {...register('occupation.employerName')} className="form-input" />
+                    </div>
+                  </>
+                )}
+                {watch('occupation.incomeSource') === 'BUSINESS' && (
+                  <>
+                    <div>
+                      <label className="form-label">Type of Business<Req /></label>
+                      <input {...register('occupation.occBusinessType')} className="form-input" />
+                    </div>
+                    <div>
+                      <label className="form-label">Business Name<Req /></label>
+                      <input {...register('occupation.occBusinessName')} className="form-input" />
+                    </div>
+                  </>
+                )}
+                {watch('occupation.incomeSource') === 'PROFESSIONAL' && (
+                  <>
+                    <div>
+                      <label className="form-label">Profession<Req /></label>
+                      <select {...register('occupation.profession')} className="form-input">
+                        <option value="">Select</option>
+                        {PROFESSIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </div>
+                    {watch('occupation.profession') === 'OTHER' && (
+                      <div>
+                        <label className="form-label">Describe the profession<Req /></label>
+                        <input {...register('occupation.professionOther')} className="form-input" />
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
             <div>
               <label className="form-label">Occupation Category</label>
               <input {...register('occupationCategory')} className="form-input" placeholder="IT, Healthcare, Business..." />
             </div>
             <div className="sm:col-span-2">
-              <label className="form-label">Annual Income <span className="text-xs text-gray-400 font-normal">(optional)</span></label>
+              <label className="form-label">Annual Income {watch('employmentStatus') === 'WORKING'
+                ? <Req />
+                : <span className="text-xs text-gray-400 font-normal">(optional)</span>} <span className="text-xs text-gray-400 font-normal">— stored as a band, never an amount</span></label>
               <select {...register('details.annualIncomeRange')} className="form-input">
                 <option value="">Not specified</option>
                 {INCOME_RANGES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -649,6 +722,7 @@ export default function EditMemberPage() {
       {/* These sections save independently — no need to hit "Save Changes" above for them. */}
       <div className="space-y-6 mt-6">
         <PhotoManager memberId={memberId} />
+        <RegistrationDetailsPanel memberId={memberId} />
         <AddressesManager memberId={memberId} types={['NATIVE']} />
         <EducationManager memberId={memberId} />
         <EmploymentManager memberId={memberId} />

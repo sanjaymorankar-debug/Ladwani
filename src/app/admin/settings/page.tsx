@@ -23,6 +23,10 @@ export default async function AdminSettingsPage() {
       icon: Users2, desc: 'Manage the master list of skills members pick from',
     },
     {
+      title: 'Convert Groups to Organisations', href: '/admin/group-conversion',
+      icon: Users2, desc: 'Copy community groups (mandals) into local organisations',
+    },
+    {
       title: 'Physical Detail Fields', href: '/admin/config/physical-fields',
       icon: Settings, desc: 'Choose which optional physical fields members are asked for',
     },

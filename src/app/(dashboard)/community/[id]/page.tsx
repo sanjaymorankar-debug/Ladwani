@@ -6,24 +6,25 @@ import Link from 'next/link'
 import { ArrowLeft, Heart, MessageSquare, Share2, Send } from 'lucide-react'
 import { timeAgo, getInitials } from '@/lib/utils'
 import CommentSection from './CommentSection'
+import { canViewPost, AUTHOR_SELECT } from '@/lib/posts'
 
 export default async function PostDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session) return null
 
   const post = await prisma.post.findUnique({
-    where: { id: params.id, status: 'PUBLISHED', deletedAt: null, groupId: null },
+    where: { id: params.id, deletedAt: null, groupId: null }, // interest-group posts stay inside their group
     include: {
-      author: { include: { member: { select: { id: true, firstName: true, lastName: true } } } },
+      author: AUTHOR_SELECT,
       postType: { select: { label: true, icon: true } },
       comments: {
         where: { status: 'ACTIVE', deletedAt: null, parentId: null },
         include: {
-          author: { include: { member: { select: { firstName: true, lastName: true } } } },
+          author: AUTHOR_SELECT,
           replies: {
             where: { status: 'ACTIVE', deletedAt: null },
             include: {
-              author: { include: { member: { select: { firstName: true, lastName: true } } } },
+              author: AUTHOR_SELECT,
             },
             orderBy: { createdAt: 'asc' },
             take: 5,
@@ -36,11 +37,12 @@ export default async function PostDetailPage({ params }: { params: { id: string 
     },
   })
 
-  if (!post) notFound()
+  // F36: the post's audience (and its author / moderators) only.
+  if (!post || !(await canViewPost(session, post))) notFound()
 
   const authorName = post.author.member
     ? `${post.author.member.firstName} ${post.author.member.lastName ?? ''}`
-    : post.author.email ?? 'Member'
+    : 'Member'
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">

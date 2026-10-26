@@ -21,6 +21,7 @@ export default function ApprovalDetailPage() {
   }, [params.id])
 
   const act = async (action: string) => {
+    if ((action === 'reject' || action === 'return') && !note.trim()) return toast.error('Give the reason in the note')
     setIsLoading(action)
     try {
       const res = await fetch(`${BASE_PATH}/api/approvals/${params.id}`, {
@@ -117,6 +118,12 @@ export default function ApprovalDetailPage() {
                 </div>
               )}
             </div>
+            {approval.actionCode === 'member.mark_deceased' && approval.newValue?.certificateKey && (
+              <a href={`${BASE_PATH}/api/members/${approval.entityId}/death-certificate?approvalId=${approval.id}`} target="_blank" rel="noopener noreferrer"
+                className="text-sm text-saffron-600 hover:underline inline-flex items-center gap-1">
+                View death certificate <ArrowUpRight className="w-3.5 h-3.5" />
+              </a>
+            )}
           </div>
         )}
       </div>
@@ -125,7 +132,7 @@ export default function ApprovalDetailPage() {
         <div className="card space-y-4">
           <h3 className="font-semibold text-gray-900">Review Action</h3>
           <div>
-            <label className="form-label">Note / Reason (optional)</label>
+            <label className="form-label">Note / Reason (required to reject or send back)</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
