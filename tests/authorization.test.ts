@@ -183,12 +183,22 @@ describe('Admin: full access', () => {
   })
 
   it('can view and edit any member', async () => {
-    mockSessionAs({ id: fx.adminUser.id, roles: ['ADMIN'], memberId: null, status: 'ACTIVE' })
-    const res = await patchMember(
-      req('http://x/api/members/x', { method: 'PATCH', body: JSON.stringify({ firstName: 'AdminEdited' }) }),
-      { params: { id: fx.memberUser.memberId } }
-    )
-    expect(res.status).toBe(200)
+    // Put the name back afterwards: "can edit their own profile" re-sends
+    // firstName 'Test', which must stay a no-op. Left as 'AdminEdited', the
+    // next run turns that into a pending F08 change request, and the run
+    // after that gets 409 "already awaiting approval".
+    const { firstName } = await prisma.member.findUniqueOrThrow({ where: { id: fx.memberUser.memberId }, select: { firstName: true } })
+    try {
+      mockSessionAs({ id: fx.adminUser.id, roles: ['ADMIN'], memberId: null, status: 'ACTIVE' })
+      const res = await patchMember(
+        req('http://x/api/members/x', { method: 'PATCH', body: JSON.stringify({ firstName: 'AdminEdited' }) }),
+        { params: { id: fx.memberUser.memberId } }
+      )
+      expect(res.status).toBe(200)
+      expect((await prisma.member.findUniqueOrThrow({ where: { id: fx.memberUser.memberId } })).firstName).toBe('AdminEdited')
+    } finally {
+      await prisma.member.update({ where: { id: fx.memberUser.memberId }, data: { firstName } })
+    }
   })
 
   it('can add a member to any family', async () => {
