@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import Link from 'next/link'
 import { isActiveAdmin } from '@/lib/scope'
 import { getTeamScope } from '@/lib/additional-details/access'
 import { groupReport, supportReport } from '@/lib/community-connect'
@@ -115,14 +116,12 @@ export default async function AdminDashboardPage() {
           <div className="space-y-2">
             {[
               { href: '/admin/approvals', label: 'Review Approvals' },
-              { href: '/admin/families', label: 'Manage Families' },
-              { href: '/admin/members', label: 'Manage Members' },
-              { href: '/admin/posts', label: 'Moderate Posts' },
+              { href: '/admin/moderation', label: 'Review Reported Content' },
             ].map((a) => (
-              <a key={a.href} href={a.href} className="flex items-center justify-between text-sm py-2 text-saffron-600 hover:text-saffron-700 border-b border-gray-50 last:border-0">
+              <Link key={a.href} href={a.href} className="flex items-center justify-between text-sm py-2 text-saffron-600 hover:text-saffron-700 border-b border-gray-50 last:border-0">
                 {a.label}
                 <span>→</span>
-              </a>
+              </Link>
             ))}
           </div>
         </div>
@@ -135,7 +134,6 @@ export default async function AdminDashboardPage() {
             <div className="space-y-2">
               {[
                 { href: '/admin/users', label: 'User Management' },
-                { href: '/admin/roles', label: 'Roles & Permissions' },
                 { href: '/admin/audit-logs', label: 'Audit Logs' },
                 { href: '/admin/data-requests', label: 'Data Requests & Consents' },
                 { href: '/reports', label: 'Reports' },
@@ -143,10 +141,10 @@ export default async function AdminDashboardPage() {
                 { href: '/admin/config/options', label: 'Additional Details Dropdowns' },
                 { href: '/admin/settings', label: 'System Settings' },
               ].map((a) => (
-                <a key={a.href} href={a.href} className="flex items-center justify-between text-sm py-2 text-blue-600 hover:text-blue-700 border-b border-gray-50 last:border-0">
+                <Link key={a.href} href={a.href} className="flex items-center justify-between text-sm py-2 text-blue-600 hover:text-blue-700 border-b border-gray-50 last:border-0">
                   {a.label}
                   <span>→</span>
-                </a>
+                </Link>
               ))}
             </div>
           </div>
