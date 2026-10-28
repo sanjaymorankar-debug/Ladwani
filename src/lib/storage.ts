@@ -147,6 +147,16 @@ export async function validatePhotoUpload(file: File): Promise<ValidatedUpload> 
   const detected = meta.format === 'jpeg' ? 'image/jpeg' : meta.format === 'png' ? 'image/png' : meta.format === 'webp' ? 'image/webp' : null
   if (!detected) throw new Error('Only JPEG, PNG or WEBP images are allowed.')
 
+  // metadata() reads only the header, so a file whose image data is cut short
+  // or corrupt gets this far and would only fail later, while uploadPhoto
+  // resizes it, as an unhandled error (a 500). Decoding a small copy here makes
+  // it an ordinary validation error instead.
+  try {
+    await sharp(buffer, { limitInputPixels: 40_000_000 }).resize(64, 64, { fit: 'inside' }).toBuffer()
+  } catch {
+    throw new Error('That file is not a readable image.')
+  }
+
   return { buffer, mimeType: detected, width: meta.width, height: meta.height }
 }
 

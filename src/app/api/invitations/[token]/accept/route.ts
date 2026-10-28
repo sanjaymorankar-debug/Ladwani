@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
   const parsed = claimInvitationSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
-      { message: parsed.error.errors[0]?.message ?? 'Invalid details', errors: parsed.error.flatten() },
+      { message: parsed.error.issues[0]?.message ?? 'Invalid details', errors: parsed.error.flatten() },
       { status: 400 }
     )
   }

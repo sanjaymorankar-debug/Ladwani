@@ -66,7 +66,7 @@ const makeSchema = (savedMobile: string) => z.object({
   mobilePrimary: z.string().optional(),
   email: z.string().email('Enter a valid email address').optional().or(z.literal('')),
   maritalStatus: z.enum(['UNMARRIED', 'MARRIED', 'WIDOWED', 'DIVORCED', 'SEPARATED', 'NOT_STATED'], {
-    errorMap: () => ({ message: 'Marital status is required' }),
+    error: 'Marital status is required',
   }),
   employmentStatus: z.string().optional(),
   occupationCategory: z.string().optional(),
@@ -120,7 +120,7 @@ export default function EditMemberPage() {
   }, [])
 
   const schema = useMemo(() => makeSchema(savedMobile), [savedMobile])
-  const { register, handleSubmit, reset, watch, setValue, formState: { errors, isDirty } } = useForm<FormData>({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors, isDirty } } = useForm<z.input<ReturnType<typeof makeSchema>>, unknown, FormData>({
     resolver: zodResolver(schema),
   })
 

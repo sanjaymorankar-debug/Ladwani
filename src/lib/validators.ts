@@ -43,10 +43,10 @@ export const registerSchema = z.object({
   // sign-up unless switched off (see registrationRequiresMobile).
   email: z.string().min(1, 'Email address is required').email('Invalid email address'),
   mobile: registrationRequiresMobile
-    ? z.string({ required_error: 'Mobile number is required' }).regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number')
+    ? z.string({ error: (iss) => (iss.input === undefined ? 'Mobile number is required' : undefined) }).regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number')
     : z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number').optional().or(z.literal('')),
   // F01: gender, date of birth and Mul Gaon are captured at sign-up.
-  gender: z.enum(['MALE', 'FEMALE', 'OTHER'], { errorMap: () => ({ message: 'Select your gender' }) }),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER'], { error: 'Select your gender' }),
   dateOfBirth: z.string().min(1, 'Date of birth is required')
     .refine((v) => !Number.isNaN(new Date(v).getTime()) && new Date(v) <= new Date(), 'Enter a valid date of birth in the past')
     .refine((v) => ageOn(new Date(v)) >= 18, 'You must be 18 or older to register yourself. Younger members are added by their Karta.'),
@@ -54,10 +54,10 @@ export const registerSchema = z.object({
   password: passwordSchema,
   confirmPassword: z.string(),
   joinIntent: z.enum(['KARTA', 'JOIN_EXISTING'], {
-    errorMap: () => ({ message: 'Please choose how you want to join the community' }),
+    error: 'Please choose how you want to join the community',
   }),
   consentAccepted: z.literal(true, {
-    errorMap: () => ({ message: 'You must accept the terms to register' }),
+    error: 'You must accept the terms to register',
   }),
 }).refine((d) => d.password === d.confirmPassword, {
   message: 'Passwords do not match',

@@ -56,7 +56,7 @@ function FamilySetup() {
   const [mulGaonAreaId, setMulGaonAreaId] = useState('')
   const [duplicates, setDuplicates] = useState<any[] | null>(null)
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, formState: { errors } } = useForm<z.input<typeof schema>, unknown, FormData>({
     resolver: zodResolver(schema),
     defaultValues: { nativeCountry: 'India' },
   })
