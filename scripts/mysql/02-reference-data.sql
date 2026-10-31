@@ -37,7 +37,7 @@
 
 LOCK TABLES `_prisma_migrations` WRITE;
 /*!40000 ALTER TABLE `_prisma_migrations` DISABLE KEYS */;
-INSERT INTO `_prisma_migrations` (`id`, `checksum`, `finished_at`, `migration_name`, `logs`, `rolled_back_at`, `started_at`, `applied_steps_count`) VALUES ('105fdd6e-a06b-4c50-b29c-c65959c918bb','c82675ee4126d590035b047acd84502263f41828cbe5b8711bc3436e1e302f9b','2026-09-11 15:32:05.379','20260911150000_member_invitations_and_join_direction',NULL,NULL,'2026-09-11 15:32:05.267',1),('a6e63255-87ae-4703-9655-3de43ffabbdc','584c8fab176b065f3aedbdf8d0012d17cbc1ab48026c15c30caeaf85f667372d','2026-09-11 15:32:05.158','20260910163143_init',NULL,NULL,'2026-09-11 15:32:01.408',1);
+INSERT INTO `_prisma_migrations` (`id`, `checksum`, `finished_at`, `migration_name`, `logs`, `rolled_back_at`, `started_at`, `applied_steps_count`) VALUES ('105fdd6e-a06b-4c50-b29c-c65959c918bb','c82675ee4126d590035b047acd84502263f41828cbe5b8711bc3436e1e302f9b','2026-09-11 15:32:05.379','20260911150000_member_invitations_and_join_direction',NULL,NULL,'2026-09-11 15:32:05.267',1),('a6e63255-87ae-4703-9655-3de43ffabbdc','584c8fab176b065f3aedbdf8d0012d17cbc1ab48026c15c30caeaf85f667372d','2026-09-11 15:32:05.158','20260910163143_init',NULL,NULL,'2026-09-11 15:32:01.408',1),('d1c6a3f0-5b7e-4c9a-9e2f-22f0a1b3c4d5','fffd6c37b011057af75ad5b74eeb71457870ed5fea7095a1529a53972fbb1b2a','2026-09-22 12:00:01.000','20260922120000_member_languages',NULL,NULL,'2026-09-22 12:00:00.000',1);
 /*!40000 ALTER TABLE `_prisma_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 

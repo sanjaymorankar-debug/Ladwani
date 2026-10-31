@@ -960,6 +960,7 @@ CREATE TABLE `members` (
   `createdBy` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `updatedBy` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `deletedAt` datetime(3) DEFAULT NULL,
+  `languages` json DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `members_memberNumber_key` (`memberNumber`),
   UNIQUE KEY `members_userId_key` (`userId`),
